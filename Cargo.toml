@@ -1,0 +1,10 @@
+[package]
+name = "fast-umap"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+burn = { version = "~0.15", features = ["train", "wgpu"] }
+ndarray = "0.16.1"
+rand = "0.8.5"
+serde = "1.0.216"
