@@ -1,7 +1,4 @@
-use burn::{
-    optim::{AdamConfig, GradientsParams, Optimizer},
-    tensor::{backend::AutodiffBackend, Device, Tensor},
-};
+use burn::tensor::{backend::AutodiffBackend, Tensor};
 
 /// Compute pairwise Euclidean distance matrix
 fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
