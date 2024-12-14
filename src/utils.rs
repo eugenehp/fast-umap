@@ -2,7 +2,7 @@ use burn::{
     prelude::Backend,
     tensor::{Device, Tensor, TensorData},
 };
-use prettytable::{cell, row, Table};
+use prettytable::{row, Table};
 use rand::Rng;
 
 // Define the function to generate random data in the format `Vec<Tensor<B, 2>>`.
@@ -31,7 +31,10 @@ pub fn load_test_data<B: Backend>(
     result
 }
 
-pub fn print_tensor<B: Backend>(tensors: &Vec<Tensor<B, 2>>) {
+pub fn print_tensor<B: Backend>(title: Option<&str>, tensors: &Vec<Tensor<B, 2>>) {
+    if let Some(title) = title {
+        println!("{title}")
+    }
     let mut table = Table::new();
     table.add_row(row!["Index", "Tensor"]);
     tensors

@@ -17,13 +17,14 @@ fn main() {
 
     let device = burn::backend::wgpu::WgpuDevice::default();
 
-    let batch_size = 10;
-    let num_samples = 100;
+    let batch_size = 1;
+    let num_samples = 10;
     let num_features = 3;
     let output_size = 2;
 
     let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
-    // print_tensor(&train_data);
+
+    print_tensor(Some("Generated data"), &train_data);
 
     let model_config = UMAPModelConfigBuilder::default()
         .input_size(num_features)

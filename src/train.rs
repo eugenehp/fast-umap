@@ -3,7 +3,7 @@ use burn::{
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
 
-use crate::{loss::umap_loss, model::UMAPModel};
+use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -99,11 +99,22 @@ pub fn train<B: AutodiffBackend>(
         println!("n_features - {n_features}");
         let mut total_loss = Tensor::<B, 2>::zeros([n_features, n_features], &config.device); // Initialize total_loss as scalar
 
+        // print_tensor(&vec![total_loss.clone()]);
+
         // Loop over batches of input data
         for (iteration, batch) in train_data.chunks(config.batch_size).enumerate() {
+            print_tensor(Some("batch"), &batch.to_vec());
             for input_tensor in batch {
+                print_tensor(Some("Input tensor"), &vec![input_tensor.clone()]);
+
                 // Forward pass to get the low-dimensional (local) representation
                 let local = model.forward(input_tensor.clone());
+                print_tensor(Some("local"), &vec![local.clone()]);
+
+                print_tensor(
+                    Some("umap loss"),
+                    &vec![input_tensor.clone(), local.clone()],
+                );
 
                 // Compute the UMAP loss by comparing the pairwise distances
                 let loss = umap_loss(input_tensor, &local);
