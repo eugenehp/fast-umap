@@ -82,7 +82,7 @@ pub fn chart<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
     let config = config.unwrap_or(ChartConfig::default());
 
     type Float = f64;
-    let data = convert_tensor_to_vector::<B, Float>(data);
+    let data: Vec<Vec<Float>> = convert_tensor_to_vector(data);
 
     // Create a drawing area with a size of 800x600 pixels
     let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();

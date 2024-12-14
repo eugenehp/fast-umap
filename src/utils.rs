@@ -71,9 +71,11 @@ pub fn print_tensor_with_title<B: Backend, const D: usize>(
 pub fn convert_tensor_to_vector<B: Backend, F>(data: Tensor<B, 2>) -> Vec<Vec<F>>
 where
     F: From<f32> + From<f64>, // Ensure that F can be constructed from f32
+                              // f32: From<F>,
+                              // f64: From<F>,
 {
     let n_components = data.dims()[1]; // usually 2 dimensional
-    let data = data.to_data().to_vec::<f32>().unwrap();
+    let data = data.to_data().to_vec::<f64>().unwrap();
     let data: Vec<Vec<F>> = data
         .chunks(n_components)
         .map(|chunk| {
