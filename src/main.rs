@@ -18,8 +18,8 @@ fn main() {
     let device = burn::backend::wgpu::WgpuDevice::default();
 
     let batch_size = 1;
-    let num_samples = 10;
-    let num_features = 3;
+    let num_samples = 100;
+    let num_features = 10;
     let output_size = 2;
     let hidden_size = 100;
     let learning_rate = 0.001;
