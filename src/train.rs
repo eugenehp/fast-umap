@@ -3,7 +3,7 @@ use burn::{
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
 
-use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor};
+use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor_with_title};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -101,17 +101,21 @@ pub fn train<B: AutodiffBackend>(
 
         // print_tensor(&vec![total_loss.clone()]);
 
-        print_tensor(Some("Input tensor"), &data);
+        print_tensor_with_title(Some("Input tensor"), &data);
 
         // Forward pass to get the low-dimensional (local) representation
         let local = model.forward(data.clone());
-        print_tensor(Some("local"), &local);
+        print_tensor_with_title(Some("local"), &local);
 
         // Compute the UMAP loss by comparing the pairwise distances
         let loss = umap_loss(&data, &local);
 
+        print_tensor_with_title(Some("loss"), &loss);
+
         // Backward pass: Compute gradients
         loss.backward();
+
+        println!("After backwards");
 
         // Log training progress
         println!(

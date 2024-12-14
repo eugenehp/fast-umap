@@ -8,7 +8,7 @@ use burn::{
 use fast_umap::{
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
-    utils::{load_test_data, print_tensor},
+    utils::{load_test_data, print_tensor_with_title},
 };
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
 
     let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
 
-    print_tensor(Some("Generated data"), &train_data);
+    print_tensor_with_title(Some("Generated data"), &train_data);
 
     let model_config = UMAPModelConfigBuilder::default()
         .input_size(num_features)

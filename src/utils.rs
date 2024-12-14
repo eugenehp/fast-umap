@@ -25,14 +25,9 @@ pub fn load_test_data<B: Backend>(
 
     tensor
 }
-
-pub fn print_tensor<B: Backend>(title: Option<&str>, data: &Tensor<B, 2>) {
-    if let Some(title) = title {
-        println!("{title}")
-    }
-
+pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
     let n_samples = data.dims()[0];
-    let _n_features = data.dims()[1];
+    // let _n_features = data.dims()[1];
 
     let mut table = Table::new();
     table.add_row(row!["Index", "Tensor"]);
@@ -45,4 +40,15 @@ pub fn print_tensor<B: Backend>(title: Option<&str>, data: &Tensor<B, 2>) {
     }
 
     table.printstd();
+}
+
+pub fn print_tensor_with_title<B: Backend, const D: usize>(
+    title: Option<&str>,
+    data: &Tensor<B, D>,
+) {
+    if let Some(title) = title {
+        println!("{title}")
+    }
+
+    print_tensor(data);
 }
