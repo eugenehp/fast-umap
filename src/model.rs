@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct UMAPModel<B: Backend> {
     linear1: Linear<B>,
     linear2: Linear<B>,
+    linear3: Linear<B>,
+    linear4: Linear<B>,
     activation: Relu,
 }
 
@@ -14,9 +16,11 @@ impl<B: Backend> UMAPModel<B> {
     pub fn new(config: &UMAPModelConfig, device: &Device<B>) -> Self {
         // Initialize the first linear layer with the input size and hidden size
         let linear1 = LinearConfig::new(config.input_size, config.hidden_size).init(device);
+        let linear2 = LinearConfig::new(config.hidden_size, config.hidden_size).init(device);
+        let linear3 = LinearConfig::new(config.hidden_size, config.hidden_size).init(device);
 
         // Initialize the second linear layer with the hidden size and output size
-        let linear2 = LinearConfig::new(config.hidden_size, config.output_size).init(device);
+        let linear4 = LinearConfig::new(config.hidden_size, config.output_size).init(device);
 
         // Initialize ReLU activation function
         let activation = Relu::new();
@@ -25,6 +29,8 @@ impl<B: Backend> UMAPModel<B> {
         UMAPModel {
             linear1,
             linear2,
+            linear3,
+            linear4,
             activation,
         }
     }
@@ -34,6 +40,10 @@ impl<B: Backend> UMAPModel<B> {
         let x = self.linear1.forward(input); // First linear transformation
         let x = self.activation.forward(x); // Apply ReLU
         let x = self.linear2.forward(x); // Second linear transformation
+        let x = self.activation.forward(x); // Apply ReLU
+        let x = self.linear3.forward(x); // Third linear transformation
+        let x = self.activation.forward(x); // Apply ReLU
+        let x = self.linear4.forward(x); // Fourth linear transformation
         x
     }
 
