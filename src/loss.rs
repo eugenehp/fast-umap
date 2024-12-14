@@ -3,7 +3,7 @@ use burn::tensor::{backend::AutodiffBackend, Tensor};
 #[allow(unused)]
 use crate::utils::print_tensor_with_title;
 
-pub fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
+fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
     let _n_features = x.dims()[1]; // Number of features (columns)
 

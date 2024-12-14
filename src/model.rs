@@ -1,11 +1,12 @@
 use burn::prelude::*;
-use nn::{Linear, LinearConfig, Relu};
+use nn::{Dropout, DropoutConfig, Linear, LinearConfig, Relu};
 use serde::{Deserialize, Serialize};
 
 #[derive(Module, Debug)]
 pub struct UMAPModel<B: Backend> {
     linear1: Linear<B>,
     linear2: Linear<B>,
+
     activation: Relu,
 }
 

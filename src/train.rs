@@ -1,14 +1,9 @@
 use burn::{
-    nn::loss::MseLoss,
-    optim::{AdamConfig, GradientsAccumulator, GradientsParams, Optimizer},
+    optim::{AdamConfig, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
 
-use crate::{
-    loss::{pairwise_distance, umap_loss},
-    model::UMAPModel,
-    utils::print_tensor_with_title,
-};
+use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor_with_title};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -95,7 +90,7 @@ pub fn train<B: AutodiffBackend>(
 ) {
     let config_optimizer = AdamConfig::new();
     let mut optim = config_optimizer.init();
-    let mut accumulator = GradientsAccumulator::new();
+    // let mut accumulator = GradientsAccumulator::new();
 
     let dims = data.dims();
     let n_samples = dims[0];
@@ -117,20 +112,15 @@ pub fn train<B: AutodiffBackend>(
         // print_tensor_with_title(Some("loss"), &loss);
 
         // Gradients for the current backward pass
-        let grads = loss.backward(); // does not work
-
-        // let grads = local.backward(); // works
+        let grads = loss.backward();
 
         // Gradients linked to each parameter of the model.
         let grads = GradientsParams::from_grads(grads, &model);
-
-        accumulator.accumulate(&model, grads);
-        let grads = accumulator.grads();
 
         // Update model parameters using the optimizer
         optim.step(config.learning_rate, model.clone(), grads);
 
         // Log the average loss for the epoch
-        println!("Epoch {}: Loss = {:.3}", epoch, loss.into_scalar());
+        println!("Epoch {}:\tLoss = {:.3}", epoch, loss.into_scalar());
     }
 }

@@ -21,6 +21,7 @@ fn main() {
     let num_samples = 10;
     let num_features = 3;
     let output_size = 2;
+    let hidden_size = 100;
 
     let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
 
@@ -28,12 +29,13 @@ fn main() {
 
     let model_config = UMAPModelConfigBuilder::default()
         .input_size(num_features)
-        .hidden_size(100)
+        .hidden_size(hidden_size)
         .output_size(output_size)
         .build()
         .unwrap();
 
     let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
+    println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
         .epochs(100)
