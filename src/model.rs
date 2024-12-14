@@ -1,12 +1,11 @@
 use burn::prelude::*;
-use nn::{Dropout, DropoutConfig, Linear, LinearConfig, Relu};
+use nn::{Linear, LinearConfig, Relu};
 use serde::{Deserialize, Serialize};
 
 #[derive(Module, Debug)]
 pub struct UMAPModel<B: Backend> {
     linear1: Linear<B>,
     linear2: Linear<B>,
-
     activation: Relu,
 }
 
@@ -36,6 +35,30 @@ impl<B: Backend> UMAPModel<B> {
         let x = self.activation.forward(x); // Apply ReLU
         let x = self.linear2.forward(x); // Second linear transformation
         x
+    }
+
+    pub fn debug(&self) {
+        println!(
+            "linear2: weight={:?}",
+            self.linear2
+                .weight
+                .to_data()
+                .to_vec::<f32>()
+                .unwrap()
+                .as_slice()[0..2]
+                .to_vec(),
+        );
+        println!(
+            "linear2: bias={:?}",
+            self.linear2
+                .bias
+                .clone()
+                .unwrap()
+                .to_data()
+                .to_vec::<f32>()
+                .unwrap()[0..2]
+                .to_vec()
+        );
     }
 }
 

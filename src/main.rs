@@ -22,6 +22,8 @@ fn main() {
     let num_features = 3;
     let output_size = 2;
     let hidden_size = 100;
+    let learning_rate = 0.001;
+    let epochs = 100;
 
     let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
 
@@ -38,9 +40,9 @@ fn main() {
     println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
-        .epochs(100)
+        .epochs(epochs)
         .batch_size(batch_size)
-        .learning_rate(0.001)
+        .learning_rate(learning_rate)
         .device(device)
         .beta1(0.9)
         .beta2(0.999)

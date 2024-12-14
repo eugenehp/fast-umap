@@ -1,4 +1,5 @@
 use burn::{
+    module::AutodiffModule,
     optim::{AdamConfig, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
@@ -122,5 +123,7 @@ pub fn train<B: AutodiffBackend>(
 
         // Log the average loss for the epoch
         println!("Epoch {}:\tLoss = {:.3}", epoch, loss.into_scalar());
+
+        model.debug();
     }
 }
