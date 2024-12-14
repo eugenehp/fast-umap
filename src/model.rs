@@ -1,4 +1,4 @@
-use burn::prelude::*;
+use burn::{prelude::*, tensor::backend::AutodiffBackend};
 use nn::{Linear, LinearConfig, Relu};
 use serde::{Deserialize, Serialize};
 

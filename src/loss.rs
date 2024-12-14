@@ -26,8 +26,8 @@ fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
     // );
     // Use `flatten()` to convert the upper triangular part (excluding the diagonal) into a 1D tensor
     let pairwise_distances = pairwise_squared_distances.triu(0); // Extract the upper triangular part (without diagonal)
-                                                                 // print_tensor_with_title(Some("pairwise_distances"), &pairwise_distances);
 
+    // print_tensor_with_title(Some("pairwise_distances"), &pairwise_distances);
     // Extract the first column (distances from the first sample to all others)
     let distances = pairwise_distances
         .slice([0..n_samples, 0..1])
@@ -49,8 +49,15 @@ pub fn umap_loss<B: AutodiffBackend>(
     let local_distances = pairwise_distance(local);
     // print_tensor_with_title(Some("local_distances"), &local_distances);
 
+    // we have to add these to prevent "attempt to subtract with overflow" error
+    let max_distance = 1e6; // A reasonable upper bound
+    let safe_global_distances = global_distances.clamp(0.0, max_distance);
+    let safe_local_distances = local_distances.clamp(0.0, max_distance);
+
     // Compute the loss as the Frobenius norm (L2 loss) between the pairwise distance matrices
-    let difference = (global_distances - local_distances).powi_scalar(2).sum();
+    let difference = (safe_global_distances - safe_local_distances)
+        .powi_scalar(2)
+        .sum();
     print_tensor_with_title(Some("difference"), &difference);
 
     let difference: Tensor<B, 0> = difference.squeeze(0);

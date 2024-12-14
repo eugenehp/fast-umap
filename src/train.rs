@@ -1,5 +1,5 @@
 use burn::{
-    optim::{AdamConfig, GradientsParams, Optimizer},
+    optim::{AdamConfig, GradientsAccumulator, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
 
@@ -88,16 +88,14 @@ pub fn train<B: AutodiffBackend>(
     data: Tensor<B, 2>,
     config: &TrainingConfig<B>,
 ) {
-    let learning_rate: f64 = 0.001;
     let config_optimizer = AdamConfig::new();
-    // Initialize an optimizer, e.g., Adam with a learning rate
     let mut optim = config_optimizer.init();
+    let mut accumulator = GradientsAccumulator::new();
 
     for epoch in 0..config.epochs {
         let n_samples = data.dims()[0];
         let n_features = data.dims()[1];
-        println!("n_features - {n_features}, n_samples - {n_samples}");
-        let mut total_loss = Tensor::<B, 2>::zeros([n_features, n_features], &config.device); // Initialize total_loss as scalar
+        println!("epoch - {epoch}, n_features - {n_features}, n_samples - {n_samples}");
 
         // print_tensor(&vec![total_loss.clone()]);
 
@@ -114,19 +112,17 @@ pub fn train<B: AutodiffBackend>(
 
         // Gradients for the current backward pass
         let grads = loss.backward();
+
         // Gradients linked to each parameter of the model.
         let grads = GradientsParams::from_grads(grads, &model);
-        // Update model parameters using the optimizer
-        optim.step(learning_rate, model.clone(), grads);
 
-        // Accumulate the loss for this epoch
-        total_loss = total_loss.add(loss.unsqueeze());
+        accumulator.accumulate(&model, grads);
+        let grads = accumulator.grads();
+
+        // Update model parameters using the optimizer
+        optim.step(config.learning_rate, model.clone(), grads);
 
         // Log the average loss for the epoch
-        println!(
-            "Epoch {}: Loss = {:.3}",
-            epoch,
-            total_loss.clone().into_scalar()
-        );
+        println!("Epoch {}: Loss = {:.3}", epoch, loss.into_scalar());
     }
 }
