@@ -1,4 +1,4 @@
-mod distance;
-mod loss;
-mod model;
-mod train;
+pub mod distance;
+pub mod loss;
+pub mod model;
+pub mod train;

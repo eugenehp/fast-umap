@@ -1,5 +1,5 @@
 use burn::prelude::*;
-use nn::{Linear, Relu};
+use nn::{Linear, LinearConfig, Relu};
 use serde::{Deserialize, Serialize};
 
 #[derive(Module, Debug)]
@@ -10,18 +10,30 @@ pub struct UMAPModel<B: Backend> {
 }
 
 impl<B: Backend> UMAPModel<B> {
+    /// Create a new instance of UMAPModel from a given configuration
+    pub fn new(config: &UMAPModelConfig, device: &Device<B>) -> Self {
+        // Initialize the first linear layer with the input size and hidden size
+        let linear1 = LinearConfig::new(config.input_size, config.hidden_size).init(device);
+
+        // Initialize the second linear layer with the hidden size and output size
+        let linear2 = LinearConfig::new(config.hidden_size, config.output_size).init(device);
+
+        // Initialize ReLU activation function
+        let activation = Relu::new();
+
+        // Return the UMAPModel with the initialized layers
+        UMAPModel {
+            linear1,
+            linear2,
+            activation,
+        }
+    }
+
     /// Forward pass: Pass the input through the model layers
     pub fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
-        // Pass input through the first linear layer
-        let x = self.linear1.forward(input);
-
-        // Apply ReLU activation
-        let x = self.activation.forward(x);
-
-        // Pass through the second linear layer
-        let x = self.linear2.forward(x);
-
-        // Return the final output
+        let x = self.linear1.forward(input); // First linear transformation
+        let x = self.activation.forward(x); // Apply ReLU
+        let x = self.linear2.forward(x); // Second linear transformation
         x
     }
 }
