@@ -1,5 +1,4 @@
 use burn::{
-    module::AutodiffModule,
     optim::{AdamConfig, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
@@ -85,13 +84,12 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
 
 /// Train the UMAP model over multiple epochs
 pub fn train<B: AutodiffBackend>(
-    model: UMAPModel<B>,
+    model: &mut UMAPModel<B>,
     data: Tensor<B, 2>,
     config: &TrainingConfig<B>,
 ) {
     let config_optimizer = AdamConfig::new();
     let mut optim = config_optimizer.init();
-    // let mut accumulator = GradientsAccumulator::new();
 
     let dims = data.dims();
     let n_samples = dims[0];
@@ -116,7 +114,7 @@ pub fn train<B: AutodiffBackend>(
         let grads = loss.backward();
 
         // Gradients linked to each parameter of the model.
-        let grads = GradientsParams::from_grads(grads, &model);
+        let grads = GradientsParams::from_grads(grads, model);
 
         // Update model parameters using the optimizer
         optim.step(config.learning_rate, model.clone(), grads);

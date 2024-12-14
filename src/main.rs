@@ -25,6 +25,8 @@ fn main() {
     let learning_rate = 0.001;
     let epochs = 100;
 
+    MyBackend::seed(9999);
+
     let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
 
     print_tensor_with_title(Some("Generated data"), &train_data);
@@ -36,7 +38,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
+    let mut model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
     println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
@@ -50,5 +52,5 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training with the configured parameters
-    train::<MyAutodiffBackend>(model, train_data, &config);
+    train::<MyAutodiffBackend>(&mut model, train_data, &config);
 }
