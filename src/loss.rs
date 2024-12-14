@@ -1,5 +1,6 @@
 use burn::tensor::{backend::AutodiffBackend, Tensor};
 
+#[allow(unused)]
 use crate::utils::print_tensor_with_title;
 
 fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
@@ -19,20 +20,19 @@ fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
     // Sum across the feature dimension (axis 2), producing a shape of (n_samples, n_samples)
     let pairwise_squared_distances = squared_diff.sum_dim(2); // Sum across the feature dimension
 
-    print_tensor_with_title(
-        Some("pairwise_squared_distances"),
-        &pairwise_squared_distances,
-    );
+    // print_tensor_with_title(
+    //     Some("pairwise_squared_distances"),
+    //     &pairwise_squared_distances,
+    // );
     // Use `flatten()` to convert the upper triangular part (excluding the diagonal) into a 1D tensor
     let pairwise_distances = pairwise_squared_distances.triu(0); // Extract the upper triangular part (without diagonal)
-    print_tensor_with_title(Some("pairwise_distances"), &pairwise_distances);
-    // let flattened_distances = pairwise_distances.flatten(0, 1); // Flatten the tensor to a 1D vector
+                                                                 // print_tensor_with_title(Some("pairwise_distances"), &pairwise_distances);
 
     // Extract the first column (distances from the first sample to all others)
     let distances = pairwise_distances
         .slice([0.._n_samples, 0..1])
         .reshape([_n_samples]);
-    print_tensor_with_title(Some("distances"), &distances);
+    // print_tensor_with_title(Some("distances"), &distances);
 
     distances
 }
@@ -45,14 +45,14 @@ pub fn umap_loss<B: AutodiffBackend>(
     println!("umap_loss");
     // Compute pairwise distances for both global and local representations
     let global_distances = pairwise_distance(global);
-    print_tensor_with_title(Some("global_distances"), &global_distances);
+    // print_tensor_with_title(Some("global_distances"), &global_distances);
     let local_distances = pairwise_distance(local);
-    print_tensor_with_title(Some("local_distances"), &local_distances);
+    // print_tensor_with_title(Some("local_distances"), &local_distances);
 
     // Compute the loss as the Frobenius norm (L2 loss) between the pairwise distance matrices
     let difference = (global_distances - local_distances).powi_scalar(2).sum();
 
-    print_tensor_with_title(Some("difference"), &difference);
+    // print_tensor_with_title(Some("difference"), &difference);
 
     difference
 }
