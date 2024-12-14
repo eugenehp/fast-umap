@@ -1,13 +1,15 @@
 use burn::{
     module::AutodiffModule,
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
-    tensor::{backend::AutodiffBackend, Device},
+    prelude::Backend,
+    tensor::{backend::AutodiffBackend, Device, Tensor},
 };
+use plotters::chart;
 
 use crate::{
     loss::umap_loss,
     model::UMAPModel,
-    utils::{load_test_data, print_tensor_with_title},
+    utils::{chart, load_test_data, print_tensor_with_title},
 };
 
 #[derive(Debug)]
@@ -136,4 +138,5 @@ pub fn train<B: AutodiffBackend>(
     let tensor_data = load_test_data(data.clone(), num_samples, num_features, &config.device);
     let local = model.forward(tensor_data);
     print_tensor_with_title(Some("result"), &local);
+    chart(local);
 }

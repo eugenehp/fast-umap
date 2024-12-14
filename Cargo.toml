@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 burn = { version = "~0.15", features = ["train", "wgpu"] }
 ndarray = "0.16.1"
+plotters = "0.3.7"
 prettytable = "0.10.0"
 rand = "0.8.5"
 serde = "1.0.216"
