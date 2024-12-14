@@ -85,7 +85,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
 /// Train the UMAP model over multiple epochs
 pub fn train<B: AutodiffBackend>(
     model: UMAPModel<B>,
-    train_data: &Vec<Tensor<B, 2>>, // Global representations (high-dimensional data)
+    data: Tensor<B, 2>,
     config: &TrainingConfig<B>,
 ) {
     let learning_rate: f64 = 0.001;
@@ -94,53 +94,41 @@ pub fn train<B: AutodiffBackend>(
     let mut optim = config_optimizer.init();
 
     for epoch in 0..config.epochs {
-        let _n_samples = train_data[0].dims()[0];
-        let n_features = train_data[0].dims()[1];
-        println!("n_features - {n_features}");
+        let n_samples = data.dims()[0];
+        let n_features = data.dims()[1];
+        println!("n_features - {n_features}, n_samples - {n_samples}");
         let mut total_loss = Tensor::<B, 2>::zeros([n_features, n_features], &config.device); // Initialize total_loss as scalar
 
         // print_tensor(&vec![total_loss.clone()]);
 
-        // Loop over batches of input data
-        for (iteration, batch) in train_data.chunks(config.batch_size).enumerate() {
-            print_tensor(Some("batch"), &batch.to_vec());
-            for input_tensor in batch {
-                print_tensor(Some("Input tensor"), &vec![input_tensor.clone()]);
+        print_tensor(Some("Input tensor"), &data);
 
-                // Forward pass to get the low-dimensional (local) representation
-                let local = model.forward(input_tensor.clone());
-                print_tensor(Some("local"), &vec![local.clone()]);
+        // Forward pass to get the low-dimensional (local) representation
+        let local = model.forward(data.clone());
+        print_tensor(Some("local"), &local);
 
-                print_tensor(
-                    Some("umap loss"),
-                    &vec![input_tensor.clone(), local.clone()],
-                );
+        // Compute the UMAP loss by comparing the pairwise distances
+        let loss = umap_loss(&data, &local);
 
-                // Compute the UMAP loss by comparing the pairwise distances
-                let loss = umap_loss(input_tensor, &local);
+        // Backward pass: Compute gradients
+        loss.backward();
 
-                // Backward pass: Compute gradients
-                loss.backward();
+        // Log training progress
+        println!(
+            "[Train - Epoch {} ] Loss {:.3}",
+            epoch,
+            loss.clone().into_scalar(),
+        );
 
-                // Log training progress
-                println!(
-                    "[Train - Epoch {} - Iteration {}] Loss {:.3}",
-                    epoch,
-                    iteration,
-                    loss.clone().into_scalar(),
-                );
+        // Gradients for the current backward pass
+        let grads = loss.backward();
+        // Gradients linked to each parameter of the model.
+        let grads = GradientsParams::from_grads(grads, &model);
+        // Update model parameters using the optimizer
+        optim.step(learning_rate, model.clone(), grads);
 
-                // Gradients for the current backward pass
-                let grads = loss.backward();
-                // Gradients linked to each parameter of the model.
-                let grads = GradientsParams::from_grads(grads, &model);
-                // Update model parameters using the optimizer
-                optim.step(learning_rate, model.clone(), grads);
-
-                // Accumulate the loss for this epoch
-                total_loss = total_loss.add(loss.unsqueeze());
-            }
-        }
+        // Accumulate the loss for this epoch
+        total_loss = total_loss.add(loss.unsqueeze());
 
         // Log the average loss for the epoch
         println!(

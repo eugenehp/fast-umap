@@ -46,5 +46,5 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training with the configured parameters
-    train::<MyAutodiffBackend>(model, &train_data, &config);
+    train::<MyAutodiffBackend>(model, train_data, &config);
 }
