@@ -3,7 +3,7 @@ use burn::tensor::{backend::AutodiffBackend, Tensor};
 #[allow(unused)]
 use crate::utils::print_tensor_with_title;
 
-fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
+pub fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
     let _n_features = x.dims()[1]; // Number of features (columns)
 
@@ -39,10 +39,10 @@ fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
 
 /// Calculate the UMAP loss by comparing pairwise distances between global and local representations
 pub fn umap_loss<B: AutodiffBackend>(
-    global: &Tensor<B, 2>, // High-dimensional (global) representation
-    local: &Tensor<B, 2>,  // Low-dimensional (local) representation
-) -> Tensor<B, 0> {
-    println!("umap_loss");
+    global: Tensor<B, 2>, // High-dimensional (global) representation
+    local: Tensor<B, 2>,  // Low-dimensional (local) representation
+) -> Tensor<B, 1> {
+    // println!("umap_loss");
     // Compute pairwise distances for both global and local representations
     let global_distances = pairwise_distance(global);
     // print_tensor_with_title(Some("global_distances"), &global_distances);
@@ -58,9 +58,9 @@ pub fn umap_loss<B: AutodiffBackend>(
     let difference = (safe_global_distances - safe_local_distances)
         .powi_scalar(2)
         .sum();
-    print_tensor_with_title(Some("difference"), &difference);
+    // print_tensor_with_title(Some("difference"), &difference);
 
-    let difference: Tensor<B, 0> = difference.squeeze(0);
+    // let difference: Tensor<B, 0> = difference.squeeze(0);
 
     difference
 }

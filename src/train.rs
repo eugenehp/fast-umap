@@ -1,9 +1,14 @@
 use burn::{
+    nn::loss::MseLoss,
     optim::{AdamConfig, GradientsAccumulator, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device, Tensor},
 };
 
-use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor_with_title};
+use crate::{
+    loss::{pairwise_distance, umap_loss},
+    model::UMAPModel,
+    utils::print_tensor_with_title,
+};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -92,26 +97,29 @@ pub fn train<B: AutodiffBackend>(
     let mut optim = config_optimizer.init();
     let mut accumulator = GradientsAccumulator::new();
 
-    for epoch in 0..config.epochs {
-        let n_samples = data.dims()[0];
-        let n_features = data.dims()[1];
-        println!("epoch - {epoch}, n_features - {n_features}, n_samples - {n_samples}");
+    let dims = data.dims();
+    let n_samples = dims[0];
+    let n_features = dims[1];
+    println!("n_features - {n_features}, n_samples - {n_samples}");
 
+    for epoch in 0..config.epochs {
         // print_tensor(&vec![total_loss.clone()]);
 
-        print_tensor_with_title(Some("Input tensor"), &data);
+        // print_tensor_with_title(Some("Input tensor"), &data);
 
         // Forward pass to get the low-dimensional (local) representation
         let local = model.forward(data.clone());
-        print_tensor_with_title(Some("local"), &local);
+        // print_tensor_with_title(Some("local"), &local);
 
         // Compute the UMAP loss by comparing the pairwise distances
-        let loss = umap_loss(&data, &local);
+        let loss = umap_loss(data.clone(), local);
 
-        print_tensor_with_title(Some("loss"), &loss);
+        // print_tensor_with_title(Some("loss"), &loss);
 
         // Gradients for the current backward pass
-        let grads = loss.backward();
+        let grads = loss.backward(); // does not work
+
+        // let grads = local.backward(); // works
 
         // Gradients linked to each parameter of the model.
         let grads = GradientsParams::from_grads(grads, &model);
