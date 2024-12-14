@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use burn::{
     backend::{Autodiff, Wgpu},
     prelude::Backend,
@@ -7,9 +8,8 @@ use burn::{
 use fast_umap::{
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
-    utils::load_test_data,
+    utils::{load_test_data, print_tensor},
 };
-use prettytable::{cell, row, Table};
 
 fn main() {
     type MyBackend = Wgpu<f32, i32>;
@@ -22,41 +22,28 @@ fn main() {
     let num_features = 3;
     let output_size = 2;
 
-    let train_data = load_test_data::<MyBackend>(num_samples, num_features, &device);
+    let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
+    // print_tensor(&train_data);
 
-    let mut table = Table::new();
+    let model_config = UMAPModelConfigBuilder::default()
+        .input_size(num_features)
+        .hidden_size(100)
+        .output_size(output_size)
+        .build()
+        .unwrap();
 
-    table.add_row(row!["Index", "Tensor"]);
-    train_data
-        .iter()
-        .enumerate()
-        .map(|(index, t)| {
-            let row = t.to_data().to_vec::<f32>().unwrap();
-            table.add_row(row![index, format!("{:?}", row)]);
-        })
-        .for_each(drop);
+    let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
 
-    table.printstd();
+    let config = TrainingConfig::<MyAutodiffBackend>::builder()
+        .epochs(100)
+        .batch_size(batch_size)
+        .learning_rate(0.001)
+        .device(device)
+        .beta1(0.9)
+        .beta2(0.999)
+        .build()
+        .expect("Failed to build TrainingConfig");
 
-    // let model_config = UMAPModelConfigBuilder::default()
-    //     .input_size(num_features)
-    //     .hidden_size(100)
-    //     .output_size(output_size)
-    //     .build()
-    //     .unwrap();
-
-    // let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
-
-    // let config = TrainingConfig::<MyAutodiffBackend>::builder()
-    //     .epochs(100)
-    //     .batch_size(batch_size)
-    //     .learning_rate(0.001)
-    //     .device(device) // Using GPU (CUDA) or Device::cpu() for CPU
-    //     .beta1(0.9)
-    //     .beta2(0.999)
-    //     .build()
-    //     .expect("Failed to build TrainingConfig"); // Expecting a valid config
-
-    // // Start training with the configured parameters
-    // train::<MyAutodiffBackend>(model, &train_data, &config);
+    // Start training with the configured parameters
+    train::<MyAutodiffBackend>(model, &train_data, &config);
 }

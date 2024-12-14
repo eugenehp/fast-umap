@@ -94,7 +94,9 @@ pub fn train<B: AutodiffBackend>(
     let mut optim = config_optimizer.init();
 
     for epoch in 0..config.epochs {
+        let _n_samples = train_data[0].dims()[0];
         let n_features = train_data[0].dims()[1];
+        println!("n_features - {n_features}");
         let mut total_loss = Tensor::<B, 2>::zeros([n_features, n_features], &config.device); // Initialize total_loss as scalar
 
         // Loop over batches of input data
