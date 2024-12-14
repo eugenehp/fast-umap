@@ -23,7 +23,7 @@ fn main() {
     let output_size = 2;
     let hidden_size = 100;
     let learning_rate = 0.001;
-    let epochs = 100;
+    let epochs = 400;
 
     MyBackend::seed(9999);
 

@@ -100,8 +100,8 @@ pub fn train<B: AutodiffBackend>(
     let tensor_data = load_test_data::<B>(data.clone(), num_samples, num_features, &config.device);
     print_tensor_with_title(Some("Training data"), &tensor_data);
 
-    // let config_optimizer = AdamConfig::new();
-    let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
+    let config_optimizer = AdamConfig::new();
+    // let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
     let mut optim = config_optimizer.init();
 
     // let dims = data.dims();
