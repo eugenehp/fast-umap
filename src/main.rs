@@ -42,17 +42,18 @@ fn main() {
 
     let device = burn::backend::wgpu::WgpuDevice::default();
 
+    let num_samples = 3;
+    let num_features = 10;
+    let train_data = load_data(num_samples, num_features, &device);
+
     let model_config = UMAPModelConfigBuilder::default()
-        .input_size(100)
+        .input_size(num_features)
         .hidden_size(100)
         .output_size(2)
         .build()
         .unwrap();
 
     let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
-
-    // Load your training data (make sure it's in the correct format)
-    let train_data = load_data(5, 10, &device); // Replace with your actual data loading logic
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
         .epochs(100)
