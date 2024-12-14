@@ -21,7 +21,7 @@ pub fn generate_test_data(
 }
 
 // Define the function to generate random data in the format `<Tensor<B, 2>`.
-pub fn load_test_data<B: Backend>(
+pub fn convert_vector_to_tensor<B: Backend>(
     data: Vec<f64>,
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample

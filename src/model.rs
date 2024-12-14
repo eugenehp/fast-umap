@@ -53,30 +53,6 @@ impl<B: Backend> UMAPModel<B> {
         let x = self.linear4.forward(x); // Fourth linear transformation
         x
     }
-
-    pub fn debug(&self) {
-        println!(
-            "linear2: weight={:?}",
-            self.linear2
-                .weight
-                .to_data()
-                .to_vec::<f32>()
-                .unwrap()
-                .as_slice()[0..2]
-                .to_vec(),
-        );
-        println!(
-            "linear2: bias={:?}",
-            self.linear2
-                .bias
-                .clone()
-                .unwrap()
-                .to_data()
-                .to_vec::<f32>()
-                .unwrap()[0..2]
-                .to_vec()
-        );
-    }
 }
 
 /// The configuration structure for the UMAPModel

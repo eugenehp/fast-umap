@@ -20,19 +20,13 @@ fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     // Sum across the feature dimension (axis 2), producing a shape of (n_samples, n_samples)
     let pairwise_squared_distances = squared_diff.sum_dim(2); // Sum across the feature dimension
 
-    // print_tensor_with_title(
-    //     Some("pairwise_squared_distances"),
-    //     &pairwise_squared_distances,
-    // );
     // Use `flatten()` to convert the upper triangular part (excluding the diagonal) into a 1D tensor
     let pairwise_distances = pairwise_squared_distances.triu(0); // Extract the upper triangular part (without diagonal)
 
-    // print_tensor_with_title(Some("pairwise_distances"), &pairwise_distances);
     // Extract the first column (distances from the first sample to all others)
     let distances = pairwise_distances
         .slice([0..n_samples, 0..1])
         .reshape([n_samples]);
-    // print_tensor_with_title(Some("distances"), &distances);
 
     distances
 }
@@ -42,12 +36,9 @@ pub fn umap_loss<B: AutodiffBackend>(
     global: Tensor<B, 2>, // High-dimensional (global) representation
     local: Tensor<B, 2>,  // Low-dimensional (local) representation
 ) -> Tensor<B, 1> {
-    // println!("umap_loss");
     // Compute pairwise distances for both global and local representations
     let global_distances = pairwise_distance(global);
-    // print_tensor_with_title(Some("global_distances"), &global_distances);
     let local_distances = pairwise_distance(local);
-    // print_tensor_with_title(Some("local_distances"), &local_distances);
 
     // we have to add these to prevent "attempt to subtract with overflow" error
     let max_distance = 1e6; // A reasonable upper bound
@@ -58,9 +49,6 @@ pub fn umap_loss<B: AutodiffBackend>(
     let difference = (safe_global_distances - safe_local_distances)
         .powi_scalar(2)
         .sum();
-    // print_tensor_with_title(Some("difference"), &difference);
-
-    // let difference: Tensor<B, 0> = difference.squeeze(0);
 
     difference
 }

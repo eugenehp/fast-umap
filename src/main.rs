@@ -1,3 +1,4 @@
+use burn::module::AutodiffModule;
 #[allow(unused_imports)]
 use burn::{
     backend::{Autodiff, Wgpu},
@@ -8,7 +9,7 @@ use burn::{
 use fast_umap::{
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
-    utils::generate_test_data,
+    utils::{chart, convert_vector_to_tensor, generate_test_data, print_tensor_with_title},
 };
 
 fn main() {
@@ -50,5 +51,19 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training with the configured parameters
-    train::<MyAutodiffBackend>(model, num_samples, num_features, train_data, &config);
+    let model = train::<MyAutodiffBackend>(
+        model,
+        num_samples,
+        num_features,
+        train_data.clone(),
+        &config,
+    );
+
+    let model = model.valid();
+    let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
+    let local = model.forward(global.clone());
+
+    print_tensor_with_title(Some("global"), &global);
+    print_tensor_with_title(Some("local"), &local);
+    chart(local);
 }

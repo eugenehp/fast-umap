@@ -1,16 +1,9 @@
+use crate::{loss::umap_loss, model::UMAPModel, utils::convert_vector_to_tensor};
 use burn::{
-    module::AutodiffModule,
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
-    prelude::Backend,
-    tensor::{backend::AutodiffBackend, Device, Tensor},
+    tensor::{backend::AutodiffBackend, Device},
 };
-use plotters::chart;
-
-use crate::{
-    loss::umap_loss,
-    model::UMAPModel,
-    utils::{chart, load_test_data, print_tensor_with_title},
-};
+use indicatif::{ProgressBar, ProgressStyle};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -20,6 +13,7 @@ pub struct TrainingConfig<B: AutodiffBackend> {
     pub device: Device<B>,
     pub beta1: f64,
     pub beta2: f64,
+    pub penalty: f64,
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -37,6 +31,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     device: Option<Device<B>>,
     beta1: Option<f64>,
     beta2: Option<f64>,
+    penalty: Option<f64>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
@@ -76,6 +71,12 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    // Set the penalty value for the Adam optimizer
+    pub fn penalty(mut self, penalty: f64) -> Self {
+        self.penalty = Some(penalty);
+        self
+    }
+
     // Finalize and build the TrainingConfig
     pub fn build(self) -> Option<TrainingConfig<B>> {
         Some(TrainingConfig {
@@ -85,6 +86,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             device: self.device?,
             beta1: self.beta1.unwrap_or(0.9), // Default beta1 if not set
             beta2: self.beta2.unwrap_or(0.999), // Default beta2 if not set
+            penalty: self.penalty.unwrap_or(5e-5), // Default penalty is not set
         })
     }
 }
@@ -96,28 +98,31 @@ pub fn train<B: AutodiffBackend>(
     num_features: usize, // Number of features (columns) per sample
     data: Vec<f64>,
     config: &TrainingConfig<B>,
-) {
-    let tensor_data = load_test_data::<B>(data.clone(), num_samples, num_features, &config.device);
-    print_tensor_with_title(Some("Training data"), &tensor_data);
+) -> UMAPModel<B> {
+    let tensor_data =
+        convert_vector_to_tensor::<B>(data.clone(), num_samples, num_features, &config.device);
 
-    let config_optimizer = AdamConfig::new();
-    // let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
+    let config_optimizer = AdamConfig::new()
+        .with_weight_decay(Some(WeightDecayConfig::new(config.penalty)))
+        .with_beta_1(config.beta1 as f32)
+        .with_beta_2(config.beta2 as f32);
     let mut optim = config_optimizer.init();
 
-    // let dims = data.dims();
-    // let num_samples = dims[0];
-    // let num_features = dims[1];
-    println!("num_features - {num_features}, num_samples - {num_samples}");
+    // Initialize the progress bar with the number of epochs
+    let pb = ProgressBar::new(config.epochs as u64);
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{bar:40} {pos}/{len} Epochs, Loss: {msg}")
+            .unwrap()
+            .progress_chars("=>-"),
+    );
 
-    for epoch in 0..config.epochs {
+    for _epoch in 0..config.epochs {
         // Forward pass to get the low-dimensional (local) representation
         let local = model.forward(tensor_data.clone());
-        // print_tensor_with_title(Some("local"), &local);
 
         // Compute the UMAP loss by comparing the pairwise distances
         let loss = umap_loss(tensor_data.clone(), local);
-
-        // print_tensor_with_title(Some("loss"), &loss);
 
         // Gradients for the current backward pass
         let grads = loss.backward();
@@ -128,15 +133,12 @@ pub fn train<B: AutodiffBackend>(
         // Update model parameters using the optimizer
         model = optim.step(config.learning_rate, model, grads);
 
-        // Log the average loss for the epoch
-        println!("Epoch {}:\tLoss = {:.3}", epoch, loss.into_scalar());
-
-        // model.debug();
+        // Update the progress bar with the current loss
+        pb.set_message(format!("{:.3}", loss.into_scalar()));
+        pb.inc(1);
     }
 
-    let model = model.valid();
-    let tensor_data = load_test_data(data.clone(), num_samples, num_features, &config.device);
-    let local = model.forward(tensor_data);
-    print_tensor_with_title(Some("result"), &local);
-    chart(local);
+    pb.finish_with_message("Training Complete");
+
+    model
 }
