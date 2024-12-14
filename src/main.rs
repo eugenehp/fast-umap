@@ -7,9 +7,10 @@ use burn::{
     tensor::{Device, Tensor},
 };
 use fast_umap::{
+    chart::chart,
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
-    utils::{chart, convert_vector_to_tensor, generate_test_data, print_tensor_with_title},
+    utils::{convert_vector_to_tensor, generate_test_data, print_tensor_with_title},
 };
 
 fn main() {
@@ -20,13 +21,14 @@ fn main() {
 
     let batch_size = 1;
     let num_samples = 100;
-    let num_features = 10;
+    let num_features = 3;
     let output_size = 2;
     let hidden_size = 100;
     let learning_rate = 0.001;
     let epochs = 400;
+    let seed = 9999;
 
-    MyBackend::seed(9999);
+    MyBackend::seed(seed);
 
     let train_data = generate_test_data(num_samples, num_features);
 
@@ -38,7 +40,7 @@ fn main() {
         .unwrap();
 
     let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
-    println!("{}", model);
+    // println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
         .epochs(epochs)
@@ -63,7 +65,7 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
     let local = model.forward(global.clone());
 
-    print_tensor_with_title(Some("global"), &global);
-    print_tensor_with_title(Some("local"), &local);
-    chart(local);
+    // print_tensor_with_title(Some("global"), &global);
+    // print_tensor_with_title(Some("local"), &local);
+    chart(local, None);
 }

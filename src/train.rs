@@ -138,7 +138,7 @@ pub fn train<B: AutodiffBackend>(
         pb.inc(1);
     }
 
-    pb.finish_with_message("Training Complete");
+    pb.finish();
 
     model
 }
