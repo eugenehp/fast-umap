@@ -15,12 +15,18 @@ impl<B: Backend> UMAPModel<B> {
     /// Create a new instance of UMAPModel from a given configuration
     pub fn new(config: &UMAPModelConfig, device: &Device<B>) -> Self {
         // Initialize the first linear layer with the input size and hidden size
-        let linear1 = LinearConfig::new(config.input_size, config.hidden_size).init(device);
-        let linear2 = LinearConfig::new(config.hidden_size, config.hidden_size).init(device);
-        let linear3 = LinearConfig::new(config.hidden_size, config.hidden_size).init(device);
-
-        // Initialize the second linear layer with the hidden size and output size
-        let linear4 = LinearConfig::new(config.hidden_size, config.output_size).init(device);
+        let linear1 = LinearConfig::new(config.input_size, config.hidden_size)
+            .with_bias(true)
+            .init(device);
+        let linear2 = LinearConfig::new(config.hidden_size, config.hidden_size)
+            .with_bias(true)
+            .init(device);
+        let linear3 = LinearConfig::new(config.hidden_size, config.hidden_size)
+            .with_bias(true)
+            .init(device);
+        let linear4 = LinearConfig::new(config.hidden_size, config.output_size)
+            .with_bias(true)
+            .init(device);
 
         // Initialize ReLU activation function
         let activation = Relu::new();
@@ -37,6 +43,7 @@ impl<B: Backend> UMAPModel<B> {
 
     /// Forward pass: Pass the input through the model layers
     pub fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
+        // let x = input.detach();
         let x = self.linear1.forward(input); // First linear transformation
         let x = self.activation.forward(x); // Apply ReLU
         let x = self.linear2.forward(x); // Second linear transformation

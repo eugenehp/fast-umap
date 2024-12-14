@@ -8,7 +8,7 @@ use burn::{
 use fast_umap::{
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
-    utils::{load_test_data, print_tensor_with_title},
+    utils::generate_test_data,
 };
 
 fn main() {
@@ -27,9 +27,7 @@ fn main() {
 
     MyBackend::seed(9999);
 
-    let train_data = load_test_data::<MyAutodiffBackend>(num_samples, num_features, &device);
-
-    print_tensor_with_title(Some("Generated data"), &train_data);
+    let train_data = generate_test_data(num_samples, num_features);
 
     let model_config = UMAPModelConfigBuilder::default()
         .input_size(num_features)
@@ -38,7 +36,7 @@ fn main() {
         .build()
         .unwrap();
 
-    let mut model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
+    let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
     println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
@@ -52,5 +50,5 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training with the configured parameters
-    train::<MyAutodiffBackend>(&mut model, train_data, &config);
+    train::<MyAutodiffBackend>(model, num_samples, num_features, train_data, &config);
 }

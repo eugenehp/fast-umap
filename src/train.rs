@@ -1,9 +1,14 @@
 use burn::{
-    optim::{AdamConfig, GradientsParams, Optimizer},
-    tensor::{backend::AutodiffBackend, Device, Tensor},
+    module::AutodiffModule,
+    optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
+    tensor::{backend::AutodiffBackend, Device},
 };
 
-use crate::{loss::umap_loss, model::UMAPModel, utils::print_tensor_with_title};
+use crate::{
+    loss::umap_loss,
+    model::UMAPModel,
+    utils::{load_test_data, print_tensor_with_title},
+};
 
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
@@ -84,29 +89,31 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
 
 /// Train the UMAP model over multiple epochs
 pub fn train<B: AutodiffBackend>(
-    model: &mut UMAPModel<B>,
-    data: Tensor<B, 2>,
+    mut model: UMAPModel<B>,
+    num_samples: usize,  // Number of samples
+    num_features: usize, // Number of features (columns) per sample
+    data: Vec<f64>,
     config: &TrainingConfig<B>,
 ) {
-    let config_optimizer = AdamConfig::new();
+    let tensor_data = load_test_data::<B>(data.clone(), num_samples, num_features, &config.device);
+    print_tensor_with_title(Some("Training data"), &tensor_data);
+
+    // let config_optimizer = AdamConfig::new();
+    let config_optimizer = AdamConfig::new().with_weight_decay(Some(WeightDecayConfig::new(5e-5)));
     let mut optim = config_optimizer.init();
 
-    let dims = data.dims();
-    let n_samples = dims[0];
-    let n_features = dims[1];
-    println!("n_features - {n_features}, n_samples - {n_samples}");
+    // let dims = data.dims();
+    // let num_samples = dims[0];
+    // let num_features = dims[1];
+    println!("num_features - {num_features}, num_samples - {num_samples}");
 
     for epoch in 0..config.epochs {
-        // print_tensor(&vec![total_loss.clone()]);
-
-        // print_tensor_with_title(Some("Input tensor"), &data);
-
         // Forward pass to get the low-dimensional (local) representation
-        let local = model.forward(data.clone());
+        let local = model.forward(tensor_data.clone());
         // print_tensor_with_title(Some("local"), &local);
 
         // Compute the UMAP loss by comparing the pairwise distances
-        let loss = umap_loss(data.clone(), local);
+        let loss = umap_loss(tensor_data.clone(), local);
 
         // print_tensor_with_title(Some("loss"), &loss);
 
@@ -114,14 +121,19 @@ pub fn train<B: AutodiffBackend>(
         let grads = loss.backward();
 
         // Gradients linked to each parameter of the model.
-        let grads = GradientsParams::from_grads(grads, model);
+        let grads = GradientsParams::from_grads(grads, &model);
 
         // Update model parameters using the optimizer
-        optim.step(config.learning_rate, model.clone(), grads);
+        model = optim.step(config.learning_rate, model, grads);
 
         // Log the average loss for the epoch
         println!("Epoch {}:\tLoss = {:.3}", epoch, loss.into_scalar());
 
         // model.debug();
     }
+
+    let model = model.valid();
+    let tensor_data = load_test_data(data.clone(), num_samples, num_features, &config.device);
+    let local = model.forward(tensor_data);
+    print_tensor_with_title(Some("result"), &local);
 }

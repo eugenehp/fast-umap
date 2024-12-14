@@ -5,19 +5,27 @@ use burn::{
 use prettytable::{row, Table};
 use rand::Rng;
 
+pub fn generate_test_data(
+    num_samples: usize,  // Number of samples
+    num_features: usize, // Number of features (columns) per sample
+) -> Vec<f64> {
+    let mut rng = rand::thread_rng();
+
+    // Generate random data for the tensor (size = num_features)
+    let data: Vec<f64> = (0..num_samples * num_features)
+        .map(|_| rng.gen::<f64>()) // Random number generation for each feature
+        .collect();
+
+    data
+}
+
 // Define the function to generate random data in the format `<Tensor<B, 2>`.
 pub fn load_test_data<B: Backend>(
+    data: Vec<f64>,
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample
     device: &Device<B>,  // Device to place the tensor (CPU, GPU)
 ) -> Tensor<B, 2> {
-    let mut rng = rand::thread_rng();
-
-    // Generate random data for the tensor (size = num_features)
-    let data: Vec<_> = (0..num_samples * num_features)
-        .map(|_| rng.gen::<f64>()) // Random number generation for each feature
-        .collect();
-
     let tensor_data = TensorData::new(data, [num_samples, num_features]);
 
     // Create a Tensor with the shape [1, num_features] (1 row, num_features columns)
