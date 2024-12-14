@@ -4,7 +4,7 @@ use burn::tensor::{backend::AutodiffBackend, Tensor};
 use crate::utils::print_tensor_with_title;
 
 fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
-    let _n_samples = x.dims()[0]; // Number of samples (rows)
+    let n_samples = x.dims()[0]; // Number of samples (rows)
     let _n_features = x.dims()[1]; // Number of features (columns)
 
     // Expand x to shapes that allow broadcasting for pairwise subtraction
@@ -30,8 +30,8 @@ fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
 
     // Extract the first column (distances from the first sample to all others)
     let distances = pairwise_distances
-        .slice([0.._n_samples, 0..1])
-        .reshape([_n_samples]);
+        .slice([0..n_samples, 0..1])
+        .reshape([n_samples]);
     // print_tensor_with_title(Some("distances"), &distances);
 
     distances
@@ -41,7 +41,7 @@ fn pairwise_distance<B: AutodiffBackend>(x: &Tensor<B, 2>) -> Tensor<B, 1> {
 pub fn umap_loss<B: AutodiffBackend>(
     global: &Tensor<B, 2>, // High-dimensional (global) representation
     local: &Tensor<B, 2>,  // Low-dimensional (local) representation
-) -> Tensor<B, 1> {
+) -> Tensor<B, 0> {
     println!("umap_loss");
     // Compute pairwise distances for both global and local representations
     let global_distances = pairwise_distance(global);
@@ -51,8 +51,9 @@ pub fn umap_loss<B: AutodiffBackend>(
 
     // Compute the loss as the Frobenius norm (L2 loss) between the pairwise distance matrices
     let difference = (global_distances - local_distances).powi_scalar(2).sum();
+    print_tensor_with_title(Some("difference"), &difference);
 
-    // print_tensor_with_title(Some("difference"), &difference);
+    let difference: Tensor<B, 0> = difference.squeeze(0);
 
     difference
 }

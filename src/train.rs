@@ -112,18 +112,6 @@ pub fn train<B: AutodiffBackend>(
 
         print_tensor_with_title(Some("loss"), &loss);
 
-        // Backward pass: Compute gradients
-        loss.backward();
-
-        println!("After backwards");
-
-        // Log training progress
-        println!(
-            "[Train - Epoch {} ] Loss {:.3}",
-            epoch,
-            loss.clone().into_scalar(),
-        );
-
         // Gradients for the current backward pass
         let grads = loss.backward();
         // Gradients linked to each parameter of the model.

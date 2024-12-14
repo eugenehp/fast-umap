@@ -26,8 +26,12 @@ pub fn load_test_data<B: Backend>(
     tensor
 }
 pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
-    let n_samples = data.dims()[0];
-    // let _n_features = data.dims()[1];
+    let dims = data.dims();
+    let n_samples = match dims.len() > 0 {
+        true => dims[0],
+        false => 0,
+    };
+    // let _n_features = dims[1];
 
     let mut table = Table::new();
     table.add_row(row!["Index", "Tensor"]);
@@ -37,6 +41,12 @@ pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
         let row = row.to_data().to_vec::<f32>().unwrap();
         let row = format!("{row:?}");
         table.add_row(row![index, format!("{:?}", row)]);
+    }
+
+    if dims.len() == 0 {
+        let row = data.to_data().to_vec::<f32>().unwrap();
+        let row = row.get(0).unwrap();
+        table.add_row(row![0, format!("{:?}", row)]);
     }
 
     table.printstd();
