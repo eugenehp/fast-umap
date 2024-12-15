@@ -23,18 +23,9 @@ This implementation leverages the [burn](https://github.com/tracel-ai/burn) mach
 
 ## Installation
 
-1. Clone the repository:
-
-   ```shell
-   git clone https://github.com/eugenehp/fast-umap.git
-   cd fast-umap
-   ```
-
-2. Build the project:
-
-   ```shell
-   cargo build --release
-   ```
+```shell
+cargo add fast-umap
+```
 
 ## Example Usage
 
@@ -287,7 +278,7 @@ fn main() {
 
 ```
 
-It also generates plot, and a loss chrt:
+It also generates 2d plot, and a loss chart:
 
 ![loss](./docs/losses.png)
 
