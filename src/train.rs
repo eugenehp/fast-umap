@@ -14,6 +14,7 @@ pub struct TrainingConfig<B: AutodiffBackend> {
     pub beta1: f64,
     pub beta2: f64,
     pub penalty: f64,
+    pub verbose: bool,
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -32,6 +33,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     beta1: Option<f64>,
     beta2: Option<f64>,
     penalty: Option<f64>,
+    verbose: Option<bool>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
@@ -77,6 +79,12 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    // Set the verbose value
+    pub fn verbose(mut self, verbose: bool) -> Self {
+        self.verbose = Some(verbose);
+        self
+    }
+
     // Finalize and build the TrainingConfig
     pub fn build(self) -> Option<TrainingConfig<B>> {
         Some(TrainingConfig {
@@ -87,6 +95,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             beta1: self.beta1.unwrap_or(0.9), // Default beta1 if not set
             beta2: self.beta2.unwrap_or(0.999), // Default beta2 if not set
             penalty: self.penalty.unwrap_or(5e-5), // Default penalty is not set
+            verbose: self.verbose.unwrap_or(false),
         })
     }
 }
@@ -109,13 +118,19 @@ pub fn train<B: AutodiffBackend>(
     let mut optim = config_optimizer.init();
 
     // Initialize the progress bar with the number of epochs
-    let pb = ProgressBar::new(config.epochs as u64);
-    pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{bar:40} {pos}/{len} Epochs, Loss: {msg}")
-            .unwrap()
-            .progress_chars("=>-"),
-    );
+    let mut pb = match config.verbose {
+        true => {
+            let pb = ProgressBar::new(config.epochs as u64);
+            pb.set_style(
+                ProgressStyle::default_bar()
+                    .template("{bar:40} {pos}/{len} Epochs, Loss: {msg}")
+                    .unwrap()
+                    .progress_chars("=>-"),
+            );
+            Some(pb)
+        }
+        false => None,
+    };
 
     for _epoch in 0..config.epochs {
         // Forward pass to get the low-dimensional (local) representation
@@ -134,11 +149,16 @@ pub fn train<B: AutodiffBackend>(
         model = optim.step(config.learning_rate, model, grads);
 
         // Update the progress bar with the current loss
-        pb.set_message(format!("{:.3}", loss.into_scalar()));
-        pb.inc(1);
+        if let Some(pbb) = pb {
+            pbb.set_message(format!("{:.3}", loss.into_scalar()));
+            pbb.inc(1);
+            pb = Some(pbb);
+        }
     }
 
-    pb.finish();
+    if let Some(pb) = pb {
+        pb.finish();
+    }
 
     model
 }

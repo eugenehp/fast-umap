@@ -29,6 +29,7 @@ fn main() {
     let beta2 = 0.999;
     let epochs = 400;
     let seed = 9999;
+    let verbose = true; // enables the progress bar
 
     MyBackend::seed(seed);
 
@@ -51,6 +52,7 @@ fn main() {
         .device(device)
         .beta1(beta1)
         .beta2(beta2)
+        .verbose(verbose)
         .build()
         .expect("Failed to build TrainingConfig");
 
@@ -67,7 +69,9 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
     let local = model.forward(global.clone());
 
-    // print_tensor_with_title("global", &global);
-    print_tensor_with_title("local", &local);
+    if verbose {
+        print_tensor_with_title("global", &global);
+        print_tensor_with_title("local", &local);
+    }
     chart::chart_tensor(local, None);
 }
