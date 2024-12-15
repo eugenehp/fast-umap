@@ -298,3 +298,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Copyright
 
 2024, Eugene Hauptmann
+
+## Thank you
+
+Inspired by original UMAP [paper](https://arxiv.org/abs/1802.03426)
