@@ -67,7 +67,7 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
     let local = model.forward(global.clone());
 
-    // print_tensor_with_title(Some("global"), &global);
-    // print_tensor_with_title(Some("local"), &local);
+    // print_tensor_with_title("global", &global);
+    print_tensor_with_title("local", &local);
     chart::chart_tensor(local, None);
 }

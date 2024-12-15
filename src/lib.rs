@@ -3,7 +3,7 @@ use model::{UMAPModel, UMAPModelConfigBuilder};
 use train::*;
 use utils::*;
 
-use burn::tensor::Device;
+use burn::tensor::{Device, Tensor};
 
 pub mod chart;
 pub mod distance;
@@ -78,7 +78,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         umap
     }
 
-    pub fn transform(&self, data: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    pub fn transform_to_tensor(&self, data: Vec<Vec<f64>>) -> Tensor<B::InnerBackend, 2> {
         let num_samples = data.len();
         let num_features = data[0].len();
 
@@ -86,20 +86,32 @@ impl<B: AutodiffBackend> UMAP<B> {
 
         let global = convert_vector_to_tensor(train_data, num_samples, num_features, &self.device);
         let local = self.model.forward(global);
+        local
+    }
+
+    pub fn transform(&self, data: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+        let local = self.transform_to_tensor(data);
         let result = convert_tensor_to_vector(local);
 
         result
     }
 }
 
-use burn::backend::wgpu::{Wgpu, WgpuDevice};
-use burn::backend::Autodiff;
+#[allow(unused)]
+pub mod prelude {
+    use crate::{chart, utils, UMAP};
+    use burn::backend::wgpu::{Wgpu, WgpuDevice};
+    use burn::backend::Autodiff;
 
-pub fn umap<F>(data: Vec<Vec<F>>) -> UMAP<Autodiff<Wgpu>>
-where
-    F: From<f32> + From<f64> + Clone,
-    f64: From<F>,
-{
-    let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default());
-    model
+    pub use chart::{chart_tensor, chart_vector};
+    pub use utils::generate_test_data;
+
+    pub fn umap<F>(data: Vec<Vec<F>>) -> UMAP<Autodiff<Wgpu>>
+    where
+        F: From<f32> + From<f64> + Clone,
+        f64: From<F>,
+    {
+        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default());
+        model
+    }
 }
