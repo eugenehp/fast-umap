@@ -1,4 +1,8 @@
-use crate::{loss::umap_loss, model::UMAPModel, utils::convert_vector_to_tensor};
+use crate::{
+    loss::{pairwise_distance, umap_loss},
+    model::UMAPModel,
+    utils::convert_vector_to_tensor,
+};
 use burn::{
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, Device},
@@ -132,12 +136,14 @@ pub fn train<B: AutodiffBackend>(
         false => None,
     };
 
+    let global_distances = pairwise_distance(tensor_data.clone());
+
     for _epoch in 0..config.epochs {
         // Forward pass to get the low-dimensional (local) representation
         let local = model.forward(tensor_data.clone());
 
         // Compute the UMAP loss by comparing the pairwise distances
-        let loss = umap_loss(tensor_data.clone(), local);
+        let loss = umap_loss(global_distances.clone(), local);
 
         // Gradients for the current backward pass
         let grads = loss.backward();

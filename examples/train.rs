@@ -20,8 +20,8 @@ fn main() {
     let device = burn::backend::wgpu::WgpuDevice::default();
 
     let batch_size = 1;
-    let num_samples = 100;
-    let num_features = 3;
+    let num_samples = 1000;
+    let num_features = 100;
     let output_size = 2;
     let hidden_size = 100;
     let learning_rate = 0.001;
@@ -69,9 +69,9 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
     let local = model.forward(global.clone());
 
-    if verbose {
-        print_tensor_with_title("global", &global);
-        print_tensor_with_title("local", &local);
-    }
+    // if verbose {
+    //     print_tensor_with_title("global", &global);
+    //     print_tensor_with_title("local", &local);
+    // }
     chart::chart_tensor(local, None);
 }

@@ -2,7 +2,7 @@ use crate::utils::*;
 use burn::prelude::*;
 use plotters::prelude::*;
 
-const CAPTION: &str = "Reduced 2 dimensional UMAP data";
+const CAPTION: &str = "fast-umap";
 const PATH: &str = "plot.png";
 
 #[derive(Debug, Clone)]

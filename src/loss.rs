@@ -1,9 +1,6 @@
 use burn::tensor::{backend::AutodiffBackend, Tensor};
 
-#[allow(unused)]
-use crate::utils::print_tensor_with_title;
-
-fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
+pub fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
     let _n_features = x.dims()[1]; // Number of features (columns)
 
@@ -33,11 +30,12 @@ fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 
 /// Calculate the UMAP loss by comparing pairwise distances between global and local representations
 pub fn umap_loss<B: AutodiffBackend>(
-    global: Tensor<B, 2>, // High-dimensional (global) representation
-    local: Tensor<B, 2>,  // Low-dimensional (local) representation
+    // global: Tensor<B, 2>, // High-dimensional (global) representation
+    global_distances: Tensor<B, 1>, // Distances in the high-dimensional (global) representation
+    local: Tensor<B, 2>,            // Low-dimensional (local) representation
 ) -> Tensor<B, 1> {
     // Compute pairwise distances for both global and local representations
-    let global_distances = pairwise_distance(global);
+    // let global_distances = pairwise_distance(global);
     let local_distances = pairwise_distance(local);
 
     // we have to add these to prevent "attempt to subtract with overflow" error
