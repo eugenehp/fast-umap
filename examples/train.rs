@@ -30,6 +30,7 @@ fn main() {
     let epochs = 400;
     let seed = 9999;
     let verbose = true; // enables the progress bar
+    let patience = 10;
 
     MyBackend::seed(seed);
 
@@ -53,6 +54,9 @@ fn main() {
         .with_beta1(beta1)
         .with_beta2(beta2)
         .with_verbose(verbose)
+        // if set, tries to find the minimal loss dynamically, and will go beyond number of epochs
+        // if too impatient, it will ensure that it goes at least number of specified epochs
+        .with_patience(patience)
         .build()
         .expect("Failed to build TrainingConfig");
 
