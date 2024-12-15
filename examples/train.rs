@@ -30,7 +30,7 @@ fn main() {
     let epochs = 400;
     let seed = 9999;
     let verbose = true; // enables the progress bar
-    let patience = 10;
+    let patience = 30;
 
     MyBackend::seed(seed);
 

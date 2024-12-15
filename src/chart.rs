@@ -192,8 +192,8 @@ pub fn plot_loss(losses: Vec<f64>, output_path: &str) -> Result<(), Box<dyn std:
     // Create a chart builder with padded Y-axis range
     let mut chart = ChartBuilder::on(&root)
         .caption("Loss Over Epochs", ("sans-serif", 30))
-        .set_label_area_size(LabelAreaPosition::Left, 100)
-        .set_label_area_size(LabelAreaPosition::Bottom, 40)
+        .set_label_area_size(LabelAreaPosition::Left, 80)
+        .set_label_area_size(LabelAreaPosition::Bottom, 50)
         .build_cartesian_2d(
             0..losses.len() as u32,
             min_loss_with_padding..max_loss_with_padding,

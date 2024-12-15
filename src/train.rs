@@ -1,5 +1,8 @@
+use std::time::Instant;
+
 use crate::{
     chart::plot_loss,
+    format_duration,
     loss::{pairwise_distance, umap_loss},
     model::UMAPModel,
     utils::convert_vector_to_tensor,
@@ -133,13 +136,16 @@ pub fn train<B: AutodiffBackend>(
         .with_beta_2(config.beta2 as f32);
     let mut optim = config_optimizer.init();
 
+    // Start timing
+    let start_time = Instant::now();
+
     // Initialize the progress bar with the number of epochs
     let mut pb = match config.verbose {
         true => {
             let pb = ProgressBar::new(config.epochs as u64);
             pb.set_style(
                 ProgressStyle::default_bar()
-                    .template("{bar:40} {pos}/{len} Epochs, Loss: {msg}")
+                    .template("{bar:40} {pos}/{len} Epochs | {msg}")
                     .unwrap()
                     .progress_chars("=>-"),
             );
@@ -173,9 +179,15 @@ pub fn train<B: AutodiffBackend>(
         // Update model parameters using the optimizer
         model = optim.step(config.learning_rate, model, grads);
 
+        let elapsed = start_time.elapsed();
         // Update the progress bar with the current loss
         if let Some(pbb) = pb {
-            pbb.set_message(format!("{:.3} Best loss: {}", current_loss, best_loss));
+            pbb.set_message(format!(
+                "Elapsed: {} | Loss: {:.3} | Best loss: {:.3}",
+                format_duration(elapsed),
+                current_loss,
+                best_loss,
+            ));
             pbb.inc(1);
             pb = Some(pbb);
         }

@@ -81,3 +81,12 @@ pub fn convert_tensor_to_vector<B: Backend>(data: Tensor<B, 2>) -> Vec<Vec<f64>>
         .collect();
     data
 }
+
+// Helper function to format elapsed time in hours, minutes, seconds format
+pub fn format_duration(duration: std::time::Duration) -> String {
+    let secs = duration.as_secs();
+    let hours = secs / 3600;
+    let minutes = (secs % 3600) / 60;
+    let seconds = secs % 60;
+    format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
+}
