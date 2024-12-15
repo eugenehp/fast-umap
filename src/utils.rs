@@ -7,6 +7,16 @@ use burn::{
 use prettytable::{row, Table};
 use rand::Rng;
 
+/// Generates random test data with the given number of samples and features.
+///
+/// # Arguments
+/// * `num_samples` - The number of samples to generate.
+/// * `num_features` - The number of features (columns) per sample.
+///
+/// # Returns
+/// A `Vec<f64>` containing the randomly generated data.
+///
+/// This function uses the `rand` crate to generate a flat vector of random floating-point values.
 pub fn generate_test_data(
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample
@@ -21,7 +31,19 @@ pub fn generate_test_data(
     data
 }
 
-// Define the function to generate random data in the format `<Tensor<B, 2>`.
+/// Converts a vector of `f64` values into a `Tensor<B, 2>` for the specified backend.
+///
+/// # Arguments
+/// * `data` - A vector of `f64` values representing the data to convert.
+/// * `num_samples` - The number of samples (rows).
+/// * `num_features` - The number of features (columns).
+/// * `device` - The device to place the tensor on (e.g., CPU, GPU).
+///
+/// # Returns
+/// A `Tensor<B, 2>` containing the data arranged as samples x features.
+///
+/// This function uses the `TensorData` struct to create a tensor from the given data, then places it
+/// on the specified device (`CPU` or `GPU`).
 pub fn convert_vector_to_tensor<B: Backend>(
     data: Vec<f64>,
     num_samples: usize,  // Number of samples
@@ -31,6 +53,14 @@ pub fn convert_vector_to_tensor<B: Backend>(
     let tensor_data = TensorData::new(data, [num_samples, num_features]);
     Tensor::<B, 2>::from_data(tensor_data, device)
 }
+
+/// Prints the content of a tensor in a table format with index and tensor values.
+///
+/// # Arguments
+/// * `data` - The tensor to print, with a generic backend and dimensionality `D`.
+///
+/// This function prints the tensor's data in a table with each row corresponding to one sample.
+/// The tensor data is printed in a format that makes it easy to inspect.
 pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
     let dims = data.dims();
     let n_samples = match dims.len() > 0 {
@@ -57,13 +87,29 @@ pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
     table.printstd();
 }
 
+/// Prints the content of a tensor with a title.
+///
+/// # Arguments
+/// * `title` - A string title to print before displaying the tensor data.
+/// * `data` - The tensor to print.
+///
+/// This function is similar to `print_tensor`, but with an added title to help distinguish different tensor prints.
 pub fn print_tensor_with_title<B: Backend, const D: usize>(title: &str, data: &Tensor<B, D>) {
     println!("{title}");
     print_tensor(data);
 }
 
+/// Converts a 2D tensor into a `Vec<Vec<f64>>` for easier inspection or manipulation.
+///
+/// # Arguments
+/// * `data` - A 2D tensor (samples x features) to convert into a vector of vectors.
+///
+/// # Returns
+/// A `Vec<Vec<f64>>` where each inner `Vec<f64>` represents a row (sample) of the tensor.
+///
+/// This function extracts the data from a tensor and converts it into a `Vec<Vec<f64>>` format. The conversion
+/// assumes that the tensor is in a 2D shape and the precision is `f32` within the tensor.
 pub fn convert_tensor_to_vector<B: Backend>(data: Tensor<B, 2>) -> Vec<Vec<f64>> {
-    // print_tensor_with_title(Some("convert_tensor_to_vector"), &data);
     let n_components = data.dims()[1]; // usually 2 dimensional
 
     // Burn Tensor only has f32 precision inside the tensors, when you export to to_data
@@ -82,7 +128,15 @@ pub fn convert_tensor_to_vector<B: Backend>(data: Tensor<B, 2>) -> Vec<Vec<f64>>
     data
 }
 
-// Helper function to format elapsed time in hours, minutes, seconds format
+/// Formats a `Duration` into a human-readable string in hours, minutes, and seconds format.
+///
+/// # Arguments
+/// * `duration` - The duration to format.
+///
+/// # Returns
+/// A formatted string representing the duration in the format `HH:MM:SS`.
+///
+/// This function is useful for displaying elapsed times or durations in a more readable format.
 pub fn format_duration(duration: std::time::Duration) -> String {
     let secs = duration.as_secs();
     let hours = secs / 3600;

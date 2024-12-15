@@ -2,9 +2,13 @@ use crate::utils::*;
 use burn::prelude::*;
 use plotters::prelude::*;
 
+/// The default caption for the chart
 const CAPTION: &str = "fast-umap";
+
+/// The default path where the plot will be saved
 const PATH: &str = "plot.png";
 
+/// Configuration structure for the chart, including caption, path, width, and height
 #[derive(Debug, Clone)]
 pub struct ChartConfig {
     pub caption: String,
@@ -14,7 +18,7 @@ pub struct ChartConfig {
 }
 
 impl ChartConfig {
-    // Builder pattern for configuring the chart
+    /// Builder pattern for configuring the chart
     pub fn builder() -> ChartConfigBuilder {
         ChartConfigBuilder {
             caption: Some(CAPTION.to_string()),
@@ -26,6 +30,7 @@ impl ChartConfig {
 }
 
 impl Default for ChartConfig {
+    /// Default implementation for ChartConfig with preset values
     fn default() -> Self {
         ChartConfig {
             caption: CAPTION.to_string(),
@@ -36,6 +41,7 @@ impl Default for ChartConfig {
     }
 }
 
+/// Builder pattern for `ChartConfig` struct to allow flexible configuration
 pub struct ChartConfigBuilder {
     caption: Option<String>,
     path: Option<String>,
@@ -44,31 +50,31 @@ pub struct ChartConfigBuilder {
 }
 
 impl ChartConfigBuilder {
-    // Set caption
+    /// Set the caption for the chart
     pub fn caption(mut self, caption: &str) -> Self {
         self.caption = Some(caption.to_string());
         self
     }
 
-    // Set path
+    /// Set the path where the chart will be saved
     pub fn path(mut self, path: &str) -> Self {
         self.path = Some(path.to_string());
         self
     }
 
-    // Set width
+    /// Set the width of the chart
     pub fn width(mut self, width: u32) -> Self {
         self.width = Some(width);
         self
     }
 
-    // Set height
+    /// Set the height of the chart
     pub fn height(mut self, height: u32) -> Self {
         self.height = Some(height);
         self
     }
 
-    // Build the final config
+    /// Build and return the final `ChartConfig`
     pub fn build(self) -> ChartConfig {
         ChartConfig {
             caption: self.caption.unwrap_or_else(|| CAPTION.to_string()),
@@ -81,11 +87,21 @@ impl ChartConfigBuilder {
 
 type Float = f64;
 
+/// Plot the 2D chart using the given tensor data and optional chart configuration
+///
+/// # Arguments
+/// * `data` - A 2D tensor of data points to plot
+/// * `config` - Optional custom chart configuration
 pub fn chart_tensor<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
     let data: Vec<Vec<Float>> = convert_tensor_to_vector(data);
     chart_vector(data, config);
 }
 
+/// Plot the 2D chart using the provided data and configuration
+///
+/// # Arguments
+/// * `data` - A 2D vector of data points to plot
+/// * `config` - Optional custom chart configuration
 pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
     let config = config.unwrap_or(ChartConfig::default());
 
@@ -175,6 +191,11 @@ pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
     root.present().unwrap();
 }
 
+/// Plot the loss curve over epochs and save it to a file
+///
+/// # Arguments
+/// * `losses` - A vector of loss values over multiple epochs
+/// * `output_path` - Path where the plot will be saved
 pub fn plot_loss(losses: Vec<f64>, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Calculate the min and max loss values
     let min_loss = losses.iter().cloned().fold(f64::INFINITY, f64::min);

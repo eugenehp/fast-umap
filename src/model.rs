@@ -2,17 +2,28 @@ use burn::prelude::*;
 use nn::{Linear, LinearConfig, Relu};
 use serde::{Deserialize, Serialize};
 
+/// A neural network model representing the UMAP architecture, consisting of four linear layers and ReLU activations
+///
+/// # Arguments
+/// * `B` - The backend type for tensor operations (e.g., `AutodiffBackend`)
 #[derive(Module, Debug)]
 pub struct UMAPModel<B: Backend> {
-    linear1: Linear<B>,
-    linear2: Linear<B>,
-    linear3: Linear<B>,
-    linear4: Linear<B>,
-    activation: Relu,
+    linear1: Linear<B>, // First linear layer
+    linear2: Linear<B>, // Second linear layer
+    linear3: Linear<B>, // Third linear layer
+    linear4: Linear<B>, // Fourth linear layer
+    activation: Relu,   // ReLU activation function
 }
 
 impl<B: Backend> UMAPModel<B> {
-    /// Create a new instance of UMAPModel from a given configuration
+    /// Creates a new instance of `UMAPModel` with the specified configuration and device
+    ///
+    /// # Arguments
+    /// * `config` - Configuration struct containing the input size, hidden size, and output size
+    /// * `device` - The device on which the model should be initialized (e.g., CPU or GPU)
+    ///
+    /// # Returns
+    /// A new `UMAPModel` instance initialized with the provided configuration
     pub fn new(config: &UMAPModelConfig, device: &Device<B>) -> Self {
         // Initialize the first linear layer with the input size and hidden size
         let linear1 = LinearConfig::new(config.input_size, config.hidden_size)
@@ -41,9 +52,16 @@ impl<B: Backend> UMAPModel<B> {
         }
     }
 
-    /// Forward pass: Pass the input through the model layers
+    /// Perform a forward pass through the model
+    ///
+    /// # Arguments
+    /// * `input` - A 2D tensor representing the input data, with shape (n_samples, n_features)
+    ///
+    /// # Returns
+    /// A 2D tensor representing the output after passing through all the layers and activations
+    ///
+    /// The input passes sequentially through the four linear layers, with ReLU activations applied between each layer.
     pub fn forward(&self, input: Tensor<B, 2>) -> Tensor<B, 2> {
-        // let x = input.detach();
         let x = self.linear1.forward(input); // First linear transformation
         let x = self.activation.forward(x); // Apply ReLU
         let x = self.linear2.forward(x); // Second linear transformation
@@ -55,7 +73,12 @@ impl<B: Backend> UMAPModel<B> {
     }
 }
 
-/// The configuration structure for the UMAPModel
+/// Configuration structure for creating a `UMAPModel`
+///
+/// # Fields
+/// * `input_size` - Number of input features
+/// * `hidden_size` - Size of the hidden layers
+/// * `output_size` - Number of output features
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UMAPModelConfig {
     pub input_size: usize,  // Number of input features
@@ -64,13 +87,21 @@ pub struct UMAPModelConfig {
 }
 
 impl UMAPModelConfig {
-    /// Create a new builder for the UMAPModelConfig
+    /// Creates a new builder for the `UMAPModelConfig`
+    ///
+    /// # Returns
+    /// A new `UMAPModelConfigBuilder` to configure the model
     pub fn builder() -> UMAPModelConfigBuilder {
         UMAPModelConfigBuilder::default()
     }
 }
 
-/// The builder for the UMAPModelConfig
+/// Builder pattern for the `UMAPModelConfig` struct
+///
+/// # Fields
+/// * `input_size` - Option for the number of input features
+/// * `hidden_size` - Option for the size of the hidden layers
+/// * `output_size` - Option for the number of output features
 #[derive(Debug, Clone)]
 pub struct UMAPModelConfigBuilder {
     input_size: Option<usize>,
@@ -89,25 +120,46 @@ impl Default for UMAPModelConfigBuilder {
 }
 
 impl UMAPModelConfigBuilder {
-    /// Set the input size
+    /// Set the input size for the model
+    ///
+    /// # Arguments
+    /// * `input_size` - The number of input features
+    ///
+    /// # Returns
+    /// The updated `UMAPModelConfigBuilder` with the specified input size
     pub fn input_size(mut self, input_size: usize) -> Self {
         self.input_size = Some(input_size);
         self
     }
 
-    /// Set the hidden size
+    /// Set the hidden layer size for the model
+    ///
+    /// # Arguments
+    /// * `hidden_size` - The size of the hidden layers
+    ///
+    /// # Returns
+    /// The updated `UMAPModelConfigBuilder` with the specified hidden size
     pub fn hidden_size(mut self, hidden_size: usize) -> Self {
         self.hidden_size = Some(hidden_size);
         self
     }
 
-    /// Set the output size
+    /// Set the output size for the model
+    ///
+    /// # Arguments
+    /// * `output_size` - The number of output features
+    ///
+    /// # Returns
+    /// The updated `UMAPModelConfigBuilder` with the specified output size
     pub fn output_size(mut self, output_size: usize) -> Self {
         self.output_size = Some(output_size);
         self
     }
 
-    /// Build the UMAPModelConfig
+    /// Build and return the final `UMAPModelConfig`
+    ///
+    /// # Returns
+    /// A `Result` containing the built `UMAPModelConfig` or an error message if required fields are missing
     pub fn build(self) -> Result<UMAPModelConfig, String> {
         // Ensure that all required fields are set
         Ok(UMAPModelConfig {
