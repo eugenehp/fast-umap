@@ -57,32 +57,25 @@ pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
     table.printstd();
 }
 
-pub fn print_tensor_with_title<B: Backend, const D: usize>(
-    title: Option<&str>,
-    data: &Tensor<B, D>,
-) {
-    if let Some(title) = title {
-        println!("{title}")
-    }
-
+pub fn print_tensor_with_title<B: Backend, const D: usize>(title: &str, data: &Tensor<B, D>) {
+    println!("{title}");
     print_tensor(data);
 }
 
-pub fn convert_tensor_to_vector<B: Backend, F>(data: Tensor<B, 2>) -> Vec<Vec<F>>
-where
-    F: From<f32> + From<f64>, // Ensure that F can be constructed from f32
-                              // f32: From<F>,
-                              // f64: From<F>,
-{
+pub fn convert_tensor_to_vector<B: Backend>(data: Tensor<B, 2>) -> Vec<Vec<f64>> {
+    // print_tensor_with_title(Some("convert_tensor_to_vector"), &data);
     let n_components = data.dims()[1]; // usually 2 dimensional
-    let data = data.to_data().to_vec::<f64>().unwrap();
-    let data: Vec<Vec<F>> = data
+
+    // Burn Tensor only has f32 precision inside the tensors, when you export to to_data
+    let data = data.to_data().to_vec::<f32>().unwrap();
+
+    let data: Vec<Vec<f64>> = data
         .chunks(n_components)
         .map(|chunk| {
             chunk
                 .to_vec()
                 .into_iter()
-                .map(|value| F::from(value))
+                .map(|value| f64::from(value))
                 .collect()
         })
         .collect();

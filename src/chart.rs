@@ -2,6 +2,9 @@ use crate::utils::*;
 use burn::prelude::*;
 use plotters::prelude::*;
 
+const CAPTION: &str = "Reduced 2 dimensional UMAP data";
+const PATH: &str = "plot.png";
+
 #[derive(Debug, Clone)]
 pub struct ChartConfig {
     pub caption: String,
@@ -14,8 +17,8 @@ impl ChartConfig {
     // Builder pattern for configuring the chart
     pub fn builder() -> ChartConfigBuilder {
         ChartConfigBuilder {
-            caption: Some("Reduced 2 dimensional UMAP data".to_string()),
-            path: Some("plot.png".to_string()),
+            caption: Some(CAPTION.to_string()),
+            path: Some(PATH.to_string()),
             width: Some(1000),
             height: Some(1000),
         }
@@ -25,8 +28,8 @@ impl ChartConfig {
 impl Default for ChartConfig {
     fn default() -> Self {
         ChartConfig {
-            caption: "Reduced 2 dimensional UMAP data".to_string(),
-            path: "plot.png".to_string(),
+            caption: CAPTION.to_string(),
+            path: PATH.to_string(),
             width: 1000,
             height: 1000,
         }
@@ -68,21 +71,23 @@ impl ChartConfigBuilder {
     // Build the final config
     pub fn build(self) -> ChartConfig {
         ChartConfig {
-            caption: self
-                .caption
-                .unwrap_or_else(|| "Reduced 2 dimensional UMAP data".to_string()),
-            path: self.path.unwrap_or_else(|| "plot.png".to_string()),
+            caption: self.caption.unwrap_or_else(|| CAPTION.to_string()),
+            path: self.path.unwrap_or_else(|| PATH.to_string()),
             width: self.width.unwrap_or(1000),
             height: self.height.unwrap_or(1000),
         }
     }
 }
 
-pub fn chart<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
-    let config = config.unwrap_or(ChartConfig::default());
+type Float = f64;
 
-    type Float = f64;
+pub fn chart_tensor<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
     let data: Vec<Vec<Float>> = convert_tensor_to_vector(data);
+    chart_vector(data, config);
+}
+
+pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
+    let config = config.unwrap_or(ChartConfig::default());
 
     // Create a drawing area with a size of 800x600 pixels
     let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();

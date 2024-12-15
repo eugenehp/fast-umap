@@ -7,7 +7,7 @@ use burn::{
     tensor::{Device, Tensor},
 };
 use fast_umap::{
-    chart::chart,
+    chart,
     model::{UMAPModel, UMAPModelConfigBuilder},
     train::{train, TrainingConfig},
     utils::*,
@@ -69,5 +69,5 @@ fn main() {
 
     // print_tensor_with_title(Some("global"), &global);
     // print_tensor_with_title(Some("local"), &local);
-    chart(local, None);
+    chart::chart_tensor(local, None);
 }

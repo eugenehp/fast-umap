@@ -3,10 +3,7 @@ use model::{UMAPModel, UMAPModelConfigBuilder};
 use train::*;
 use utils::*;
 
-use burn::{
-    backend::{Autodiff, Wgpu},
-    tensor::Device,
-};
+use burn::tensor::Device;
 
 pub mod chart;
 pub mod distance;
@@ -15,22 +12,20 @@ pub mod model;
 pub mod train;
 pub mod utils;
 
-type MyBackend = Wgpu<f32, i32>;
-type MyAutodiffBackend = Autodiff<MyBackend>;
-
 pub struct UMAP<B: AutodiffBackend> {
     model: UMAPModel<B::InnerBackend>,
     device: Device<B>,
 }
 
 impl<B: AutodiffBackend> UMAP<B> {
-    pub fn fit<F>(data: Vec<Vec<F>>) -> Self
+    pub fn fit<F>(data: Vec<Vec<F>>, device: Device<B>) -> Self
     where
         F: From<f32> + From<f64> + Clone,
         f64: From<F>,
-        B: AutodiffBackend,
     {
-        let device = burn::backend::wgpu::WgpuDevice::default();
+        // type MyBackend = Wgpu<f32, i32>;
+        // type MyAutodiffBackend = Autodiff<MyBackend>;
+        // let device = burn::backend::wgpu::WgpuDevice::default();
 
         let batch_size = 1;
         let num_samples = data.len();
@@ -40,7 +35,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         let learning_rate = 0.001;
         let beta1 = 0.9;
         let beta2 = 0.999;
-        let epochs = 400;
+        let epochs = 100;
         let seed = 9999;
 
         B::seed(seed);
@@ -54,9 +49,9 @@ impl<B: AutodiffBackend> UMAP<B> {
             .build()
             .unwrap();
 
-        let model: UMAPModel<_> = UMAPModel::new(&model_config, &device);
+        let model: UMAPModel<B> = UMAPModel::new(&model_config, &device);
 
-        let config = TrainingConfig::<_>::builder()
+        let config = TrainingConfig::builder()
             .epochs(epochs)
             .batch_size(batch_size)
             .learning_rate(learning_rate)
@@ -67,7 +62,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             .expect("Failed to build TrainingConfig");
 
         // Start training with the configured parameters
-        let model = train::<MyAutodiffBackend>(
+        let model = train(
             model,
             num_samples,
             num_features,
@@ -83,11 +78,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         umap
     }
 
-    pub fn transform<F>(&self, data: Vec<Vec<F>>) -> Vec<Vec<F>>
-    where
-        F: From<f64> + From<f32>,
-        f64: From<F>,
-    {
+    pub fn transform(&self, data: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
         let num_samples = data.len();
         let num_features = data[0].len();
 
@@ -99,4 +90,16 @@ impl<B: AutodiffBackend> UMAP<B> {
 
         result
     }
+}
+
+use burn::backend::wgpu::{Wgpu, WgpuDevice};
+use burn::backend::Autodiff;
+
+pub fn umap<F>(data: Vec<Vec<F>>) -> UMAP<Autodiff<Wgpu>>
+where
+    F: From<f32> + From<f64> + Clone,
+    f64: From<F>,
+{
+    let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default());
+    model
 }

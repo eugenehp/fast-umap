@@ -1,4 +1,4 @@
-use fast_umap::{utils::*, UMAP};
+use fast_umap::{chart::chart_vector, umap, utils::*};
 
 fn main() {
     let num_samples = 100;
@@ -9,9 +9,9 @@ fn main() {
         .map(|chunk| chunk.to_vec())
         .collect();
 
-    let umap = UMAP::fit(data.clone());
+    let umap = umap(data.clone());
     let reduced_dimensions = umap.transform(data);
 
     // print_tensor_with_title(Some("local"), &local);
-    chart(reduced_dimensions, None);
+    chart_vector(reduced_dimensions, None);
 }
