@@ -46,13 +46,13 @@ fn main() {
     // println!("{}", model);
 
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
-        .epochs(epochs)
-        .batch_size(batch_size)
-        .learning_rate(learning_rate)
-        .device(device)
-        .beta1(beta1)
-        .beta2(beta2)
-        .verbose(verbose)
+        .with_epochs(epochs)
+        .with_batch_size(batch_size)
+        .with_learning_rate(learning_rate)
+        .with_device(device)
+        .with_beta1(beta1)
+        .with_beta2(beta2)
+        .with_verbose(verbose)
         .build()
         .expect("Failed to build TrainingConfig");
 

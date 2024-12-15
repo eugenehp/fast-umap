@@ -38,49 +38,49 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
     // Set the number of epochs
-    pub fn epochs(mut self, epochs: usize) -> Self {
+    pub fn with_epochs(mut self, epochs: usize) -> Self {
         self.epochs = Some(epochs);
         self
     }
 
     // Set the batch size
-    pub fn batch_size(mut self, batch_size: usize) -> Self {
+    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = Some(batch_size);
         self
     }
 
     // Set the learning rate
-    pub fn learning_rate(mut self, learning_rate: f64) -> Self {
+    pub fn with_learning_rate(mut self, learning_rate: f64) -> Self {
         self.learning_rate = Some(learning_rate);
         self
     }
 
     // Set the device (e.g., CPU or GPU)
-    pub fn device(mut self, device: Device<B>) -> Self {
+    pub fn with_device(mut self, device: Device<B>) -> Self {
         self.device = Some(device);
         self
     }
 
     // Set the beta1 value for the Adam optimizer
-    pub fn beta1(mut self, beta1: f64) -> Self {
+    pub fn with_beta1(mut self, beta1: f64) -> Self {
         self.beta1 = Some(beta1);
         self
     }
 
     // Set the beta2 value for the Adam optimizer
-    pub fn beta2(mut self, beta2: f64) -> Self {
+    pub fn with_beta2(mut self, beta2: f64) -> Self {
         self.beta2 = Some(beta2);
         self
     }
 
     // Set the penalty value for the Adam optimizer
-    pub fn penalty(mut self, penalty: f64) -> Self {
+    pub fn with_penalty(mut self, penalty: f64) -> Self {
         self.penalty = Some(penalty);
         self
     }
 
     // Set the verbose value
-    pub fn verbose(mut self, verbose: bool) -> Self {
+    pub fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = Some(verbose);
         self
     }

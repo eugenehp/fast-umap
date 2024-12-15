@@ -52,12 +52,12 @@ impl<B: AutodiffBackend> UMAP<B> {
         let model: UMAPModel<B> = UMAPModel::new(&model_config, &device);
 
         let config = TrainingConfig::builder()
-            .epochs(epochs)
-            .batch_size(batch_size)
-            .learning_rate(learning_rate)
-            .device(device.clone())
-            .beta1(beta1)
-            .beta2(beta2)
+            .with_epochs(epochs)
+            .with_batch_size(batch_size)
+            .with_learning_rate(learning_rate)
+            .with_device(device.clone())
+            .with_beta1(beta1)
+            .with_beta2(beta2)
             .build()
             .expect("Failed to build TrainingConfig");
 
