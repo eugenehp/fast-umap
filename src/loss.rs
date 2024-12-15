@@ -37,34 +37,3 @@ pub fn pairwise_distance<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 
     distances
 }
-
-/// Compute the UMAP loss between global and local representations using pairwise distances
-///
-/// # Arguments
-/// * `global_distances` - A 1D tensor containing pairwise distances in the high-dimensional (global) representation
-/// * `local` - A 2D tensor containing the low-dimensional (local) representation of shape (n_samples, n_features)
-///
-/// # Returns
-/// A 1D tensor representing the UMAP loss between global and local pairwise distances
-///
-/// This function computes the UMAP loss by calculating the difference between pairwise distances in
-/// global and local representations, clamping the distances to avoid overflow, and summing the squared differences.
-pub fn umap_loss<B: AutodiffBackend>(
-    global_distances: Tensor<B, 1>, // Distances in the high-dimensional (global) representation
-    local: Tensor<B, 2>,            // Low-dimensional (local) representation
-) -> Tensor<B, 1> {
-    // Compute pairwise distances for both global and local representations
-    let local_distances = pairwise_distance(local);
-
-    // we have to add these to prevent "attempt to subtract with overflow" error
-    let max_distance = 1e6; // A reasonable upper bound
-    let safe_global_distances = global_distances.clamp(0.0, max_distance);
-    let safe_local_distances = local_distances.clamp(0.0, max_distance);
-
-    // Compute the loss as the Frobenius norm (L2 loss) between the pairwise distance matrices
-    let difference = (safe_global_distances - safe_local_distances)
-        .powi_scalar(2)
-        .sum();
-
-    difference
-}
