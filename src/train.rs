@@ -8,6 +8,7 @@ use crate::{
     utils::convert_vector_to_tensor,
 };
 use burn::{
+    nn::loss::MseLoss,
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
     tensor::{backend::AutodiffBackend, cast::ToElement, Device},
 };
@@ -189,12 +190,19 @@ pub fn train<B: AutodiffBackend>(
     let mut best_loss = f64::INFINITY;
     let mut epochs_without_improvement = 0;
 
+    let mse_loss = MseLoss::new();
+
     loop {
         // Forward pass to get the local (low-dimensional) representation.
         let local = model.forward(tensor_data.clone());
 
-        // Calculate the UMAP loss using pairwise distance in both the global and local spaces.
-        let loss = umap_loss(global_distances.clone(), local);
+        let local_distances = pairwise_distance(local);
+
+        let loss = mse_loss.forward(
+            global_distances.clone(),
+            local_distances,
+            burn::nn::loss::Reduction::Sum,
+        );
 
         // Compute gradients and update the model parameters using the optimizer.
         let grads = loss.backward();
