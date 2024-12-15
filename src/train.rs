@@ -1,10 +1,7 @@
 use std::time::Instant;
 
 use crate::{
-    chart::plot_loss,
-    format_duration,
-    loss::{pairwise_distance, umap_loss},
-    model::UMAPModel,
+    chart::plot_loss, format_duration, loss::pairwise_distance, model::UMAPModel,
     utils::convert_vector_to_tensor,
 };
 use burn::{
