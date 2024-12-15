@@ -1,7 +1,7 @@
 [package]
 name = "fast-umap"
 description = "UMAP (Uniform Manifold Approximation and Projection) in Rust"
-keywords = ["UMAP", "dimensionality reduction", "manifold learning", "Rust", "machine learning", "GPU"]
+keywords = ["UMAP", "dimensionality reduction", "manifold learning", "machine learning", "GPU"]
 categories = ["science", "mathematics", "visualization"]
 authors = ["Eugene Hauptmann"]
 repository = "https://github.com/eugenehp/fast-map"
