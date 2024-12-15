@@ -6,6 +6,7 @@ categories = ["science", "mathematics", "visualization"]
 authors = ["Eugene Hauptmann"]
 repository = "https://github.com/eugenehp/fast-map"
 homepage = "https://github.com/eugenehp/fast-map"
+license-file = "LICENSE"
 version = "0.0.1"
 edition = "2021"
 
