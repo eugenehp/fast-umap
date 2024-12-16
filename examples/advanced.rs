@@ -35,11 +35,10 @@ fn main() {
     let epochs = 400; // Number of training epochs
     let seed = 9999; // Random seed for reproducibility
     let verbose = true; // Enables the progress bar for training
-    let patience = 50; // Number of epochs with no improvement before stopping early
+    let patience = 10; // Number of epochs with no improvement before stopping early
     let min_desired_loss = 0.001;
-    let metric = Metric::Euclidean; // this also works
-                                    // let metric = Metric::EuclideanKNN; // this also works
-                                    // let metric = "euclidean_knn";
+    // let metric = Metric::EuclideanKNN; // this also works
+    let metric = "euclidean_knn";
 
     // Seed the random number generator for reproducibility
     MyBackend::seed(seed);
