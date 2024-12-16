@@ -1,15 +1,14 @@
 use burn::module::AutodiffModule;
-#[allow(unused_imports)]
+
 use burn::{
     backend::{Autodiff, Wgpu},
-    prelude::Backend,
     prelude::*,
-    tensor::{Device, Tensor},
 };
 use fast_umap::{
     chart,
     model::{UMAPModel, UMAPModelConfigBuilder},
-    train::{train, TrainingConfig},
+    prelude::*,
+    train::train,
     utils::*,
 };
 
@@ -25,8 +24,9 @@ fn main() {
 
     // Set the training parameters
     let batch_size = 1; // Batch size for training
-    let num_samples = 1000; // Number of samples in the dataset
-    let num_features = 100; // Number of features (dimensions) for each sample
+    let num_samples = 10; //1000; // Number of samples in the dataset
+    let num_features = 10; // 100; // Number of features (dimensions) for each sample
+    let k_neighbors = 10; // should be smaller than k_neighbors
     let output_size = 2; // Number of output dimensions (e.g., 2 for 2D embeddings)
     let hidden_size = 100; // Size of the hidden layer in the neural network
     let learning_rate = 0.001; // Learning rate for optimization
@@ -35,7 +35,11 @@ fn main() {
     let epochs = 400; // Number of training epochs
     let seed = 9999; // Random seed for reproducibility
     let verbose = true; // Enables the progress bar for training
-    let patience = 30; // Number of epochs with no improvement before stopping early
+    let patience = 50; // Number of epochs with no improvement before stopping early
+    let min_desired_loss = 0.001;
+    let metric = Metric::Euclidean; // this also works
+                                    // let metric = Metric::EuclideanKNN; // this also works
+                                    // let metric = "euclidean_knn";
 
     // Seed the random number generator for reproducibility
     MyBackend::seed(seed);
@@ -63,7 +67,10 @@ fn main() {
         .with_beta1(beta1) // Set the beta1 parameter for Adam optimizer
         .with_beta2(beta2) // Set the beta2 parameter for Adam optimizer
         .with_verbose(verbose) // Enable or disable the progress bar
-        .with_patience(patience) // Set the patience for early stopping
+        .with_patience(patience)
+        .with_metric(metric.into())
+        .with_k_neighbors(k_neighbors)
+        .with_min_desired_loss(min_desired_loss)
         .build()
         .expect("Failed to build TrainingConfig");
 
@@ -77,7 +84,7 @@ fn main() {
     );
 
     // Validate the trained model
-    let model = model.valid();
+    let (model, _) = model.valid();
 
     // Convert the training data into a tensor for input to the model
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);

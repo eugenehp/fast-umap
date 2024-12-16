@@ -1,15 +1,47 @@
-use std::time::Instant;
+use std::{fmt, time::Instant};
 
 use crate::{
-    chart::plot_loss, format_duration, loss::pairwise_distance, model::UMAPModel,
-    utils::convert_vector_to_tensor,
+    chart::plot_loss, format_duration, loss::*, model::UMAPModel, utils::convert_vector_to_tensor,
 };
 use burn::{
     nn::loss::MseLoss,
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
-    tensor::{backend::AutodiffBackend, cast::ToElement, Device},
+    tensor::{backend::AutodiffBackend, cast::ToElement, Device, Tensor},
 };
 use indicatif::{ProgressBar, ProgressStyle};
+
+#[derive(Debug)]
+pub enum LossReduction {
+    Mean,
+    Sum,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Metric {
+    Euclidean,
+    EuclideanKNN,
+}
+
+// Implement From<&str> for Metric
+impl From<&str> for Metric {
+    fn from(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "euclidean" => Metric::Euclidean,
+            "euclideanknn" | "euclidean_knn" => Metric::EuclideanKNN,
+            _ => panic!("Invalid metric type: {}", s),
+        }
+    }
+}
+
+// Implement Display for Metric
+impl fmt::Display for Metric {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Metric::Euclidean => write!(f, "Euclidean"),
+            Metric::EuclideanKNN => write!(f, "Euclidean KNN"),
+        }
+    }
+}
 
 /// Configuration for training the UMAP model.
 ///
@@ -18,6 +50,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 /// verbosity and early stopping through patience.
 #[derive(Debug)]
 pub struct TrainingConfig<B: AutodiffBackend> {
+    pub metric: Metric,
     pub epochs: usize,         // Total number of training epochs.
     pub batch_size: usize,     // Size of each training batch.
     pub learning_rate: f64,    // Learning rate for the optimizer.
@@ -27,6 +60,9 @@ pub struct TrainingConfig<B: AutodiffBackend> {
     pub penalty: f64,          // L2 regularization (weight decay) penalty.
     pub verbose: bool,         // Whether to show detailed progress information.
     pub patience: Option<i32>, // Early stopping patience. None disables early stopping.
+    pub loss_reduction: LossReduction,
+    pub k_neighbors: usize,
+    pub min_desired_loss: Option<f64>,
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -41,6 +77,7 @@ impl<B: AutodiffBackend> TrainingConfig<B> {
 /// Builder pattern for constructing a `TrainingConfig` with optional parameters.
 #[derive(Default)]
 pub struct TrainingConfigBuilder<B: AutodiffBackend> {
+    metric: Option<Metric>,
     epochs: Option<usize>,
     batch_size: Option<usize>,
     learning_rate: Option<f64>,
@@ -50,9 +87,17 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     penalty: Option<f64>,
     verbose: Option<bool>,
     patience: Option<i32>,
+    loss_reduction: Option<LossReduction>,
+    k_neighbors: Option<usize>,
+    min_desired_loss: Option<f64>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
+    pub fn with_metric(mut self, metric: Metric) -> Self {
+        self.metric = Some(metric);
+        self
+    }
+
     /// Set the number of epochs for training.
     pub fn with_epochs(mut self, epochs: usize) -> Self {
         self.epochs = Some(epochs);
@@ -110,12 +155,28 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    pub fn with_loss_reduction(mut self, loss_reduction: LossReduction) -> Self {
+        self.loss_reduction = Some(loss_reduction);
+        self
+    }
+
+    pub fn with_k_neighbors(mut self, k_neighbors: usize) -> Self {
+        self.k_neighbors = Some(k_neighbors);
+        self
+    }
+
+    pub fn with_min_desired_loss(mut self, min_desired_loss: f64) -> Self {
+        self.min_desired_loss = Some(min_desired_loss);
+        self
+    }
+
     /// Finalize and create a `TrainingConfig` with the specified options.
     ///
     /// This method returns an `Option<TrainingConfig>` where `None` indicates that
     /// not all required parameters have been set. Default values are used for missing fields.
     pub fn build(self) -> Option<TrainingConfig<B>> {
         Some(TrainingConfig {
+            metric: self.metric.unwrap_or(Metric::Euclidean),
             epochs: self.epochs?,
             batch_size: self.batch_size?,
             learning_rate: self.learning_rate.unwrap_or(0.001), // Default to 0.001 if not set
@@ -125,7 +186,20 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             penalty: self.penalty.unwrap_or(5e-5), // Default penalty if not set
             verbose: self.verbose.unwrap_or(false),
             patience: self.patience,
+            loss_reduction: self.loss_reduction.unwrap_or(LossReduction::Sum),
+            k_neighbors: self.k_neighbors.unwrap_or(15),
+            min_desired_loss: self.min_desired_loss,
         })
+    }
+}
+
+fn get_distance<B: AutodiffBackend>(
+    data: Tensor<B, 2>,
+    config: &TrainingConfig<B>,
+) -> Tensor<B, 1> {
+    match config.metric {
+        Metric::Euclidean => euclidean(data),
+        Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
     }
 }
 
@@ -149,7 +223,11 @@ pub fn train<B: AutodiffBackend>(
     num_features: usize,        // Number of features (columns) in each sample.
     data: Vec<f64>,             // Training data.
     config: &TrainingConfig<B>, // Configuration parameters for training.
-) -> UMAPModel<B> {
+) -> (UMAPModel<B>, Vec<f64>) {
+    if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
+        panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
+    }
+
     // Convert the input data into a tensor for processing.
     let tensor_data =
         convert_vector_to_tensor::<B>(data.clone(), num_samples, num_features, &config.device);
@@ -180,7 +258,9 @@ pub fn train<B: AutodiffBackend>(
     };
 
     // Precompute the pairwise distances in the global space for loss calculation.
-    let global_distances = pairwise_distance(tensor_data.clone());
+    let global_distances = get_distance(tensor_data.clone(), config);
+
+    // print_tensor_with_title("global_distances", &global_distances);
 
     let mut epoch = 0;
     let mut losses: Vec<f64> = vec![];
@@ -193,7 +273,7 @@ pub fn train<B: AutodiffBackend>(
         // Forward pass to get the local (low-dimensional) representation.
         let local = model.forward(tensor_data.clone());
 
-        let local_distances = pairwise_distance(local);
+        let local_distances = get_distance(local, config);
 
         let loss = mse_loss.forward(
             global_distances.clone(),
@@ -240,12 +320,19 @@ pub fn train<B: AutodiffBackend>(
             break; // Stop training if the specified number of epochs is reached.
         }
 
+        // stop early, if we reached the desired loss
+        if let Some(min_desired_loss) = config.min_desired_loss {
+            if current_loss < min_desired_loss {
+                break;
+            }
+        }
+
         epoch += 1; // Increment epoch counter.
     }
 
     // If verbose mode is enabled, plot the loss curve after training.
     if config.verbose {
-        plot_loss(losses, "losses.png").unwrap();
+        plot_loss(losses.clone(), "losses.png").unwrap();
     }
 
     // Finish the progress bar if it was used.
@@ -254,5 +341,5 @@ pub fn train<B: AutodiffBackend>(
     }
 
     // Return the trained model.
-    model
+    (model, losses)
 }

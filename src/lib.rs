@@ -87,7 +87,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         );
 
         // Validate the trained model
-        let model: UMAPModel<_> = model.valid();
+        let (model, _) = model.valid();
 
         // Return the fitted UMAP model wrapped in the UMAP struct
         let umap = UMAP { model, device };
@@ -142,12 +142,14 @@ impl<B: AutodiffBackend> UMAP<B> {
 #[allow(unused)]
 /// Predefined module for commonly used utilities like generating test data and charting functions.
 pub mod prelude {
-    use crate::{chart, utils, UMAP};
+    use crate::{chart, train, utils, UMAP};
     use burn::backend::wgpu::{Wgpu, WgpuDevice};
     use burn::backend::Autodiff;
 
     // Re-export common utilities for easier use
     pub use chart::{chart_tensor, chart_vector};
+    pub use train::Metric;
+    pub use train::{TrainingConfig, TrainingConfigBuilder};
     pub use utils::generate_test_data;
 
     /// Convenience function for running UMAP with WGPU backend.
