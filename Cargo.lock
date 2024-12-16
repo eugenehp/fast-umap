@@ -2644,9 +2644,8 @@ dependencies = [
 
 [[package]]
 name = "mnist"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a06eb594c0749d3a505304db3b7a9c9891630d32daad059e81bfd0d51846f95c"
+version = "0.6.1"
+source = "git+https://github.com/eugenehp/mnist.git#c236ff0264f6eb5484c27bb8e3d7dbffd220f08f"
 dependencies = [
  "byteorder",
  "curl",

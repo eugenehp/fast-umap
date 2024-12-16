@@ -1,4 +1,5 @@
 use burn::{backend::*, module::*, prelude::*};
+#[allow(unused)]
 use fast_umap::{
     chart::*,
     model::*,
@@ -51,7 +52,7 @@ fn main() {
         // tst_lbl,
         ..
     } = MnistBuilder::new()
-        // .download_and_extract() // this one is broken
+        .download_and_extract()
         .label_format_digit()
         .training_set_length(num_samples as u32)
         // .validation_set_length(10_000)
