@@ -179,103 +179,100 @@ cargo run --example advanced
 Sample code:
 
 ```rust
-use burn::module::AutodiffModule;
-#[allow(unused_imports)]
-use burn::{
-    backend::{Autodiff, Wgpu},
-    prelude::Backend,
-    prelude::*,
-    tensor::{Device, Tensor},
-};
-use fast_umap::{
-    chart,
-    model::{UMAPModel, UMAPModelConfigBuilder},
-    train::{train, TrainingConfig},
-    utils::*,
-};
+use burn::{backend::*, module::*, prelude::*};
+use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
 
 fn main() {
-    // Define the custom backend type using Wgpu with specific precision (f32) and integer type (i32)
+    // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
     type MyBackend = Wgpu<f32, i32>;
 
     // Define the AutodiffBackend based on the custom MyBackend type
     type MyAutodiffBackend = Autodiff<MyBackend>;
 
-    // Initialize the device (GPU) for computation
+    // Initialize the GPU device for computation
     let device = burn::backend::wgpu::WgpuDevice::default();
 
-    // Set the training parameters
-    let batch_size = 1; // Batch size for training
-    let num_samples = 1000; // Number of samples in the dataset
+    // Set training hyperparameters
+    let batch_size = 1; // Number of samples per batch during training
+    let num_samples = 1000; // Total number of samples in the dataset
     let num_features = 100; // Number of features (dimensions) for each sample
-    let output_size = 2; // Number of output dimensions (e.g., 2 for 2D embeddings)
-    let hidden_size = 100; // Size of the hidden layer in the neural network
+    let k_neighbors = 10; // Number of nearest neighbors for the UMAP algorithm
+    let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
+    let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
     let learning_rate = 0.001; // Learning rate for optimization
-    let beta1 = 0.9; // Beta1 parameter for Adam optimizer
-    let beta2 = 0.999; // Beta2 parameter for Adam optimizer
+    let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
+    let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
     let epochs = 400; // Number of training epochs
-    let seed = 9999; // Random seed for reproducibility
-    let verbose = true; // Enables the progress bar for training
-    let patience = 30; // Number of epochs with no improvement before stopping early
+    let seed = 9999; // Random seed to ensure reproducibility
+    let verbose = true; // Whether to enable the progress bar during training
+    let patience = 10; // Number of epochs without improvement before early stopping
+    let min_desired_loss = 0.001; // Minimum loss threshold for early stopping
+    let timeout = 60;
 
-    // Seed the random number generator for reproducibility
+    // let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
+    let metric = "euclidean_knn"; // Distance metric used for the nearest neighbor search
+
+    // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);
 
     // Generate random test data for training
     let train_data = generate_test_data(num_samples, num_features);
 
-    // Configure the model by setting input size, hidden size, and output size
+    // Configure the UMAP model with the specified input size, hidden layer size, and output size
     let model_config = UMAPModelConfigBuilder::default()
         .input_size(num_features)
-        .hidden_size(hidden_size)
+        .hidden_sizes(hidden_sizes)
         .output_size(output_size)
         .build()
         .unwrap();
 
-    // Initialize the UMAP model with the specified configuration and device
+    // Initialize the UMAP model with the defined configuration and the selected device
     let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
 
-    // Set up the training configuration with the specified parameters
+    // Set up the training configuration with the specified hyperparameters
     let config = TrainingConfig::<MyAutodiffBackend>::builder()
-        .with_epochs(epochs) // Set the number of training epochs
-        .with_batch_size(batch_size) // Set the batch size
-        .with_learning_rate(learning_rate) // Set the learning rate
-        .with_device(device) // Set the computation device (GPU)
-        .with_beta1(beta1) // Set the beta1 parameter for Adam optimizer
-        .with_beta2(beta2) // Set the beta2 parameter for Adam optimizer
+        .with_epochs(epochs) // Set the number of epochs for training
+        .with_batch_size(batch_size) // Set the batch size for training
+        .with_learning_rate(learning_rate) // Set the learning rate for the optimizer
+        .with_device(device) // Specify the device (GPU) for computation
+        .with_beta1(beta1) // Set the beta1 parameter for the Adam optimizer
+        .with_beta2(beta2) // Set the beta2 parameter for the Adam optimizer
         .with_verbose(verbose) // Enable or disable the progress bar
         .with_patience(patience) // Set the patience for early stopping
+        .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
+        .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
+        .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
+        .with_timeout(timeout) // set timeout in seconds
         .build()
         .expect("Failed to build TrainingConfig");
 
-    // Start training the model with the training data and configuration
+    // Start training the UMAP model with the specified training data and configuration
     let model = train::<MyAutodiffBackend>(
         model,              // The model to train
-        num_samples,        // Number of samples in the dataset
+        num_samples,        // Total number of training samples
         num_features,       // Number of features per sample
         train_data.clone(), // The training data
         &config,            // The training configuration
     );
 
-    // Validate the trained model
-    let model = model.valid();
+    // Validate the trained model after training
+    let (model, _) = model.valid();
 
-    // Convert the training data into a tensor for input to the model
+    // Convert the training data into a tensor for model input
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
 
-    // Perform the forward pass to get the low-dimensional (local) representation
+    // Perform a forward pass through the model to obtain the low-dimensional (local) representation
     let local = model.forward(global.clone());
 
-    // Optionally, print the global and local tensors for inspection (commented-out for now)
+    // Optionally, print the global and local tensors for inspection (currently commented out)
     // if verbose {
     //     print_tensor_with_title("global", &global);
     //     print_tensor_with_title("local", &local);
     // }
 
-    // Visualize the reduced dimensions (2D embedding) using a chart
+    // Visualize the 2D embedding (local representation) using a chart
     chart::chart_tensor(local, None);
 }
-
 ```
 
 It also generates 2d plot, and a loss chart:
