@@ -33,7 +33,7 @@ impl<B: AutodiffBackend> UMAP<B> {
     /// This method initializes the model configuration, sets up the training parameters (like batch size, learning rate, etc.),
     /// and runs the training process using the provided data. It returns an instance of the `UMAP` struct containing
     /// the trained model and the device.
-    pub fn fit<F>(data: Vec<Vec<F>>, device: Device<B>) -> Self
+    pub fn fit<F>(data: Vec<Vec<F>>, device: Device<B>, output_size: usize) -> Self
     where
         F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
         f64: From<F>,                     // Ensure F can be converted to f64
@@ -42,7 +42,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         let batch_size = 1;
         let num_samples = data.len();
         let num_features = data[0].len();
-        let output_size = 2; // UMAP typically reduces the data to 2 dimensions
+        // let output_size = 2; // UMAP typically reduces the data to 2 dimensions
         let hidden_sizes = vec![100]; // Size of the hidden layers in the model
         let learning_rate = 0.001; // Learning rate for optimization
         let beta1 = 0.9; // Beta1 parameter for Adam optimizer
@@ -152,21 +152,55 @@ pub mod prelude {
     pub use train::{TrainingConfig, TrainingConfigBuilder};
     pub use utils::generate_test_data;
 
-    /// Convenience function for running UMAP with WGPU backend.
+    /// Convenience function for running UMAP with the WGPU backend.
     ///
     /// # Arguments
     /// * `data` - A vector of vectors, where each inner vector represents a data sample with multiple features.
     ///
     /// # Returns
-    /// A trained `UMAP` model that has been fitted to the input data.
+    /// A trained `UMAP` model that has been fitted to the input data, using the WGPU backend for computation.
     ///
-    /// This function wraps the `UMAP::fit` method and provides a simplified way to fit UMAP models.
+    /// This function wraps the `UMAP::fit` method and provides a simplified way to fit UMAP models with the WGPU backend.
+    /// The resulting model will have 2-dimensional output by default.
+    ///
+    /// # Example
+    /// ```rust
+    /// let data = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
+    /// let model = umap(data);
+    /// ```
     pub fn umap<F>(data: Vec<Vec<F>>) -> UMAP<Autodiff<Wgpu>>
     where
         F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
         f64: From<F>,                     // Ensure F can be converted to f64
     {
-        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default());
+        let output_size = 2;
+        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default(), output_size);
+        model
+    }
+
+    /// Convenience function for running UMAP with the WGPU backend and a custom output size.
+    ///
+    /// # Arguments
+    /// * `data` - A vector of vectors, where each inner vector represents a data sample with multiple features.
+    /// * `output_size` - The number of dimensions for the reduced output. This controls the dimensionality of the embedding space.
+    ///
+    /// # Returns
+    /// A trained `UMAP` model that has been fitted to the input data, using the WGPU backend for computation and the specified output size.
+    ///
+    /// This function wraps the `UMAP::fit` method, providing a way to fit UMAP models with the WGPU backend and a customizable number of output dimensions.
+    ///
+    /// # Example
+    /// ```rust
+    /// let data = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
+    /// let output_size = 3;
+    /// let model = umap_size(data, output_size);
+    /// ```
+    pub fn umap_size<F>(data: Vec<Vec<F>>, output_size: usize) -> UMAP<Autodiff<Wgpu>>
+    where
+        F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
+        f64: From<F>,                     // Ensure F can be converted to f64
+    {
+        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default(), output_size);
         model
     }
 }
