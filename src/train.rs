@@ -1,4 +1,7 @@
-use std::{fmt, time::Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
 use crate::{
     chart::plot_loss, format_duration, loss::*, model::UMAPModel, utils::convert_vector_to_tensor,
@@ -63,6 +66,7 @@ pub struct TrainingConfig<B: AutodiffBackend> {
     pub loss_reduction: LossReduction,
     pub k_neighbors: usize,
     pub min_desired_loss: Option<f64>,
+    pub timeout: Option<u64>, // Maximum time for training in seconds (e.g., 60 for 1 minute).
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -90,6 +94,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     loss_reduction: Option<LossReduction>,
     k_neighbors: Option<usize>,
     min_desired_loss: Option<f64>,
+    timeout: Option<u64>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
@@ -170,6 +175,12 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    /// set timeout in seconds
+    pub fn with_timeout(mut self, timeout: u64) -> Self {
+        self.timeout = Some(timeout);
+        self
+    }
+
     /// Finalize and create a `TrainingConfig` with the specified options.
     ///
     /// This method returns an `Option<TrainingConfig>` where `None` indicates that
@@ -189,6 +200,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             loss_reduction: self.loss_reduction.unwrap_or(LossReduction::Sum),
             k_neighbors: self.k_neighbors.unwrap_or(15),
             min_desired_loss: self.min_desired_loss,
+            timeout: self.timeout,
         })
     }
 }
@@ -324,6 +336,17 @@ pub fn train<B: AutodiffBackend>(
         if let Some(min_desired_loss) = config.min_desired_loss {
             if current_loss < min_desired_loss {
                 break;
+            }
+        }
+
+        // Check for timeout
+        if let Some(timeout) = config.timeout {
+            if elapsed >= Duration::new(timeout, 0) {
+                println!(
+                    "Training stopped due to timeout after {:.2?} seconds.",
+                    elapsed
+                );
+                break; // Stop training if the elapsed time exceeds the timeout
             }
         }
 
