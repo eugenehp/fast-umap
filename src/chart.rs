@@ -173,10 +173,10 @@ pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
         .draw_series(data.iter().map(|values| {
             Circle::new(
                 (values[0], values[1]),
-                5,
+                3,
                 ShapeStyle {
                     color: RED.to_rgba(),
-                    filled: true,
+                    filled: false,
                     stroke_width: 1,
                 },
             )

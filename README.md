@@ -18,8 +18,8 @@ See [documentation](https://docs.rs/crate/fast-umap/latest) for more.
 
 ## Roadmap
 
-- [ ] Add MNIST dataset example. add intermediary plots. move charting into a feature.
-- [ ] Implement batches, accumulated gradient
+- [ ] Add MNIST dataset example. add intermediary plots. move charting into a feature. add labels in the plots.
+- [ ] Implement batches, **accumulated gradient**
 - [ ] precompute inital local fitting with the PCA
 - [ ] Create testbench to compare different hyper parameters (`patience` vs `n_features` vs `epochs` etc.)
 
