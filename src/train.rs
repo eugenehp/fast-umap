@@ -255,7 +255,33 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
     }
 }
 
-fn get_distance<B: AutodiffBackend>(
+/// Computes the distance metric for the given data.
+///
+/// This function calculates the distance between points in the provided `data` tensor
+/// according to the metric specified in the `config`. It currently supports the following
+/// metrics:
+///
+/// - `Euclidean`: Computes the Euclidean distance between points.
+/// - `EuclideanKNN`: Computes the Euclidean distance using k-nearest neighbors (KNN), with `k_neighbors`
+///   determining the number of nearest neighbors to consider.
+///
+/// # Parameters
+/// - `data`: A 2D tensor representing the data points, where each row is a point and each column is a feature.
+/// - `config`: The training configuration, which specifies the metric and other parameters like `k_neighbors`.
+///
+/// # Returns
+/// A 1D tensor containing the computed distances for each point based on the selected metric.
+///
+/// # Type Parameters
+/// - `B`: The backend type used for automatic differentiation (AutodiffBackend), which enables GPU or CPU computations.
+///
+/// # Example
+/// ```rust
+/// let data = Tensor::from(...); // Some 2D tensor of data points
+/// let config = TrainingConfig { metric: Metric::Euclidean, k_neighbors: 5 };
+/// let distances = get_distance_by_metric(data, &config);
+/// ```
+fn get_distance_by_metric<B: AutodiffBackend>(
     data: Tensor<B, 2>,
     config: &TrainingConfig<B>,
 ) -> Tensor<B, 1> {
@@ -325,7 +351,7 @@ pub fn train<B: AutodiffBackend>(
     };
 
     // Precompute the pairwise distances in the global space for loss calculation.
-    let global_distances = get_distance(tensor_data.clone(), config);
+    let global_distances = get_distance_by_metric(tensor_data.clone(), config);
 
     // print_tensor_with_title("global_distances", &global_distances);
 
@@ -340,7 +366,7 @@ pub fn train<B: AutodiffBackend>(
         // Forward pass to get the local (low-dimensional) representation.
         let local = model.forward(tensor_data.clone());
 
-        let local_distances = get_distance(local.clone(), config);
+        let local_distances = get_distance_by_metric(local.clone(), config);
 
         let loss = mse_loss.forward(
             global_distances.clone(),
