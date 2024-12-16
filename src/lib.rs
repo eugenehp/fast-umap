@@ -6,7 +6,7 @@ use utils::*;
 use burn::tensor::{Device, Tensor};
 
 pub mod chart;
-pub mod loss;
+pub mod distances;
 pub mod model;
 pub mod train;
 pub mod utils;

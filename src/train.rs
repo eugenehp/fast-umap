@@ -1,13 +1,14 @@
 use std::{
-    fmt,
+    fmt, thread,
     time::{Duration, Instant},
 };
 
 use crate::{
     chart::{self, plot_loss, ChartConfigBuilder},
+    distances::*,
     format_duration,
-    loss::*,
     model::UMAPModel,
+    normalize_data,
     utils::convert_vector_to_tensor,
 };
 use burn::{
@@ -282,12 +283,17 @@ pub fn train<B: AutodiffBackend>(
     mut model: UMAPModel<B>,
     num_samples: usize,         // Number of samples in the dataset.
     num_features: usize,        // Number of features (columns) in each sample.
-    data: Vec<f64>,             // Training data.
+    mut data: Vec<f64>,         // Training data.
     config: &TrainingConfig<B>, // Configuration parameters for training.
 ) -> (UMAPModel<B>, Vec<f64>) {
     if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
+
+    // Normalize the input data (Z-score normalization).
+    normalize_data(&mut data, num_samples, num_features);
+
+    // println!("Normalized data - {:?}", data.clone()[0..100].to_vec());
 
     // Convert the input data into a tensor for processing.
     let tensor_data =
@@ -401,15 +407,18 @@ pub fn train<B: AutodiffBackend>(
 
         const STEP: usize = 100;
         if epoch > 0 && epoch % STEP == 0 {
-            let chart_config = ChartConfigBuilder::default()
-                .caption("MNIST")
-                .path(format!("mnist_{epoch}.png").as_str())
-                .build();
+            let losses = losses.clone();
+            thread::spawn(move || {
+                let chart_config = ChartConfigBuilder::default()
+                    .caption("MNIST")
+                    .path(format!("mnist_{epoch}.png").as_str())
+                    .build();
 
-            // Visualize the 2D embedding (local representation) using a chart
-            chart::chart_tensor(local.clone(), Some(chart_config));
-            // print only last losses
-            plot_loss(losses.clone()[STEP..].to_vec(), "losses.png").unwrap();
+                // Visualize the 2D embedding (local representation) using a chart
+                chart::chart_tensor(local.clone(), Some(chart_config));
+                // print only last losses
+                plot_loss(losses.clone()[STEP..].to_vec(), "losses.png").unwrap();
+            });
         }
 
         epoch += 1; // Increment epoch counter.

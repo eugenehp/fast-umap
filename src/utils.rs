@@ -144,3 +144,53 @@ pub fn format_duration(duration: std::time::Duration) -> String {
     let seconds = secs % 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
+
+// a constant used to offset division by zero in the normalization function below
+const SMALL_STD_DEV: f64 = 1e-6;
+
+/// Normalizes the given dataset by centering each feature (column) to have mean 0
+/// and standard deviation 1.
+///
+/// # Arguments
+/// * `data` - A mutable slice representing the dataset, where each row is a sample,
+///   and each column represents a feature. The data is assumed to be stored in
+///   row-major order (i.e., `data[sample_idx * num_features + feature_idx]`).
+/// * `num_samples` - The number of samples (rows) in the dataset.
+/// * `num_features` - The number of features (columns) in the dataset.
+///
+/// # Example
+/// ```
+/// let mut data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+/// let num_samples = 2;
+/// let num_features = 3;
+/// normalize_data(&mut data, num_samples, num_features);
+/// ```
+/// The function will normalize each feature (column) across all samples (rows).
+///
+/// # Note
+/// This function assumes that the dataset has at least one sample and one feature.
+/// The data is normalized in-place, meaning the original data is modified directly.
+pub fn normalize_data(data: &mut [f64], num_samples: usize, num_features: usize) {
+    for feature_idx in 0..num_features {
+        // Calculate mean and standard deviation for the current feature
+        let mut sum = 0.0;
+        let mut sum_sq = 0.0;
+
+        for sample_idx in 0..num_samples {
+            let value = data[sample_idx * num_features + feature_idx];
+            sum += value;
+            sum_sq += value * value;
+        }
+
+        let mean = sum / num_samples as f64;
+        let variance = (sum_sq / num_samples as f64) - (mean * mean);
+        let std_dev = variance.sqrt();
+
+        // Normalize the feature
+        for sample_idx in 0..num_samples {
+            let value = data[sample_idx * num_features + feature_idx];
+            let normalized_value = (value - mean) / (std_dev + SMALL_STD_DEV);
+            data[sample_idx * num_features + feature_idx] = normalized_value;
+        }
+    }
+}
