@@ -101,16 +101,72 @@ let model_config = UMAPModelConfigBuilder::default()
     .unwrap();
 ```
 
+Certainly! Here's an improved version of your documentation with additional details for clarity and completeness:
+
+---
+
 ## Training the UMAP Model
 
-You can train the UMAP model on your dataset by calling the `fit` method on the `UMAP` struct. The training process will optimize the model's weights to reduce the data's dimensionality.
+To train the UMAP model on your dataset, you can use the `fit` method of the `UMAP` struct. The training process involves optimizing the model's weights to effectively reduce the dimensionality of the data while preserving its underlying structure.
 
-Training configuration parameters include:
+The training process is governed by several key configuration parameters, which control aspects of optimization, regularization, and performance. These parameters can be customized to suit your specific training needs:
 
-- **epochs**: The number of epochs to train the model.
-- **batch_size**: The number of samples per training batch.
-- **learning_rate**: The learning rate for gradient descent.
-- **beta1**, **beta2**: Optimizer hyperparameters for Adam optimization.
+### Configuration Parameters:
+
+- **`epochs`**:  
+  Specifies the total number of epochs (iterations over the entire dataset) to run during training. Increasing the number of epochs allows the model more time to converge but may also increase the risk of overfitting.
+
+- **`batch_size`**:  
+  Defines the number of samples to process in each training batch. Larger batch sizes typically speed up training but require more memory. A smaller batch size may help the model generalize better but might take longer to train.
+
+- **`learning_rate`**:  
+  The learning rate determines the size of the steps the optimizer will take during parameter updates. A higher learning rate can speed up training but may cause instability, while a smaller learning rate ensures more gradual updates but might result in slower convergence.
+
+- **`beta1`** and **`beta2`**:  
+  These are the hyperparameters for the Adam optimizer:
+  - **`beta1`** controls the decay rate of the first moment estimate (the moving average of the gradients).
+  - **`beta2`** controls the decay rate of the second moment estimate (the moving average of the squared gradients).
+  Both parameters influence how the optimizer adapts the learning rate over time, with typical values being `beta1 = 0.9` and `beta2 = 0.999`.
+
+- **`penalty`**:  
+  L2 regularization (weight decay) applied during training to prevent overfitting by penalizing large model weights. This can help improve the generalization ability of the model.
+
+- **`metric`**:  
+  The distance metric used during training, such as `"euclidean"`, `"manhattan"`, or `"cosine"`. This metric is used to measure the similarity between points and plays a crucial role in the dimensionality reduction process.
+
+- **`verbose`**:  
+  A flag indicating whether detailed progress information (e.g., loss values, training status) should be printed during training. This can be useful for monitoring the model's progress.
+
+- **`patience`**:  
+  The number of epochs to wait for improvement in the loss before triggering early stopping. If the model's performance doesn't improve after `patience` epochs, training will be stopped early to avoid unnecessary computations and prevent overfitting. If set to `None`, early stopping is disabled.
+
+- **`loss_reduction`**:  
+  Specifies how to reduce the loss during training (e.g., "mean" or "sum"). This parameter determines how the loss is aggregated across the training batch.
+
+- **`k_neighbors`**:  
+  The number of nearest neighbors to consider in the UMAP algorithm. This parameter is crucial for determining the local structure of the data and can impact the quality of the dimensionality reduction.
+
+- **`min_desired_loss`**:  
+  An optional parameter that specifies the minimum acceptable loss. If the model's loss reaches this threshold, training will stop. This can be useful if you want to set a target performance level before halting training.
+
+- **`timeout`**:  
+  The maximum amount of time (in seconds) to allow for training. If `None`, there is no time limit. This can be useful for controlling long-running training sessions in resource-constrained environments.
+
+### Summary of Key Parameters:
+- **`epochs`**: Number of epochs to train.
+- **`batch_size`**: Number of samples per batch.
+- **`learning_rate`**: Step size for gradient updates.
+- **`beta1`**, **`beta2`**: Adam optimizer parameters.
+- **`penalty`**: L2 regularization strength.
+- **`verbose`**: Whether to display detailed training progress.
+- **`patience`**: Early stopping criterion.
+- **`loss_reduction`**: Method to reduce loss.
+- **`k_neighbors`**: Number of nearest neighbors in the UMAP algorithm.
+- **`min_desired_loss`**: Optional target loss for stopping early.
+- **`timeout`**: Maximum training time.
+
+By carefully tuning these parameters, you can optimize the UMAP model to better capture the underlying structure of your high-dimensional data while balancing training time, memory usage, and generalization performance.
+
 
 For example:
 
