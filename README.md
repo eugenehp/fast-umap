@@ -16,9 +16,7 @@ This implementation leverages the [burn](https://github.com/tracel-ai/burn) mach
 
 ## Roadmap
 
-- [ ] Add `k-neighbors` element and add precalculated KNN tree to do faster calculations on high dimensional data.
 - [ ] Add MNIST dataset example
-- [ ] Add [different distance functions](https://github.com/eugenehp/fast-distances), not just euclidean
 - [ ] Create testbench to compare different hyper parameters (`patience` vs `n_features` vs `epochs` etc.)
 
 ## Installation

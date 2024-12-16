@@ -21,11 +21,12 @@ fn main() {
 
     // Fit the UMAP model to the data and reduce the data to a lower-dimensional space (default: 2D)
     let umap = umap(data.clone());
+    // let umap = umap_size(data.clone(), 3); // where 3 is the output size of projected dimensions
 
     // Transform the data using the trained UMAP model to reduce its dimensions
     let reduced_dimensions_vector = umap.transform(data.clone());
 
-    // Visualize the reduced dimensions as a vector
+    // Visualize the reduced dimensions as a vector, plots only 2D for now
     chart_vector(reduced_dimensions_vector, None);
 
     // Optionally, you can also visualize the reduced dimensions as a tensor
