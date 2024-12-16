@@ -168,7 +168,7 @@ fn main() {
 
 Generates this plot:
 
-![plot](./docs/plot.png)
+![plot](https://github.com/eugenehp/fast-umap/raw/refs/heads/master/plot.png)
 
 ### Advanced
 
@@ -280,7 +280,7 @@ fn main() {
 
 It also generates 2d plot, and a loss chart:
 
-![loss](./docs/losses.png)
+![loss](https://github.com/eugenehp/fast-umap/raw/refs/heads/master/losses.png)
 
 ## License
 
