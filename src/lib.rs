@@ -43,7 +43,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         let num_samples = data.len();
         let num_features = data[0].len();
         let output_size = 2; // UMAP typically reduces the data to 2 dimensions
-        let hidden_size = 100; // Size of the hidden layers in the model
+        let hidden_sizes = vec![100]; // Size of the hidden layers in the model
         let learning_rate = 0.001; // Learning rate for optimization
         let beta1 = 0.9; // Beta1 parameter for Adam optimizer
         let beta2 = 0.999; // Beta2 parameter for Adam optimizer
@@ -58,7 +58,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         // Build the model configuration
         let model_config = UMAPModelConfigBuilder::default()
             .input_size(num_features)
-            .hidden_size(hidden_size)
+            .hidden_sizes(hidden_sizes)
             .output_size(output_size)
             .build()
             .unwrap();
