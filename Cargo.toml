@@ -1,13 +1,13 @@
 [package]
 name = "fast-umap"
-description = "UMAP (Uniform Manifold Approximation and Projection) in Rust"
+description = "Configurable UMAP (Uniform Manifold Approximation and Projection) in Rust"
 keywords = ["UMAP", "dimensionality", "manifold", "machine-learning", "GPU"]
 categories = ["science", "mathematics", "visualization"]
 authors = ["Eugene Hauptmann"]
 repository = "https://github.com/eugenehp/fast-map"
 homepage = "https://github.com/eugenehp/fast-map"
-license-file = "LICENSE"
-version = "0.0.1"
+license-file = "MIT"
+version = "0.0.2"
 edition = "2021"
 
 [dependencies]
