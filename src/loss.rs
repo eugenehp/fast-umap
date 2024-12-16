@@ -61,39 +61,64 @@ pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 /// let result = euclidean_knn(x, k);
 /// // result will contain the sum of squared distances to the 2 nearest neighbors for each sample
 /// ```
+// pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
+//     let n_samples = x.dims()[0]; // Number of samples (rows)
+//     let _n_features = x.dims()[1]; // Number of features (columns)
+
+//     // Expand x to shapes that allow broadcasting for pairwise subtraction:
+//     // Shape of x_expanded: (1, n_samples, n_features)
+//     let x_expanded = x.clone().unsqueeze::<3>();
+
+//     // Shape of x_transposed: (n_samples, 1, n_features)
+//     let x_transposed = x.clone().unsqueeze_dim(1);
+
+//     // Compute pairwise differences using broadcasting:
+//     // Shape: (n_samples, n_samples, n_features)
+//     let diff = x_expanded - x_transposed;
+
+//     // Element-wise square the differences:
+//     let squared_diff = diff.powi_scalar(2); // Shape: (n_samples, n_samples, n_features)
+
+//     // Sum along the feature dimension (axis 2) to get squared Euclidean distance:
+//     let pairwise_squared_distances = squared_diff.sum_dim(2); // Shape: (n_samples, n_samples)
+
+//     // Now, we have pairwise squared distances in `pairwise_squared_distances`
+//     // For each sample, we want to find the k nearest neighbors, so we do the following:
+
+//     // Get the top K smallest distances (along axis 1) and the corresponding indices:
+//     let (top_k_distances, _top_k_indices) = pairwise_squared_distances.topk_with_indices(k, 1);
+
+//     // Sort distances in ascending order to ensure we are taking the smallest ones:
+//     let top_k_distances = top_k_distances.sort_descending(1);
+
+//     // Sum up the top K distances (you could also take the mean, depending on your loss function):
+//     let sum_of_top_k_distances = top_k_distances.sum_dim(1).reshape([n_samples]); // Shape: (n_samples)
+
+//     // You can return the sum of distances to K nearest neighbors (or use this as part of your loss):
+//     sum_of_top_k_distances
+// }
+
 pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
-    let _n_features = x.dims()[1]; // Number of features (columns)
+    let n_features = x.dims()[1]; // Number of features (columns)
 
-    // Expand x to shapes that allow broadcasting for pairwise subtraction:
-    // Shape of x_expanded: (1, n_samples, n_features)
-    let x_expanded = x.clone().unsqueeze::<3>();
+    // Efficient pairwise squared Euclidean distance computation:
+    // We compute the distances without explicitly creating the full 3D tensor.
 
-    // Shape of x_transposed: (n_samples, 1, n_features)
-    let x_transposed = x.clone().unsqueeze_dim(1);
+    // Step 1: Compute the squared norm of each sample (x^2)
+    let x_norm_squared = x.clone().powi_scalar(2).sum_dim(1); // Shape: (n_samples)
 
-    // Compute pairwise differences using broadcasting:
-    // Shape: (n_samples, n_samples, n_features)
-    let diff = x_expanded - x_transposed;
+    // Step 2: Compute pairwise squared Euclidean distances using broadcasting
+    let pairwise_squared_distances = x_norm_squared.clone().unsqueeze_dim(1)
+        + x_norm_squared.unsqueeze_dim(0)
+        - x.clone().matmul(x.clone().transpose()).mul_scalar(2.0); // Shape: (n_samples, n_samples)
 
-    // Element-wise square the differences:
-    let squared_diff = diff.powi_scalar(2); // Shape: (n_samples, n_samples, n_features)
-
-    // Sum along the feature dimension (axis 2) to get squared Euclidean distance:
-    let pairwise_squared_distances = squared_diff.sum_dim(2); // Shape: (n_samples, n_samples)
-
-    // Now, we have pairwise squared distances in `pairwise_squared_distances`
-    // For each sample, we want to find the k nearest neighbors, so we do the following:
-
-    // Get the top K smallest distances (along axis 1) and the corresponding indices:
+    // Step 3: Get the top K smallest distances for each sample (along axis 1)
     let (top_k_distances, _top_k_indices) = pairwise_squared_distances.topk_with_indices(k, 1);
 
-    // Sort distances in ascending order to ensure we are taking the smallest ones:
-    let top_k_distances = top_k_distances.sort_descending(1);
-
-    // Sum up the top K distances (you could also take the mean, depending on your loss function):
+    // Step 4: Sum the top K distances for each sample
     let sum_of_top_k_distances = top_k_distances.sum_dim(1).reshape([n_samples]); // Shape: (n_samples)
 
-    // You can return the sum of distances to K nearest neighbors (or use this as part of your loss):
+    // Return the sum of the top K distances
     sum_of_top_k_distances
 }

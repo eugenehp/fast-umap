@@ -24,8 +24,8 @@ fn main() {
 
     // Set the training parameters
     let batch_size = 1; // Batch size for training
-    let num_samples = 10; //1000; // Number of samples in the dataset
-    let num_features = 10; // 100; // Number of features (dimensions) for each sample
+    let num_samples = 1000; //1000; // Number of samples in the dataset
+    let num_features = 100; // 100; // Number of features (dimensions) for each sample
     let k_neighbors = 10; // should be smaller than k_neighbors
     let output_size = 2; // Number of output dimensions (e.g., 2 for 2D embeddings)
     let hidden_size = 100; // Size of the hidden layer in the neural network
