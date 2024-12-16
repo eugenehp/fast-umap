@@ -4,7 +4,11 @@ use std::{
 };
 
 use crate::{
-    chart::plot_loss, format_duration, loss::*, model::UMAPModel, utils::convert_vector_to_tensor,
+    chart::{self, plot_loss, ChartConfigBuilder},
+    format_duration,
+    loss::*,
+    model::UMAPModel,
+    utils::convert_vector_to_tensor,
 };
 use burn::{
     nn::loss::MseLoss,
@@ -330,7 +334,7 @@ pub fn train<B: AutodiffBackend>(
         // Forward pass to get the local (low-dimensional) representation.
         let local = model.forward(tensor_data.clone());
 
-        let local_distances = get_distance(local, config);
+        let local_distances = get_distance(local.clone(), config);
 
         let loss = mse_loss.forward(
             global_distances.clone(),
@@ -393,6 +397,19 @@ pub fn train<B: AutodiffBackend>(
                 );
                 break; // Stop training if the elapsed time exceeds the timeout
             }
+        }
+
+        const STEP: usize = 100;
+        if epoch > 0 && epoch % STEP == 0 {
+            let chart_config = ChartConfigBuilder::default()
+                .caption("MNIST")
+                .path(format!("mnist_{epoch}.png").as_str())
+                .build();
+
+            // Visualize the 2D embedding (local representation) using a chart
+            chart::chart_tensor(local.clone(), Some(chart_config));
+            // print only last losses
+            plot_loss(losses.clone()[STEP..].to_vec(), "losses.png").unwrap();
         }
 
         epoch += 1; // Increment epoch counter.

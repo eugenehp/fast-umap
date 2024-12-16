@@ -1,9 +1,9 @@
 use burn::{backend::*, module::*, prelude::*};
 use fast_umap::{
-    chart::{self, ChartConfigBuilder},
+    chart::*,
     model::*,
     prelude::*,
-    train::train,
+    train::{train, LossReduction},
     utils::*,
 };
 use mnist::*;
@@ -27,17 +27,19 @@ fn main() {
     let num_features = 28 * 28; // Number of features (dimensions) for each sample, size of each mnist image
     let k_neighbors = 10; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
-    let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
-    let learning_rate = 0.001; // Learning rate for optimization
+    let hidden_sizes = vec![1000, 500, 100]; // Size of the hidden layer in the neural network
+    let learning_rate = 0.0001; // Learning rate for optimization
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
-    let epochs = 400; // Number of training epochs
+    let epochs = 1000; // Number of training epochs
     let seed = 9999; // Random seed to ensure reproducibility
     let verbose = true; // Whether to enable the progress bar during training
-    let patience = 10; // Number of epochs without improvement before early stopping
+    let patience = 1000; // Number of epochs without improvement before early stopping
     let min_desired_loss = 0.001; // Minimum loss threshold for early stopping
-    let timeout = 60; // timeout in seconds
-    let metric = Metric::Euclidean; // Alternative metric for neighbors search
+    let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
+    let loss_reduction = LossReduction::Sum;
+
+    // let timeout = 60; // timeout in seconds
 
     // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);
@@ -84,7 +86,8 @@ fn main() {
         .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
         .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
-        .with_timeout(timeout) // set timeout in seconds
+        .with_loss_reduction(loss_reduction)
+        // .with_timeout(timeout) // set timeout in seconds
         .build()
         .expect("Failed to build TrainingConfig");
 
@@ -104,7 +107,7 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
 
     // Perform a forward pass through the model to obtain the low-dimensional (local) representation
-    let local = model.forward(global.clone());
+    let _local = model.forward(global.clone());
 
     // Optionally, print the global and local tensors for inspection (currently commented out)
     // if verbose {
@@ -112,11 +115,11 @@ fn main() {
     //     print_tensor_with_title("local", &local);
     // }
 
-    let chart_config = ChartConfigBuilder::default()
-        .caption("MNIST")
-        .path("mnist.png")
-        .build();
+    // let chart_config = ChartConfigBuilder::default()
+    //     .caption("MNIST")
+    //     .path("mnist.png")
+    //     .build();
 
-    // Visualize the 2D embedding (local representation) using a chart
-    chart::chart_tensor(local, Some(chart_config));
+    // // Visualize the 2D embedding (local representation) using a chart
+    // chart::chart_tensor(local, Some(chart_config));
 }
