@@ -20,13 +20,13 @@ fn main() {
     let device = burn::backend::wgpu::WgpuDevice::default();
 
     // Set training hyperparameters
-    let batch_size = 1; // Number of samples per batch during training
+    let batch_size = 1_000; // Number of samples per batch during training
     let num_samples = 1_000 as usize; // Total number of samples in the dataset
 
     // let num_samples = 50_000 as usize; // Total number of samples in the dataset
 
     let num_features = 28 * 28; // Number of features (dimensions) for each sample, size of each mnist image
-    let k_neighbors = 10; // Number of nearest neighbors for the UMAP algorithm
+    let k_neighbors = 15; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
     let hidden_sizes = vec![1000, 500, 100]; // Size of the hidden layer in the neural network
     let learning_rate = 0.0001; // Learning rate for optimization
@@ -37,7 +37,7 @@ fn main() {
     let verbose = true; // Whether to enable the progress bar during training
     let patience = 100; // Number of epochs without improvement before early stopping
     let min_desired_loss = 1.0; // Minimum loss threshold for early stopping
-    let metric = Metric::Euclidean; // Alternative metric for neighbors search
+    let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
 
     // let timeout = 60; // timeout in seconds
