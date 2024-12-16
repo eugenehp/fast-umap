@@ -49,6 +49,17 @@ pub struct ChartConfigBuilder {
     height: Option<u32>,
 }
 
+impl Default for ChartConfigBuilder {
+    fn default() -> Self {
+        ChartConfigBuilder {
+            caption: Some(CAPTION.into()),
+            path: Some(PATH.into()),
+            width: None,
+            height: None,
+        }
+    }
+}
+
 impl ChartConfigBuilder {
     /// Set the caption for the chart
     pub fn caption(mut self, caption: &str) -> Self {

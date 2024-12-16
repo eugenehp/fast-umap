@@ -19,6 +19,7 @@ See [documentation](https://docs.rs/crate/fast-umap/latest) for more.
 ## Roadmap
 
 - [ ] Add MNIST dataset example
+- [ ] Implement batch size
 - [ ] Create testbench to compare different hyper parameters (`patience` vs `n_features` vs `epochs` etc.)
 
 ## Installation
