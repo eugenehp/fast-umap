@@ -18,3 +18,6 @@ plotters = "0.3.7"
 prettytable = "0.10.0"
 rand = "0.8.5"
 serde = "1.0.216"
+
+[dev-dependencies]
+mnist = { version = "0.6.0", features = ["download"] }
