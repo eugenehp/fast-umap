@@ -6,6 +6,8 @@ This repository contains a Rust implementation of **UMAP** (Uniform Manifold App
 
 This implementation leverages the [burn](https://github.com/tracel-ai/burn) machine learning framework, which provides automatic differentiation and GPU support, allowing you to train and apply UMAP models on high-dimensional datasets efficiently.
 
+See [documentation](https://docs.rs/crate/fast-umap/latest) for more.
+
 ## Features
 
 - **Dimensionality Reduction**: Reduces high-dimensional data to a lower-dimensional space (e.g., 2D or 3D) for visualization or further analysis.
