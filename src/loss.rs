@@ -40,31 +40,29 @@ pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     distances
 }
 
-/// Computes the sum of the squared Euclidean distances to the `k` nearest neighbors for each sample.
+/// Computes the sum of the top K smallest pairwise squared Euclidean distances for each sample in the input tensor.
+///
+/// This function calculates the Euclidean distances between all pairs of samples in the input tensor `x` using an efficient method
+/// that avoids creating a full 3D tensor of pairwise distances. It then returns the sum of the K smallest distances for each sample.
 ///
 /// # Parameters
-/// - `x`: A 2D tensor of shape `(n_samples, n_features)`, where `n_samples` is the number of samples
-///   and `n_features` is the number of features (dimensions) for each sample.
-/// - `k`: The number of nearest neighbors to consider.
+/// - `x`: A 2D tensor of shape `(n_samples, n_features)` representing the dataset, where each row is a sample and each column is a feature.
+/// - `k`: The number of nearest neighbors to consider when computing the sum of distances.
 ///
 /// # Returns
-/// A 1D tensor of shape `(n_samples,)`, where each element is the sum of squared Euclidean distances
-/// to the `k` nearest neighbors for the corresponding sample.
-///
-/// # Description
-/// This function computes the pairwise squared Euclidean distances between each sample in the input tensor
-/// `x`, and then identifies the `k` smallest distances for each sample. It returns the sum of these `k` smallest
-/// distances, which can be used in various applications such as k-NN classification or as part of a loss function.
+/// - A 1D tensor of shape `(n_samples,)` containing the sum of the squared Euclidean distances to the top K nearest neighbors
+///   for each sample. The distance computation is done efficiently using broadcasting to avoid creating large intermediate tensors.
 ///
 /// # Example
 /// ```rust
-/// let x = Tensor::<f32>::from([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]);
+/// let x = Tensor::from([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]);
 /// let k = 2;
 /// let result = euclidean_knn(x, k);
-/// // result will contain the sum of squared distances to the 2 nearest neighbors for each sample
+/// println!("{:?}", result); // Output: sum of squared distances for each sample to its 2 nearest neighbors
 /// ```
 pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
+    let _n_features = x.dims()[1]; // Number of features (columns)
     let _n_features = x.dims()[1]; // Number of features (columns)
 
     // Expand x to shapes that allow broadcasting for pairwise subtraction:
