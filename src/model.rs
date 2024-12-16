@@ -62,9 +62,13 @@ impl<B: Backend> UMAPModel<B> {
         let mut x = input;
 
         // Forward pass through each layer with activation
-        for layer in &self.layers {
+        for (i, layer) in self.layers.iter().enumerate() {
             x = layer.forward(x); // Apply linear transformation
-            x = self.activation.forward(x); // Apply ReLU activation
+
+            // Apply activation only if it's not the last layer
+            if i < self.layers.len() - 1 {
+                x = self.activation.forward(x); // Apply ReLU activation
+            }
         }
 
         x
