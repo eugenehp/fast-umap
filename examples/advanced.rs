@@ -26,6 +26,7 @@ fn main() {
     let verbose = true; // Whether to enable the progress bar during training
     let patience = 10; // Number of epochs without improvement before early stopping
     let min_desired_loss = 0.001; // Minimum loss threshold for early stopping
+    let timeout = 60;
 
     // let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
     let metric = "euclidean_knn"; // Distance metric used for the nearest neighbor search
@@ -60,6 +61,7 @@ fn main() {
         .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
         .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
+        .with_timeout(timeout) // set timeout in seconds
         .build()
         .expect("Failed to build TrainingConfig");
 
