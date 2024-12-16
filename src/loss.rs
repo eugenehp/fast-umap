@@ -1,7 +1,5 @@
 use burn::tensor::{backend::AutodiffBackend, Tensor};
 
-use crate::print_tensor_with_title;
-
 /// Calculate the pairwise Euclidean distance matrix for a given 2D tensor
 ///
 /// # Arguments
