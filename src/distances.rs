@@ -155,3 +155,63 @@ pub fn cosine<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
 
     x.reshape([n_samples])
 }
+
+/// Computes the Minkowski distance between each row of a tensor and the first row.
+///
+/// The Minkowski distance is a generalized distance metric defined as:
+///
+/// D(x, y) = (sum_i |x_i - y_i|^p)^(1/p)
+///
+/// Where `x` and `y` are vectors (rows), and `p` is the order of the distance. When `p = 1`,
+/// this becomes the **Manhattan distance**, and when `p = 2`, it becomes the **Euclidean distance**.
+///
+/// This function calculates the Minkowski distance between each row of the input tensor and the
+/// first row of the tensor. It returns a 1D tensor containing the computed distances for each row.
+///
+/// # Arguments
+/// * `tensor` - A 2D tensor of shape `(n_samples, n_features)`, where each row represents a sample.
+/// * `p` - A scalar value representing the order of the Minkowski distance. `p` must be a positive number.
+///
+/// # Returns
+/// A 1D tensor of shape `(n_samples,)` where each element is the Minkowski distance between the
+/// corresponding row of the input tensor and the first row.
+///
+/// # Example
+/// ```
+/// let tensor = Tensor::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+/// let distances = minkowski(tensor, 2.0);
+/// // `distances` will contain the Euclidean distances between each row and the first row.
+/// ```
+///
+/// # Notes
+/// - The first row of the tensor is used as the reference row to compute distances.
+/// - The function supports any positive value of `p`. For `p = 1`, it computes Manhattan distance,
+///   and for `p = 2`, it computes Euclidean distance.
+/// - The function works element-wise along rows and sums over features (columns) to compute the distance.
+///
+/// # Performance
+/// The function clones the tensor to avoid modifying the original data. For large tensors, this may
+/// incur some overhead due to memory allocation. You may want to explore optimization techniques like
+/// in-place operations if memory usage is a concern.
+pub fn minkowski<B: AutodiffBackend>(tensor: Tensor<B, 2>, p: f64) -> Tensor<B, 1> {
+    let n_samples = tensor.dims()[0];
+    let n_features = tensor.dims()[1];
+
+    // Compute the L2 norm (distance to itself) for each row as a reference (row 0)
+    let reference_row = tensor.clone().slice([0..1, 0..n_features]); // First row as the reference
+
+    // Compute the element-wise absolute difference between the reference row and all rows
+    let diff = tensor.clone().sub(reference_row.clone()).abs();
+
+    // Raise the absolute differences to the power of p
+    let diff_p = diff.powf_scalar(p);
+
+    // Sum over the features (dim 1) for each row
+    let sum_p = diff_p.sum_dim(1);
+
+    // Take the p-th root of the sum
+    let distances = sum_p.powf_scalar(1.0 / p);
+
+    // Return the distances as a 1D tensor
+    distances.reshape([n_samples])
+}

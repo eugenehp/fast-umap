@@ -17,7 +17,7 @@ pub enum Metric {
     // Correlation,
     // Hamming,
     // Jaccard,
-    // Minkowski,
+    Minkowski,
     // Chebyshev,
     // Mahalnobis,
     // Spearman, // Spearman’s Rank Correlation Distance
@@ -31,6 +31,7 @@ impl From<&str> for Metric {
             "euclideanknn" | "euclidean_knn" => Metric::EuclideanKNN,
             "manhattan" => Metric::Manhattan,
             "cosine" => Metric::Cosine,
+            "minkowski" => Metric::Minkowski,
             _ => panic!("Invalid metric type: {}", s),
         }
     }
@@ -44,6 +45,7 @@ impl fmt::Display for Metric {
             Metric::EuclideanKNN => write!(f, "Euclidean KNN"),
             Metric::Manhattan => write!(f, "Manhattan"),
             Metric::Cosine => write!(f, "cosine"),
+            Metric::Minkowski => write!(f, "minkowski"),
         }
     }
 }
@@ -101,6 +103,8 @@ pub struct TrainingConfig<B: AutodiffBackend> {
 
     // normalize distance output
     pub normalized: bool,
+
+    pub minkowski_p: f64,
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -130,6 +134,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     min_desired_loss: Option<f64>,
     timeout: Option<u64>,
     normalized: Option<bool>,
+    minkowski_p: Option<f64>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
@@ -237,6 +242,13 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    /// The minkowski function supports any positive value of `p`. For `p = 1`,
+    /// it computes Manhattan distance, and for `p = 2`, it computes Euclidean distance.
+    pub fn with_minkowski_p(mut self, p: f64) -> Self {
+        self.minkowski_p = Some(p);
+        self
+    }
+
     /// Finalize and create a `TrainingConfig` with the specified options.
     ///
     /// This method returns an `Option<TrainingConfig>`. If any required parameters are missing,
@@ -258,6 +270,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             min_desired_loss: self.min_desired_loss,     // Optional, no default
             timeout: self.timeout,                       // Optional, no default
             normalized: self.normalized.unwrap_or(true), // normalize output of distance by default
+            minkowski_p: self.minkowski_p.unwrap_or(1.0), // default to 1.0 so it computes Manhattan distance
         })
     }
 }
