@@ -18,8 +18,10 @@ use burn::{
     tensor::{backend::AutodiffBackend, cast::ToElement, Tensor},
 };
 pub use config::*;
+use ctrlc;
 use get_distance_by_metric::get_distance_by_metric;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::sync::mpsc::channel;
 use std::{thread, time::Instant};
 
 /// Train the UMAP model over multiple epochs.
@@ -46,6 +48,11 @@ pub fn train<B: AutodiffBackend>(
     if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
+
+    let (exit_tx, exit_rx) = channel();
+
+    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
 
     let batch_size = config.batch_size;
 
@@ -122,9 +129,13 @@ pub fn train<B: AutodiffBackend>(
 
     let mse_loss = MseLoss::new();
 
-    loop {
+    'main: loop {
         // println!("batch {}", format_duration(start_time.elapsed()));
         for (batch_idx, _) in batches.iter().enumerate() {
+            if let Ok(_) = exit_rx.try_recv() {
+                break 'main;
+            }
+
             let tensor_batch = &tensor_batches[batch_idx];
             let global_distances = &global_distances_batches[batch_idx];
 
