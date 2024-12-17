@@ -1,4 +1,5 @@
 use core::f64;
+use std::sync::Mutex;
 
 use burn::{
     prelude::Backend,
@@ -6,6 +7,7 @@ use burn::{
 };
 use prettytable::{row, Table};
 use rand::Rng;
+use rayon::prelude::*;
 
 /// Generates random test data with the given number of samples and features.
 ///
@@ -171,26 +173,41 @@ const SMALL_STD_DEV: f64 = 1e-6;
 /// This function assumes that the dataset has at least one sample and one feature.
 /// The data is normalized in-place, meaning the original data is modified directly.
 pub fn normalize_data(data: &mut [f64], num_samples: usize, num_features: usize) {
-    for feature_idx in 0..num_features {
-        // Calculate mean and standard deviation for the current feature
-        let mut sum = 0.0;
-        let mut sum_sq = 0.0;
+    // Create a mutable copy of the data
+    let normalized_data = Mutex::new(data.to_vec());
 
-        for sample_idx in 0..num_samples {
-            let value = data[sample_idx * num_features + feature_idx];
-            sum += value;
-            sum_sq += value * value;
-        }
+    // Parallelize the outer loop over features
+    (0..num_features).into_par_iter().for_each(|feature_idx| {
+        // Calculate mean and standard deviation for the current feature
+        let (sum, sum_sq) = (0..num_samples)
+            .into_par_iter()
+            .fold(
+                || (0.0, 0.0), // Initial value for fold: (sum, sum_sq)
+                |(acc_sum, acc_sum_sq), sample_idx| {
+                    let value = data[sample_idx * num_features + feature_idx];
+                    (acc_sum + value, acc_sum_sq + value * value)
+                },
+            )
+            .reduce(
+                || (0.0, 0.0),
+                |(sum1, sum_sq1), (sum2, sum_sq2)| (sum1 + sum2, sum_sq1 + sum_sq2),
+            );
 
         let mean = sum / num_samples as f64;
         let variance = (sum_sq / num_samples as f64) - (mean * mean);
         let std_dev = variance.sqrt();
 
-        // Normalize the feature
-        for sample_idx in 0..num_samples {
+        // Normalize the feature in parallel and store results in `normalized_data`
+        (0..num_samples).into_par_iter().for_each(|sample_idx| {
             let value = data[sample_idx * num_features + feature_idx];
             let normalized_value = (value - mean) / (std_dev + SMALL_STD_DEV);
-            data[sample_idx * num_features + feature_idx] = normalized_value;
-        }
-    }
+            // Lock the Mutex to safely access `normalized_data`
+            let mut normalized_data = normalized_data.lock().unwrap();
+            normalized_data[sample_idx * num_features + feature_idx] = normalized_value;
+        });
+    });
+
+    // After parallel computation, copy the normalized data back to the original `data`
+    let normalized_data = normalized_data.lock().unwrap();
+    data.copy_from_slice(&normalized_data);
 }
