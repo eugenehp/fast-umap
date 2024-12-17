@@ -99,3 +99,59 @@ pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
 
     x
 }
+
+/// Computes the cosine similarity between each row of a 2D tensor and the first row.
+///
+/// This function calculates the cosine similarity between each sample (row) in the input tensor
+/// and the first sample (first row). The cosine similarity is defined as the dot product of two
+/// vectors divided by the product of their magnitudes (L2 norms). The result is a 1D tensor where
+/// each element represents the cosine similarity between the corresponding row and the first row.
+///
+/// # Arguments
+/// * `tensor` - A 2D tensor of shape `(n_samples, n_features)` representing the data. The function
+///   computes cosine similarity between each row (sample) and the first row.
+///
+/// # Returns
+/// A 1D tensor of shape `(n_samples,)` containing the cosine similarities between the first row and
+/// each of the other rows in the input tensor. The values are in the range [-1, 1], where 1 indicates
+/// identical orientation, 0 indicates orthogonality, and -1 indicates opposite orientation.
+///
+/// # Example
+/// ```
+/// let tensor = Tensor::from([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]);
+/// let similarities = cosine(tensor);
+/// // `similarities` is a 1D tensor of cosine similarities between the first row and all other rows
+/// ```
+///
+/// # Notes
+/// The function uses the following steps:
+/// 1. Computes the L2 norm (magnitude) of the first row.
+/// 2. Computes the dot product of each row with the first row.
+/// 3. Computes the L2 norm of each row.
+/// 4. Divides the dot product by the product of the norms to compute cosine similarity.
+///
+/// # Performance
+/// This function clones the tensor multiple times, which may impact performance for large tensors.
+/// Optimizations could be made to minimize memory allocations and cloning.
+pub fn cosine<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
+    let n_samples = tensor.dims()[0];
+    let n_features = tensor.dims()[1];
+    // First, get the first row to compare to
+    let first_row = tensor.clone().slice([0..1, 0..n_features]); // Select the first row
+
+    // Compute L2 norm of the first row manually (sqrt(sum(x^2)))
+    let first_row_norm = first_row.clone().powi_scalar(2).sum_dim(1).sqrt();
+
+    // Compute dot product of each row with the first row
+    let dot_product: Tensor<B, 2> = tensor.clone().mul(first_row.clone()); // Calculate dot product for each row
+    let dot_product: Tensor<B, 3> = dot_product.unsqueeze_dim(2);
+    let dot_product: Tensor<B, 2> = dot_product.sum_dim(1).reshape([n_samples, 1]); // Reshape to a column vector (1D)
+
+    // Compute L2 norm (magnitude) of each row manually (sqrt(sum(x^2)))
+    let row_norms = tensor.clone().powi_scalar(2).sum_dim(1).sqrt();
+
+    // Compute cosine similarity
+    let x = dot_product.div(row_norms).div(first_row_norm);
+
+    x.reshape([n_samples])
+}
