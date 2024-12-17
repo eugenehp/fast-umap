@@ -12,7 +12,9 @@ use crate::{
 use burn::{
     module::AutodiffModule,
     nn::loss::MseLoss,
-    optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
+    optim::{
+        decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
+    },
     tensor::{backend::AutodiffBackend, cast::ToElement, Tensor},
 };
 pub use config::*;
@@ -97,6 +99,8 @@ pub fn train<B: AutodiffBackend>(
         .with_beta_2(config.beta2 as f32);
     let mut optim = config_optimizer.init();
 
+    let mut accumulator = GradientsAccumulator::new();
+
     // Start the timer to track training duration.
     let start_time = Instant::now();
 
@@ -156,12 +160,19 @@ pub fn train<B: AutodiffBackend>(
             // Compute gradients and update the model parameters using the optimizer.
             losses.push(current_loss);
             total_loss = total_loss + loss;
+
+            let grads = total_loss.backward();
+            let batch_grads = GradientsParams::from_grads(grads, &model);
+
+            // Accumulate gradients.
+            accumulator.accumulate(&model, batch_grads);
         }
 
         let current_loss = losses.last().unwrap().clone();
 
-        let grads = total_loss.backward();
-        let grads = GradientsParams::from_grads(grads, &model);
+        // let grads = total_loss.backward();
+        // let grads = GradientsParams::from_grads(grads, &model);
+        let grads = accumulator.grads(); // Pop the accumulated gradients.
 
         // Perform an optimization step to update model parameters.
         model = optim.step(config.learning_rate, model, grads);
