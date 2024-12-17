@@ -95,6 +95,9 @@ pub fn train<B: AutodiffBackend>(
         global_distances_batches.push(global_distances);
     }
 
+    let global_distances_all = Tensor::<B, 1>::cat(global_distances_batches, 0); // Concatenate along the 0-axis
+    let tensor_batches_all = Tensor::<B, 2>::cat(tensor_batches, 0); // Concatenate along the 0-axis
+
     // Initialize the Adam optimizer with weight decay (L2 regularization).
     let config_optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(config.penalty)))
@@ -136,8 +139,16 @@ pub fn train<B: AutodiffBackend>(
                 break 'main;
             }
 
-            let tensor_batch = &tensor_batches[batch_idx];
-            let global_distances = &global_distances_batches[batch_idx];
+            // let tensor_batch: &Tensor<B, 2> = &tensor_batches[batch_idx];
+            // let global_distances: &Tensor<B, 1> = &global_distances_batches[batch_idx];
+
+            // Slice the corresponding part of the global_distances_all tensor for this batch
+            let start_idx = batch_idx * batch_size; // Calculate the starting index
+            let end_idx = (batch_idx + 1) * batch_size; // Calculate the ending index
+            let end_idx = end_idx.min(tensor_batches_all.shape().dims[0]); // Clip to the size of the tensor
+
+            let tensor_batch = tensor_batches_all.clone().slice([start_idx..end_idx]); // Slice the tensor
+            let global_distances = global_distances_all.clone().slice([start_idx..end_idx]); // Slice the tensor
 
             // Forward pass to get the local (low-dimensional) representation.
             let local = model.forward(tensor_batch.clone());
