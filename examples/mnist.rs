@@ -40,7 +40,7 @@ fn main() {
     let min_desired_loss = 0.0001; // Minimum loss threshold for early stopping
     let metric = Metric::Minkowski; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
-    // TODO: non 1.0 gives NaN loss.
+    // below 1.0 gives NaN loss. Mind that it's rounded to integer inside the function
     let minkowski_p = 3.0; // 1 is manhattan, 2 is Euclidean
     let normalized = true; // to reduce math, and keep it at float
 
