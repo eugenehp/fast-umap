@@ -3,7 +3,7 @@ use std::sync::Mutex;
 
 use burn::{
     prelude::Backend,
-    tensor::{Device, Tensor, TensorData},
+    tensor::{backend::AutodiffBackend, Device, Tensor, TensorData},
 };
 use prettytable::{row, Table};
 use rand::Rng;
@@ -210,4 +210,76 @@ pub fn normalize_data(data: &mut [f64], num_samples: usize, num_features: usize)
     // After parallel computation, copy the normalized data back to the original `data`
     let normalized_data = normalized_data.lock().unwrap();
     data.copy_from_slice(&normalized_data);
+}
+
+/// Normalizes a 1D tensor using min-max normalization.
+///
+/// This function performs min-max normalization on a 1D tensor, scaling its values
+/// to a range between 0 and 1. If the minimum and maximum values of the tensor are
+/// equal (i.e., the tensor has no variance), the original tensor is returned unmodified.
+///
+/// # Type Parameters
+///
+/// - `B`: The autodiff backend type. This should implement the `AutodiffBackend` trait,
+///   which provides support for automatic differentiation.
+///
+/// # Arguments
+///
+/// - `tensor`: A 1D tensor of type `Tensor<B, 1>`, which represents the input data to be normalized.
+///
+/// # Returns
+///
+/// - A new tensor of the same type and shape as the input tensor, with normalized values.
+///   If the minimum and maximum values of the tensor are equal, the original tensor is returned unchanged.
+///
+/// # Explanation
+///
+/// The normalization is performed using the following formula:
+///
+/// ```
+/// normalized = (tensor - min) / (max - min + epsilon)
+/// ```
+///
+/// Where:
+/// - `min`: The minimum value in the tensor.
+/// - `max`: The maximum value in the tensor.
+/// - `epsilon`: A small constant (`1e-6`) added to prevent division by zero, ensuring numerical stability.
+///
+/// The function first checks if the minimum and maximum values are equal. If they are, it avoids division by zero
+/// and simply returns the original tensor. If they are not equal, it applies the min-max normalization formula.
+///
+/// # Example
+///
+/// ```rust
+/// let tensor = Tensor::<B, 1>::from_data(vec![1.0, 2.0, 3.0], &device);
+/// let normalized_tensor = normalize_tensor(tensor);
+/// ```
+pub fn normalize_tensor<B: AutodiffBackend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
+    let device = tensor.device();
+
+    // Normalize the result using min-max normalization:
+    let min_val = tensor.clone().min(); // Find the minimum value
+    let max_val = tensor.clone().max(); // Find the maximum value
+
+    // this is to prevent deleting by zero
+    let offset_val = Tensor::<B, 1>::from_data(TensorData::new(vec![1e-6], [1]), &device);
+
+    let are_equal = max_val
+        .clone()
+        .equal(min_val.clone())
+        .to_data()
+        .to_vec::<bool>()
+        .unwrap();
+
+    let are_equal = are_equal.first().unwrap();
+
+    // Avoid division by zero by ensuring max_val != min_val
+    let normalized = if !are_equal {
+        (tensor - min_val.clone()) / (max_val - min_val + offset_val)
+    } else {
+        tensor.clone() // If all values are the same, return the original
+    };
+
+    // Return the normalized sum of the top K distances
+    normalized
 }

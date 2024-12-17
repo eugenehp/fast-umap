@@ -11,6 +11,16 @@ pub enum LossReduction {
 pub enum Metric {
     Euclidean,
     EuclideanKNN,
+    // EuclideanWeighted,
+    Manhattan,
+    // Cosine,
+    // Correlation,
+    // Hamming,
+    // Jaccard,
+    // Minkowski,
+    // Chebyshev,
+    // Mahalnobis,
+    // Spearman, // Spearman’s Rank Correlation Distance
 }
 
 // Implement From<&str> for Metric
@@ -19,6 +29,7 @@ impl From<&str> for Metric {
         match s.to_lowercase().as_str() {
             "euclidean" => Metric::Euclidean,
             "euclideanknn" | "euclidean_knn" => Metric::EuclideanKNN,
+            "manhattan" => Metric::Manhattan,
             _ => panic!("Invalid metric type: {}", s),
         }
     }
@@ -30,6 +41,7 @@ impl fmt::Display for Metric {
         match self {
             Metric::Euclidean => write!(f, "Euclidean"),
             Metric::EuclideanKNN => write!(f, "Euclidean KNN"),
+            Metric::Manhattan => write!(f, "Manhattan"),
         }
     }
 }

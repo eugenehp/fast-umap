@@ -1,5 +1,7 @@
 use burn::tensor::{backend::AutodiffBackend, Tensor, TensorData};
 
+use crate::normalize_tensor;
+#[allow(unused)]
 use crate::print_tensor_with_title;
 
 /// Calculate the pairwise Euclidean distance matrix for a given 2D tensor
@@ -113,4 +115,15 @@ pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B,
 
     // Return the normalized sum of the top K distances
     normalized_distances
+}
+
+pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
+    let n_samples = tensor.dims()[0];
+    // Sum the absolute difference along the rows (axis 1)
+    let x = tensor
+        .abs() // Take absolute value
+        .sum_dim(1)
+        .reshape([n_samples]); // Sum along axis 1 (columns)
+
+    normalize_tensor(x)
 }
