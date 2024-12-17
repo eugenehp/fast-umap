@@ -13,7 +13,7 @@ pub enum Metric {
     EuclideanKNN,
     // EuclideanWeighted,
     Manhattan,
-    // Cosine,
+    Cosine,
     // Correlation,
     // Hamming,
     // Jaccard,
@@ -30,6 +30,7 @@ impl From<&str> for Metric {
             "euclidean" => Metric::Euclidean,
             "euclideanknn" | "euclidean_knn" => Metric::EuclideanKNN,
             "manhattan" => Metric::Manhattan,
+            "cosine" => Metric::Cosine,
             _ => panic!("Invalid metric type: {}", s),
         }
     }
@@ -42,6 +43,7 @@ impl fmt::Display for Metric {
             Metric::Euclidean => write!(f, "Euclidean"),
             Metric::EuclideanKNN => write!(f, "Euclidean KNN"),
             Metric::Manhattan => write!(f, "Manhattan"),
+            Metric::Cosine => write!(f, "cosine"),
         }
     }
 }
