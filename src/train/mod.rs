@@ -132,8 +132,7 @@ pub fn train<B: AutodiffBackend>(
     let mse_loss = MseLoss::new();
 
     loop {
-        let mut total_loss = Tensor::<B, 1>::zeros([1], &config.device);
-        let mut last_local = Tensor::<B, 2>::zeros([batch_size, batch_size], &config.device);
+        // println!("batch {}", format_duration(start_time.elapsed()));
         for (batch_idx, _) in batches.iter().enumerate() {
             let tensor_batch = &tensor_batches[batch_idx];
             let global_distances = &global_distances_batches[batch_idx];
@@ -159,10 +158,8 @@ pub fn train<B: AutodiffBackend>(
             let current_loss = loss.clone().into_scalar().to_f64();
             // Compute gradients and update the model parameters using the optimizer.
             losses.push(current_loss);
-            total_loss = total_loss + loss;
 
-            let grads = total_loss.backward();
-            let batch_grads = GradientsParams::from_grads(grads, &model);
+            let batch_grads = GradientsParams::from_grads(loss.backward(), &model);
 
             // Accumulate gradients.
             accumulator.accumulate(&model, batch_grads);
@@ -213,7 +210,7 @@ pub fn train<B: AutodiffBackend>(
             }
         }
 
-        const STEP: usize = 1000;
+        const STEP: usize = 100;
         if epoch > 0 && epoch % STEP == 0 {
             let losses = losses.clone();
             let model = &model.valid();
@@ -224,8 +221,8 @@ pub fn train<B: AutodiffBackend>(
                 &config.device,
             );
             // this is still slow
-            let embeddings_for_entire_dataset = model.forward(tensor_data);
 
+            let embeddings_for_entire_dataset = model.forward(tensor_data);
             thread::spawn(move || {
                 let chart_config = ChartConfigBuilder::default()
                     .caption("MNIST")
