@@ -96,6 +96,9 @@ pub struct TrainingConfig<B: AutodiffBackend> {
 
     /// The maximum time (in seconds) to allow for training. If `None`, there is no time limit.
     pub timeout: Option<u64>,
+
+    // normalize distance output
+    pub normalized: bool,
 }
 
 impl<B: AutodiffBackend> TrainingConfig<B> {
@@ -124,6 +127,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     k_neighbors: Option<usize>,
     min_desired_loss: Option<f64>,
     timeout: Option<u64>,
+    normalized: Option<bool>,
 }
 
 impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
@@ -226,6 +230,11 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
         self
     }
 
+    pub fn with_normalized(mut self, normalized: bool) -> Self {
+        self.normalized = Some(normalized);
+        self
+    }
+
     /// Finalize and create a `TrainingConfig` with the specified options.
     ///
     /// This method returns an `Option<TrainingConfig>`. If any required parameters are missing,
@@ -246,6 +255,7 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
             k_neighbors: self.k_neighbors.unwrap_or(15), // Default to 15 if not set
             min_desired_loss: self.min_desired_loss,     // Optional, no default
             timeout: self.timeout,                       // Optional, no default
+            normalized: self.normalized.unwrap_or(true), // normalize output of distance by default
         })
     }
 }

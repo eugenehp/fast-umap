@@ -1,6 +1,5 @@
-use burn::tensor::{backend::AutodiffBackend, Tensor, TensorData};
+use burn::tensor::{backend::AutodiffBackend, Tensor};
 
-use crate::normalize_tensor;
 #[allow(unused)]
 use crate::print_tensor_with_title;
 
@@ -63,7 +62,6 @@ pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 /// println!("{:?}", result); // Output: sum of squared distances for each sample to its 2 nearest neighbors
 /// ```
 pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
-    let device = x.device();
     let n_samples = x.dims()[0]; // Number of samples (rows)
 
     // Expand x to shapes that allow broadcasting for pairwise subtraction:
@@ -88,33 +86,7 @@ pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B,
     // Sum the top K distances for each sample:
     let sum_of_top_k_distances: Tensor<B, 1> = top_k_distances.sum_dim(1).reshape([n_samples]); // Shape: (n_samples)
 
-    // Normalize the result using min-max normalization:
-    let min_val = sum_of_top_k_distances.clone().min(); // Find the minimum value
-    let max_val = sum_of_top_k_distances.clone().max(); // Find the maximum value
-
-    // this is to prevent deleting by zero
-    let offset_val = Tensor::<B, 1>::from_data(TensorData::new(vec![1e-6], [1]), &device);
-
-    let are_equal = max_val
-        .clone()
-        .equal(min_val.clone())
-        .to_data()
-        .to_vec::<bool>()
-        .unwrap();
-
-    let are_equal = are_equal.first().unwrap();
-
-    // Avoid division by zero by ensuring max_val != min_val
-    let normalized_distances = if !are_equal {
-        (sum_of_top_k_distances - min_val.clone()) / (max_val - min_val + offset_val)
-    } else {
-        sum_of_top_k_distances.clone() // If all values are the same, return the original
-    };
-
-    // print_tensor_with_title("normalized_distances", &normalized_distances);
-
-    // Return the normalized sum of the top K distances
-    normalized_distances
+    sum_of_top_k_distances
 }
 
 pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
@@ -125,5 +97,5 @@ pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
         .sum_dim(1)
         .reshape([n_samples]); // Sum along axis 1 (columns)
 
-    normalize_tensor(x)
+    x
 }
