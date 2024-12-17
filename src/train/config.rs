@@ -244,8 +244,8 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
 
     /// The minkowski function supports any positive value of `p`. For `p = 1`,
     /// it computes Manhattan distance, and for `p = 2`, it computes Euclidean distance.
-    pub fn with_minkowski_p(mut self, p: f64) -> Self {
-        self.minkowski_p = Some(p);
+    pub fn with_minkowski_p(mut self, minkowski_p: f64) -> Self {
+        self.minkowski_p = Some(minkowski_p);
         self
     }
 

@@ -1,4 +1,5 @@
 use burn::{backend::*, module::*, prelude::*};
+use fast_umap::chart;
 #[allow(unused)]
 use fast_umap::{
     chart::*,
@@ -39,8 +40,11 @@ fn main() {
     let min_desired_loss = 0.0001; // Minimum loss threshold for early stopping
     let metric = Metric::Minkowski; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
+    // TODO: non 1.0 gives NaN loss.
+    let minkowski_p = 3.0; // 1 is manhattan, 2 is Euclidean
+    let normalized = true; // to reduce math, and keep it at float
 
-    // let timeout = 60; // timeout in seconds
+    let timeout = 30; // timeout in seconds
 
     // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);
@@ -88,7 +92,9 @@ fn main() {
         .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
         .with_loss_reduction(loss_reduction)
-        // .with_timeout(timeout) // set timeout in seconds
+        .with_timeout(timeout) // set timeout in seconds
+        .with_minkowski_p(minkowski_p)
+        .with_normalized(normalized)
         .build()
         .expect("Failed to build TrainingConfig");
 
@@ -108,7 +114,7 @@ fn main() {
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
 
     // Perform a forward pass through the model to obtain the low-dimensional (local) representation
-    let _local = model.forward(global.clone());
+    let local = model.forward(global.clone());
 
     // Optionally, print the global and local tensors for inspection (currently commented out)
     // if verbose {
@@ -116,11 +122,11 @@ fn main() {
     //     print_tensor_with_title("local", &local);
     // }
 
-    // let chart_config = ChartConfigBuilder::default()
-    //     .caption("MNIST")
-    //     .path("mnist.png")
-    //     .build();
+    let chart_config = ChartConfigBuilder::default()
+        .caption("MNIST")
+        .path("mnist.png")
+        .build();
 
     // // Visualize the 2D embedding (local representation) using a chart
-    // chart::chart_tensor(local, Some(chart_config));
+    chart::chart_tensor(local, Some(chart_config));
 }

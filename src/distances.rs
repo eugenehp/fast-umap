@@ -204,13 +204,13 @@ pub fn minkowski<B: AutodiffBackend>(tensor: Tensor<B, 2>, p: f64) -> Tensor<B, 
     let diff = tensor.clone().sub(reference_row.clone()).abs();
 
     // Raise the absolute differences to the power of p
-    let diff_p = diff.powf_scalar(p);
+    let diff_p = diff.powi_scalar(p);
 
     // Sum over the features (dim 1) for each row
     let sum_p = diff_p.sum_dim(1);
 
     // Take the p-th root of the sum
-    let distances = sum_p.powf_scalar(1.0 / p);
+    let distances = sum_p.powi_scalar((1.0 / p).ceil() as i32); // have to convert to integer, otherwise it returns NaN
 
     // Return the distances as a 1D tensor
     distances.reshape([n_samples])
