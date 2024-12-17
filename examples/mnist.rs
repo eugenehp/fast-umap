@@ -36,7 +36,7 @@ fn main() {
     let seed = 9999; // Random seed to ensure reproducibility
     let verbose = true; // Whether to enable the progress bar during training
     let patience = 100; // Number of epochs without improvement before early stopping
-    let min_desired_loss = 1.0; // Minimum loss threshold for early stopping
+    let min_desired_loss = 0.0001; // Minimum loss threshold for early stopping
     let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
 

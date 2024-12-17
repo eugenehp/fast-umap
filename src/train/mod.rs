@@ -182,7 +182,7 @@ pub fn train<B: AutodiffBackend>(
         let elapsed = start_time.elapsed();
         if let Some(pb) = &pb {
             pb.set_message(format!(
-                "Elapsed: {} | Epoch: {} | Loss: {:.3} | Best loss: {:.3}",
+                "Elapsed: {} | Epoch: {} | Loss: {:.4} | Best loss: {:.4}",
                 format_duration(elapsed),
                 epoch,
                 current_loss,
