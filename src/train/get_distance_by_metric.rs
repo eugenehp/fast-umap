@@ -35,5 +35,6 @@ pub fn get_distance_by_metric<B: AutodiffBackend>(
     match config.metric {
         Metric::Euclidean => euclidean(data),
         Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
+        Metric::Manhattan => manhattan(data),
     }
 }
