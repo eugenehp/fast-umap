@@ -60,68 +60,6 @@ pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 /// let result = euclidean_knn(x, k);
 /// println!("{:?}", result); // Output: sum of squared distances for each sample to its 2 nearest neighbors
 /// ```
-pub fn euclidean_knn_old<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
-    let device = x.device();
-    let n_samples = x.dims()[0]; // Number of samples (rows)
-    let _n_features = x.dims()[1]; // Number of features (columns)
-
-    // Expand x to shapes that allow broadcasting for pairwise subtraction:
-    // Shape of x_expanded: (1, n_samples, n_features)
-    let x_expanded = x.clone().unsqueeze::<3>();
-
-    // Shape of x_transposed: (n_samples, 1, n_features)
-    let x_transposed = x.clone().unsqueeze_dim(1);
-
-    // Compute pairwise differences using broadcasting:
-    // Shape: (n_samples, n_samples, n_features)
-    let diff = x_expanded - x_transposed;
-
-    // Element-wise square the differences:
-    let squared_diff = diff.powi_scalar(2); // Shape: (n_samples, n_samples, n_features)
-
-    // Sum along the feature dimension (axis 2) to get squared Euclidean distance:
-    let pairwise_squared_distances = squared_diff.sum_dim(2); // Shape: (n_samples, n_samples)
-
-    // this speeds up the KNN calculations after this line
-    let pairwise_distances = pairwise_squared_distances.triu(0); // Extract the upper triangular part (without diagonal)
-
-    // Step 3: Get the top K smallest distances for each sample (along axis 1)
-    let (top_k_distances, _top_k_indices) = pairwise_distances.topk_with_indices(k, 1);
-
-    // Step 4: Sum the top K distances for each sample
-    let sum_of_top_k_distances = top_k_distances.sum_dim(1).reshape([n_samples]); // Shape: (n_samples)
-
-    // Return the sum of the top K distances
-    // sum_of_top_k_distances
-
-    let min_val = sum_of_top_k_distances.clone().min(); // Find the minimum value
-    let max_val = sum_of_top_k_distances.clone().max(); // Find the maximum value
-
-    // this is to prevent deleting by zero
-    let offset_val = Tensor::<B, 1>::from_data(TensorData::new(vec![1e-6], [1]), &device);
-
-    let are_equal = max_val
-        .clone()
-        .equal(min_val.clone())
-        .to_data()
-        .to_vec::<bool>()
-        .unwrap();
-
-    let are_equal = are_equal.first().unwrap();
-
-    // Avoid division by zero by ensuring max_val != min_val
-    let normalized_distances = if !are_equal {
-        (sum_of_top_k_distances - min_val.clone()) / (max_val - min_val + offset_val)
-    } else {
-        sum_of_top_k_distances.clone() // If all values are the same, return the original
-    };
-
-    // print_tensor_with_title("normalized_distances", &normalized_distances);
-
-    // Return the normalized sum of the top K distances
-    normalized_distances
-}
-
 pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
     let device = x.device();
     let n_samples = x.dims()[0]; // Number of samples (rows)
