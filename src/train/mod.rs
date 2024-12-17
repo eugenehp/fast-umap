@@ -88,10 +88,6 @@ pub fn train<B: AutodiffBackend>(
         global_distances_batches.push(global_distances);
     }
 
-    // Convert the input data into a tensor for processing.
-    // let tensor_data =
-    //     convert_vector_to_tensor::<B>(data.clone(), num_samples, num_features, &config.device);
-
     // Initialize the Adam optimizer with weight decay (L2 regularization).
     let config_optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(config.penalty)))
@@ -119,11 +115,6 @@ pub fn train<B: AutodiffBackend>(
         false => None,
     };
 
-    // Precompute the pairwise distances in the global space for loss calculation.
-    // let global_distances = get_distance_by_metric(tensor_data.clone(), config);
-
-    // print_tensor_with_title("global_distances", &global_distances);
-
     let mut epoch = 0;
     let mut losses: Vec<f64> = vec![];
     let mut best_loss = f64::INFINITY;
@@ -137,15 +128,8 @@ pub fn train<B: AutodiffBackend>(
             let tensor_batch = &tensor_batches[batch_idx];
             let global_distances = &global_distances_batches[batch_idx];
 
-            // println!(
-            //     "tensor_batch - {:?}, global_distances - {:?}",
-            //     tensor_batch.shape(),
-            //     global_distances.shape()
-            // );
-
             // Forward pass to get the local (low-dimensional) representation.
             let local = model.forward(tensor_batch.clone());
-            // last_local = local.clone();
 
             // Compute the loss for the batch.
             let local_distances = get_distance_by_metric(local.clone(), config);
@@ -167,8 +151,6 @@ pub fn train<B: AutodiffBackend>(
 
         let current_loss = losses.last().unwrap().clone();
 
-        // let grads = total_loss.backward();
-        // let grads = GradientsParams::from_grads(grads, &model);
         let grads = accumulator.grads(); // Pop the accumulated gradients.
 
         // Perform an optimization step to update model parameters.

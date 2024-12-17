@@ -17,6 +17,7 @@ ndarray = "0.16.1"
 plotters = "0.3.7"
 prettytable = "0.10.0"
 rand = "0.8.5"
+rayon = "1.10.0"
 serde = "1.0.216"
 
 [dev-dependencies]

@@ -37,7 +37,7 @@ fn main() {
     let verbose = true; // Whether to enable the progress bar during training
     let patience = 100; // Number of epochs without improvement before early stopping
     let min_desired_loss = 1.0; // Minimum loss threshold for early stopping
-    let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
+    let metric = Metric::Euclidean; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
 
     // let timeout = 60; // timeout in seconds
