@@ -1487,6 +1487,7 @@ dependencies = [
  "plotters",
  "prettytable",
  "rand",
+ "rayon",
  "serde",
 ]
 
