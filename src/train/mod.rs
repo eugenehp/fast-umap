@@ -21,7 +21,7 @@ pub use config::*;
 use ctrlc;
 use get_distance_by_metric::get_distance_by_metric;
 use indicatif::{ProgressBar, ProgressStyle};
-use std::sync::mpsc::channel;
+use std::{sync::mpsc::channel, time::Duration};
 use std::{thread, time::Instant};
 
 /// Train the UMAP model over multiple epochs.
@@ -188,6 +188,12 @@ pub fn train<B: AutodiffBackend>(
                 current_loss,
                 best_loss,
             ));
+        }
+
+        if let Some(timeout) = config.timeout {
+            if elapsed >= Duration::from_secs(timeout) {
+                break;
+            }
         }
 
         // Track improvements in loss for early stopping.
