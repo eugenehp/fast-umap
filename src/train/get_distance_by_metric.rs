@@ -45,7 +45,7 @@ pub fn get_distance_by_metric<B: AutodiffBackend>(
         Metric::Manhattan => manhattan(data),
         Metric::Cosine => cosine(data),
         Metric::Minkowski => minkowski(data, config.minkowski_p),
-        _ => euclidean(data),
+        // _ => euclidean(data),
     };
 
     match config.normalized {

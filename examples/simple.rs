@@ -24,7 +24,7 @@ fn main() {
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
     // Fit the UMAP model to the data and reduce the data to a lower-dimensional space (default: 2D)
-    let umap: fast_umap::UMAP<MyAutodiffBackend> = umap(data.clone());
+    let umap = umap(data.clone());
     // let umap = umap_size(data.clone(), 3); // where 3 is the output size of projected dimensions
 
     // Transform the data using the trained UMAP model to reduce its dimensions

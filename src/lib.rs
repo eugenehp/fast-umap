@@ -1,6 +1,7 @@
 use burn::module::AutodiffModule;
 use kernels::AutodiffBackend;
 use model::{UMAPModel, UMAPModelConfigBuilder};
+use num::Float;
 use train::*;
 use utils::*;
 
@@ -10,6 +11,7 @@ pub mod chart;
 pub mod distances;
 pub mod kernels;
 pub mod model;
+pub mod prelude;
 pub mod train;
 pub mod utils;
 
@@ -35,10 +37,9 @@ impl<B: AutodiffBackend> UMAP<B> {
     /// This method initializes the model configuration, sets up the training parameters (like batch size, learning rate, etc.),
     /// and runs the training process using the provided data. It returns an instance of the `UMAP` struct containing
     /// the trained model and the device.
-    pub fn fit<F>(data: Vec<Vec<F>>, device: Device<B>, output_size: usize) -> Self
+    pub fn fit<F: Float>(data: Vec<Vec<F>>, device: Device<B>, output_size: usize) -> Self
     where
-        F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
-        f64: From<F>,                     // Ensure F can be converted to f64
+        F: num::FromPrimitive + burn::tensor::Element,
     {
         // Set training parameters
         let batch_size = 1;
@@ -55,7 +56,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         B::seed(seed); // Set the seed for the backend
 
         // Flatten the input data into a single vector of f64 values
-        let train_data: Vec<f64> = data.into_iter().flatten().map(|f| f64::from(f)).collect();
+        let train_data: Vec<F> = data.into_iter().flatten().map(|f| f).collect();
 
         // Build the model configuration
         let model_config = UMAPModelConfigBuilder::default()
@@ -138,75 +139,5 @@ impl<B: AutodiffBackend> UMAP<B> {
         let result = convert_tensor_to_vector(local);
 
         result
-    }
-}
-
-#[allow(unused)]
-/// Predefined module for commonly used utilities like generating test data and charting functions.
-pub mod prelude {
-    use crate::kernels::{AutodiffBackend, Backend};
-    use crate::{chart, train, utils, UMAP};
-    use burn::backend::wgpu::{Wgpu, WgpuDevice};
-    use burn::backend::Autodiff;
-
-    // Re-export common utilities for easier use
-    pub use chart::{chart_tensor, chart_vector};
-    use cubecl::wgpu::WgpuRuntime;
-    pub use train::Metric;
-    pub use train::{TrainingConfig, TrainingConfigBuilder};
-    pub use utils::generate_test_data;
-
-    /// Convenience function for running UMAP with the WGPU backend.
-    ///
-    /// # Arguments
-    /// * `data` - A vector of vectors, where each inner vector represents a data sample with multiple features.
-    ///
-    /// # Returns
-    /// A trained `UMAP` model that has been fitted to the input data, using the WGPU backend for computation.
-    ///
-    /// This function wraps the `UMAP::fit` method and provides a simplified way to fit UMAP models with the WGPU backend.
-    /// The resulting model will have 2-dimensional output by default.
-    ///
-    /// # Example
-    /// ```rust
-    /// let data = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
-    /// let model = umap(data);
-    /// ```
-    pub fn umap<B: AutodiffBackend, F>(data: Vec<Vec<F>>) -> UMAP<B>
-    where
-        F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
-        f64: From<F>,                     // Ensure F can be converted to f64
-    {
-        let output_size = 2;
-        let device = Default::default();
-        let model = UMAP::<B>::fit(data, device, output_size);
-        model
-    }
-
-    /// Convenience function for running UMAP with the WGPU backend and a custom output size.
-    ///
-    /// # Arguments
-    /// * `data` - A vector of vectors, where each inner vector represents a data sample with multiple features.
-    /// * `output_size` - The number of dimensions for the reduced output. This controls the dimensionality of the embedding space.
-    ///
-    /// # Returns
-    /// A trained `UMAP` model that has been fitted to the input data, using the WGPU backend for computation and the specified output size.
-    ///
-    /// This function wraps the `UMAP::fit` method, providing a way to fit UMAP models with the WGPU backend and a customizable number of output dimensions.
-    ///
-    /// # Example
-    /// ```rust
-    /// let data = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
-    /// let output_size = 3;
-    /// let model = umap_size(data, output_size);
-    /// ```
-    pub fn umap_size<B: AutodiffBackend, F>(data: Vec<Vec<F>>, output_size: usize) -> UMAP<B>
-    where
-        F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
-        f64: From<F>,                     // Ensure F can be converted to f64
-    {
-        let device = Default::default();
-        let model = UMAP::<B>::fit(data, device, output_size);
-        model
     }
 }

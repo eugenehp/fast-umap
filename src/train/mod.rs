@@ -22,6 +22,7 @@ pub use config::*;
 use ctrlc;
 use get_distance_by_metric::get_distance_by_metric;
 use indicatif::{ProgressBar, ProgressStyle};
+use num::{Float, FromPrimitive};
 use std::{sync::mpsc::channel, time::Duration};
 use std::{thread, time::Instant};
 
@@ -39,13 +40,16 @@ use std::{thread, time::Instant};
 /// * `data`: The training data as a flat `Vec<f64>`, where each sample is represented as a
 ///   sequence of `num_features` values.
 /// * `config`: The `TrainingConfig` containing training hyperparameters and options.
-pub fn train<B: AutodiffBackend>(
+pub fn train<B: AutodiffBackend, F: Float>(
     mut model: UMAPModel<B>,
     num_samples: usize,         // Number of samples in the dataset.
     num_features: usize,        // Number of features (columns) in each sample.
-    mut data: Vec<f64>,         // Training data.
+    mut data: Vec<F>,           // Training data.
     config: &TrainingConfig<B>, // Configuration parameters for training.
-) -> (UMAPModel<B>, Vec<f64>) {
+) -> (UMAPModel<B>, Vec<f64>)
+where
+    F: FromPrimitive + Send + Sync + burn::tensor::Element,
+{
     if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
@@ -61,7 +65,7 @@ pub fn train<B: AutodiffBackend>(
     normalize_data(&mut data, num_samples, num_features);
 
     // Step 1: Split the data into batches (Vec<Vec<f64>>).
-    let mut batches: Vec<Vec<f64>> = Vec::new();
+    let mut batches: Vec<Vec<F>> = Vec::new();
     for batch_start in (0..num_samples).step_by(config.batch_size) {
         let batch_end = std::cmp::min(batch_start + config.batch_size, num_samples);
         // Create a batch by extracting `batch_size * num_features` elements
@@ -80,18 +84,14 @@ pub fn train<B: AutodiffBackend>(
 
     for batch_data in &batches {
         // Convert each batch to tensor format.
-        let tensor_batch = convert_vector_to_tensor::<B>(
-            batch_data.clone(),
-            batch_size,
-            num_features,
-            &config.device,
-        );
+        let tensor_batch =
+            convert_vector_to_tensor(batch_data.clone(), batch_size, num_features, &config.device);
 
         tensor_batches.push(tensor_batch);
 
         // Compute the global distances for each batch (using the entire dataset).
         let global_tensor_data =
-            convert_vector_to_tensor::<B>(data.clone(), batch_size, num_features, &config.device);
+            convert_vector_to_tensor(data.clone(), batch_size, num_features, &config.device);
         let global_distances = get_distance_by_metric(global_tensor_data.clone(), config);
         global_distances_batches.push(global_distances);
     }
@@ -225,12 +225,8 @@ pub fn train<B: AutodiffBackend>(
         if epoch > 0 && epoch % STEP == 0 {
             let losses = losses.clone();
             let model = &model.valid();
-            let tensor_data = convert_vector_to_tensor::<B::InnerBackend>(
-                data.clone(),
-                num_samples,
-                num_features,
-                &config.device,
-            );
+            let tensor_data =
+                convert_vector_to_tensor(data.clone(), num_samples, num_features, &config.device);
             // this is still slow
 
             let embeddings_for_entire_dataset = model.forward(tensor_data);

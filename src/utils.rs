@@ -1,10 +1,10 @@
 use core::f64;
-use std::sync::Mutex;
 
 use burn::{
     prelude::Backend,
     tensor::{backend::AutodiffBackend, Device, Tensor, TensorData},
 };
+use num::Float;
 use prettytable::{row, Table};
 use rand::Rng;
 use rayon::prelude::*;
@@ -46,12 +46,15 @@ pub fn generate_test_data(
 ///
 /// This function uses the `TensorData` struct to create a tensor from the given data, then places it
 /// on the specified device (`CPU` or `GPU`).
-pub fn convert_vector_to_tensor<B: Backend>(
-    data: Vec<f64>,
+pub fn convert_vector_to_tensor<B: Backend, F: Float>(
+    data: Vec<F>,
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample
     device: &Device<B>,  // Device to place the tensor (CPU, GPU)
-) -> Tensor<B, 2> {
+) -> Tensor<B, 2>
+where
+    F: burn::tensor::Element,
+{
     let tensor_data = TensorData::new(data, [num_samples, num_features]);
     Tensor::<B, 2>::from_data(tensor_data, device)
 }
@@ -109,23 +112,20 @@ pub fn print_tensor_with_title<B: Backend, const D: usize>(title: &str, data: &T
 /// # Returns
 /// A `Vec<Vec<f64>>` where each inner `Vec<f64>` represents a row (sample) of the tensor.
 ///
-/// This function extracts the data from a tensor and converts it into a `Vec<Vec<f64>>` format. The conversion
+/// This function extracts the data from a tensor and converts it into a `Vec<Vec<F>>` format. The conversion
 /// assumes that the tensor is in a 2D shape and the precision is `f32` within the tensor.
-pub fn convert_tensor_to_vector<B: Backend>(data: Tensor<B, 2>) -> Vec<Vec<f64>> {
+pub fn convert_tensor_to_vector<B: Backend, F: Float>(data: Tensor<B, 2>) -> Vec<Vec<F>>
+where
+    F: burn::tensor::Element,
+{
     let n_components = data.dims()[1]; // usually 2 dimensional
 
     // Burn Tensor only has f32 precision inside the tensors, when you export to to_data
-    let data = data.to_data().to_vec::<f32>().unwrap();
+    let data = data.to_data().to_vec::<F>().unwrap();
 
-    let data: Vec<Vec<f64>> = data
+    let data: Vec<Vec<F>> = data
         .chunks(n_components)
-        .map(|chunk| {
-            chunk
-                .to_vec()
-                .into_iter()
-                .map(|value| f64::from(value))
-                .collect()
-        })
+        .map(|chunk| chunk.to_vec())
         .collect();
     data
 }
@@ -172,44 +172,43 @@ const SMALL_STD_DEV: f64 = 1e-6;
 /// # Note
 /// This function assumes that the dataset has at least one sample and one feature.
 /// The data is normalized in-place, meaning the original data is modified directly.
-pub fn normalize_data(data: &mut [f64], num_samples: usize, num_features: usize) {
-    // Create a mutable copy of the data
-    let normalized_data = Mutex::new(data.to_vec());
-
+pub fn normalize_data<F: Float>(data: &mut [F], num_samples: usize, num_features: usize)
+where
+    F: num::FromPrimitive + Send + Sync,
+{
     // Parallelize the outer loop over features
-    (0..num_features).into_par_iter().for_each(|feature_idx| {
+    (0..num_features).into_iter().for_each(|feature_idx| {
         // Calculate mean and standard deviation for the current feature
         let (sum, sum_sq) = (0..num_samples)
             .into_par_iter()
             .fold(
-                || (0.0, 0.0), // Initial value for fold: (sum, sum_sq)
+                || (F::zero(), F::zero()), // Initial value for fold: (sum, sum_sq)
                 |(acc_sum, acc_sum_sq), sample_idx| {
                     let value = data[sample_idx * num_features + feature_idx];
                     (acc_sum + value, acc_sum_sq + value * value)
                 },
             )
             .reduce(
-                || (0.0, 0.0),
+                || (F::zero(), F::zero()),
                 |(sum1, sum_sq1), (sum2, sum_sq2)| (sum1 + sum2, sum_sq1 + sum_sq2),
             );
 
-        let mean = sum / num_samples as f64;
-        let variance = (sum_sq / num_samples as f64) - (mean * mean);
+        let mean = sum / F::from_usize(num_samples).unwrap();
+        let variance = (sum_sq / F::from_usize(num_samples).unwrap()) - (mean * mean);
         let std_dev = variance.sqrt();
 
-        // Normalize the feature in parallel and store results in `normalized_data`
-        (0..num_samples).into_par_iter().for_each(|sample_idx| {
-            let value = data[sample_idx * num_features + feature_idx];
-            let normalized_value = (value - mean) / (std_dev + SMALL_STD_DEV);
-            // Lock the Mutex to safely access `normalized_data`
-            let mut normalized_data = normalized_data.lock().unwrap();
-            normalized_data[sample_idx * num_features + feature_idx] = normalized_value;
+        // Avoid division by zero by adding SMALL_STD_DEV
+        let safe_std_dev = std_dev + F::from_f64(SMALL_STD_DEV).unwrap();
+
+        // Normalize the feature in parallel
+        (0..num_samples).into_iter().for_each(|sample_idx| {
+            let idx = sample_idx * num_features + feature_idx;
+            let value = data[idx];
+            let normalized_value = (value - mean) / safe_std_dev;
+            // Directly update the value in the `data` array
+            data[idx] = normalized_value;
         });
     });
-
-    // After parallel computation, copy the normalized data back to the original `data`
-    let normalized_data = normalized_data.lock().unwrap();
-    data.copy_from_slice(&normalized_data);
 }
 
 /// Normalizes a 1D tensor using min-max normalization.
