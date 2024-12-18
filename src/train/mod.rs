@@ -94,6 +94,7 @@ where
         let global_tensor_data =
             convert_vector_to_tensor(data.clone(), batch_size, num_features, &device);
         let global_distances = get_distance_by_metric(global_tensor_data.clone(), config);
+        // let global_distances = global_distances.set_require_grad(false);
         global_distances_batches.push(global_distances);
     }
 
@@ -145,9 +146,20 @@ where
             // let global_distances: &Tensor<B, 1> = &global_distances_batches[batch_idx];
 
             // Slice the corresponding part of the global_distances_all tensor for this batch
-            let start_idx = batch_idx * batch_size; // Calculate the starting index
-            let end_idx = (batch_idx + 1) * batch_size; // Calculate the ending index
+            let start_idx = batch_idx * batch_size * num_features; // Calculate the starting index
+            let end_idx = (batch_idx + 1) * batch_size * num_features; // Calculate the ending index
             let end_idx = end_idx.min(tensor_batches_all.shape().dims[0]); // Clip to the size of the tensor
+
+            // skip last batch
+            if start_idx > end_idx {
+                continue;
+            }
+
+            // println!(
+            //     "start_idx={start_idx}, end_idx={end_idx}, tensor_batches_all={:?}, global_distances_all={:?}",
+            //     tensor_batches_all.shape(),
+            //     global_distances_all.shape()
+            // );
 
             let tensor_batch = tensor_batches_all.clone().slice([start_idx..end_idx]); // Slice the tensor
             let global_distances = global_distances_all.clone().slice([start_idx..end_idx]); // Slice the tensor
@@ -157,6 +169,17 @@ where
 
             // Compute the loss for the batch.
             let local_distances = get_distance_by_metric(local.clone(), config);
+            // let local_distances = local_distances.set_require_grad(false);
+
+            // println!(
+            //     "global_distances[{batch_idx}] - {:?}",
+            //     global_distances.to_data()
+            // );
+            // println!(
+            //     "local_distances[{batch_idx}] - {:?}",
+            //     local_distances.to_data()
+            // );
+
             let loss = mse_loss.forward(
                 global_distances.clone(),
                 local_distances,
@@ -166,6 +189,8 @@ where
             let current_loss = loss.clone().into_scalar().to_f64();
             // Compute gradients and update the model parameters using the optimizer.
             losses.push(current_loss);
+
+            // println!("current_loss[{batch_idx}] - {:?}", current_loss);
 
             let grads = loss.backward();
 
