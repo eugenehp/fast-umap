@@ -1,6 +1,6 @@
-use burn::tensor::{backend::AutodiffBackend, Tensor};
+use burn::tensor::Tensor;
 
-use crate::normalize_tensor;
+use crate::{kernels::AutodiffBackend, normalize_tensor};
 
 use super::*;
 
@@ -35,11 +35,13 @@ pub fn get_distance_by_metric<B: AutodiffBackend>(
     config: &TrainingConfig<B>,
 ) -> Tensor<B, 1> {
     let distance = match config.metric {
-        Metric::Euclidean => euclidean(data),
+        // Metric::Euclidean => euclidean(data),
+        Metric::Euclidean => B::euclidean_pairwise_distance(data),
         Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
         Metric::Manhattan => manhattan(data),
         Metric::Cosine => cosine(data),
         Metric::Minkowski => minkowski(data, config.minkowski_p),
+        _ => euclidean(data),
     };
 
     match config.normalized {

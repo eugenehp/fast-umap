@@ -5,6 +5,7 @@ use crate::{
     chart::{self, plot_loss, ChartConfigBuilder},
     distances::*,
     format_duration,
+    kernels::AutodiffBackend,
     model::UMAPModel,
     normalize_data,
     utils::convert_vector_to_tensor,
@@ -15,7 +16,7 @@ use burn::{
     optim::{
         decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
     },
-    tensor::{backend::AutodiffBackend, cast::ToElement, Tensor},
+    tensor::{cast::ToElement, Tensor},
 };
 pub use config::*;
 use ctrlc;

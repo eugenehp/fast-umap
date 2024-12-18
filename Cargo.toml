@@ -12,7 +12,9 @@ edition = "2021"
 
 [dependencies]
 burn = { version = "~0.15", features = ["train", "wgpu"] }
+burn-jit = { version = "0.15.0", features = ["burn-autodiff"] }
 ctrlc = "3.4.5"
+cubecl = { version = "0.3.0", features = ["wgpu", "cubecl-wgpu"] }
 indicatif = "0.17.9"
 ndarray = "0.16.1"
 plotters = "0.3.7"

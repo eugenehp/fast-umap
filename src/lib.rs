@@ -1,4 +1,5 @@
-use burn::{module::AutodiffModule, tensor::backend::AutodiffBackend};
+use burn::module::AutodiffModule;
+use kernels::AutodiffBackend;
 use model::{UMAPModel, UMAPModelConfigBuilder};
 use train::*;
 use utils::*;
@@ -7,6 +8,7 @@ use burn::tensor::{Device, Tensor};
 
 pub mod chart;
 pub mod distances;
+pub mod kernels;
 pub mod model;
 pub mod train;
 pub mod utils;
@@ -142,12 +144,14 @@ impl<B: AutodiffBackend> UMAP<B> {
 #[allow(unused)]
 /// Predefined module for commonly used utilities like generating test data and charting functions.
 pub mod prelude {
+    use crate::kernels::{AutodiffBackend, Backend};
     use crate::{chart, train, utils, UMAP};
     use burn::backend::wgpu::{Wgpu, WgpuDevice};
     use burn::backend::Autodiff;
 
     // Re-export common utilities for easier use
     pub use chart::{chart_tensor, chart_vector};
+    use cubecl::wgpu::WgpuRuntime;
     pub use train::Metric;
     pub use train::{TrainingConfig, TrainingConfigBuilder};
     pub use utils::generate_test_data;
@@ -168,13 +172,14 @@ pub mod prelude {
     /// let data = vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]];
     /// let model = umap(data);
     /// ```
-    pub fn umap<F>(data: Vec<Vec<F>>) -> UMAP<Autodiff<Wgpu>>
+    pub fn umap<B: AutodiffBackend, F>(data: Vec<Vec<F>>) -> UMAP<B>
     where
         F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
         f64: From<F>,                     // Ensure F can be converted to f64
     {
         let output_size = 2;
-        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default(), output_size);
+        let device = Default::default();
+        let model = UMAP::<B>::fit(data, device, output_size);
         model
     }
 
@@ -195,12 +200,13 @@ pub mod prelude {
     /// let output_size = 3;
     /// let model = umap_size(data, output_size);
     /// ```
-    pub fn umap_size<F>(data: Vec<Vec<F>>, output_size: usize) -> UMAP<Autodiff<Wgpu>>
+    pub fn umap_size<B: AutodiffBackend, F>(data: Vec<Vec<F>>, output_size: usize) -> UMAP<B>
     where
         F: From<f32> + From<f64> + Clone, // F can be either f32 or f64
         f64: From<F>,                     // Ensure F can be converted to f64
     {
-        let model = UMAP::<Autodiff<Wgpu>>::fit(data, WgpuDevice::default(), output_size);
+        let device = Default::default();
+        let model = UMAP::<B>::fit(data, device, output_size);
         model
     }
 }
