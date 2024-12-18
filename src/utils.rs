@@ -125,12 +125,18 @@ where
     let n_components = data.dims()[1]; // usually 2 dimensional
 
     // Burn Tensor only has f32 precision inside the tensors, when you export to to_data
-    let data = data.to_data().to_vec::<F>().unwrap();
+    let data = data.to_data().to_vec::<f32>().unwrap();
 
-    let data: Vec<Vec<F>> = data
+    let data: Vec<Vec<f32>> = data
         .chunks(n_components)
         .map(|chunk| chunk.to_vec())
         .collect();
+
+    let data: Vec<Vec<F>> = data
+        .into_iter()
+        .map(|v| v.into_iter().map(|v| F::from(v).unwrap()).collect())
+        .collect();
+
     data
 }
 

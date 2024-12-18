@@ -30,7 +30,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
-                println!("euclidean_pairwise_distance[backward]");
+                // println!("euclidean_pairwise_distance[backward]");
                 // Fetch the node and the gradient for the current node
                 let [node_lhs] = ops.parents;
                 let grad = grads.consume::<B>(&ops.node);
@@ -39,33 +39,34 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let (lhs_state, output) = ops.state;
                 let lhs: FloatTensor<B> = checkpointer.retrieve_node_output(lhs_state);
 
-                let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
-                let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
-                let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
+                // let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
+                // let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
+                // let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
 
-                // Fetch shapes of our tensor to support broadcasting.
-                let shape_lhs = lhs.shape();
+                // // Fetch shapes of our tensor to support broadcasting.
+                // let shape_lhs = lhs.shape();
 
-                // Add a small epsilon value to avoid division by zero
-                let epsilon = 1e-6; // Adjust this value as needed
+                // // Add a small epsilon value to avoid division by zero
+                // let epsilon = 1e-6; // Adjust this value as needed
 
-                // Clamp the output to a minimum value (epsilon) to avoid division by zero
-                let output_clamped = output.clone().clamp_min(epsilon);
+                // // Clamp the output to a minimum value (epsilon) to avoid division by zero
+                // let output_clamped = output.clone().clamp_min(epsilon);
 
-                // Now, we need to compute the gradient with respect to `lhs`
-                // For pairwise Euclidean distance, the gradient is:
-                // grad = (x_i - x_j) / distance(x_i, x_j)
-                // let grad_output: Tensor<B, 1, Float> = grad / output.clone();
-                let grad_output: Tensor<B, 1, Float> = grad / output_clamped;
+                // // Now, we need to compute the gradient with respect to `lhs`
+                // // For pairwise Euclidean distance, the gradient is:
+                // // grad = (x_i - x_j) / distance(x_i, x_j)
+                // // let grad_output: Tensor<B, 1, Float> = grad / output.clone();
+                // let grad_output: Tensor<B, 1, Float> = grad / output_clamped;
 
-                let grad = grad_output.clone() * lhs.clone();
+                // let grad = grad_output.clone() * lhs.clone();
 
-                // Compute the gradient for the lhs tensor (x_i)
-                let grad_lhs = broadcast_shape::<B>(grad.into_primitive().tensor(), &shape_lhs);
+                // // Compute the gradient for the lhs tensor (x_i)
+                // let grad_lhs = broadcast_shape::<B>(grad.into_primitive().tensor(), &shape_lhs);
 
                 // Register the gradients
                 if let Some(node) = node_lhs {
-                    grads.register::<B>(node.id, grad_lhs);
+                    grads.register::<B>(node.id, lhs);
+                    // grads.register::<B>(node.id, grad_lhs);
                 }
             }
         }
