@@ -16,7 +16,7 @@ use burn::{
     optim::{
         decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
     },
-    tensor::{cast::ToElement, Tensor},
+    tensor::{cast::ToElement, Device, Tensor},
 };
 pub use config::*;
 use ctrlc;
@@ -42,10 +42,11 @@ use std::{thread, time::Instant};
 /// * `config`: The `TrainingConfig` containing training hyperparameters and options.
 pub fn train<B: AutodiffBackend, F: Float>(
     mut model: UMAPModel<B>,
-    num_samples: usize,         // Number of samples in the dataset.
-    num_features: usize,        // Number of features (columns) in each sample.
-    mut data: Vec<F>,           // Training data.
-    config: &TrainingConfig<B>, // Configuration parameters for training.
+    num_samples: usize,      // Number of samples in the dataset.
+    num_features: usize,     // Number of features (columns) in each sample.
+    mut data: Vec<F>,        // Training data.
+    config: &TrainingConfig, // Configuration parameters for training.
+    device: Device<B>,
 ) -> (UMAPModel<B>, Vec<f64>)
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
@@ -85,13 +86,13 @@ where
     for batch_data in &batches {
         // Convert each batch to tensor format.
         let tensor_batch =
-            convert_vector_to_tensor(batch_data.clone(), batch_size, num_features, &config.device);
+            convert_vector_to_tensor(batch_data.clone(), batch_size, num_features, &device);
 
         tensor_batches.push(tensor_batch);
 
         // Compute the global distances for each batch (using the entire dataset).
         let global_tensor_data =
-            convert_vector_to_tensor(data.clone(), batch_size, num_features, &config.device);
+            convert_vector_to_tensor(data.clone(), batch_size, num_features, &device);
         let global_distances = get_distance_by_metric(global_tensor_data.clone(), config);
         global_distances_batches.push(global_distances);
     }
@@ -226,7 +227,7 @@ where
             let losses = losses.clone();
             let model = &model.valid();
             let tensor_data =
-                convert_vector_to_tensor(data.clone(), num_samples, num_features, &config.device);
+                convert_vector_to_tensor(data.clone(), num_samples, num_features, &device);
             // this is still slow
 
             let embeddings_for_entire_dataset = model.forward(tensor_data);

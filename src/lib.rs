@@ -74,7 +74,6 @@ impl<B: AutodiffBackend> UMAP<B> {
             .with_epochs(epochs)
             .with_batch_size(batch_size)
             .with_learning_rate(learning_rate)
-            .with_device(device.clone())
             .with_beta1(beta1)
             .with_beta2(beta2)
             .build()
@@ -87,6 +86,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             num_features,
             train_data.clone(),
             &config,
+            device.clone(),
         );
 
         // Validate the trained model

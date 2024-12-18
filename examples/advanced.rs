@@ -56,7 +56,6 @@ fn main() {
         .with_epochs(epochs) // Set the number of epochs for training
         .with_batch_size(batch_size) // Set the batch size for training
         .with_learning_rate(learning_rate) // Set the learning rate for the optimizer
-        .with_device(device) // Specify the device (GPU) for computation
         .with_beta1(beta1) // Set the beta1 parameter for the Adam optimizer
         .with_beta2(beta2) // Set the beta2 parameter for the Adam optimizer
         .with_verbose(verbose) // Enable or disable the progress bar
@@ -75,13 +74,14 @@ fn main() {
         num_features,       // Number of features per sample
         train_data.clone(), // The training data
         &config,            // The training configuration
+        device.clone(),
     );
 
     // Validate the trained model after training
     let model = model.valid();
 
     // Convert the training data into a tensor for model input
-    let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
+    let global = convert_vector_to_tensor(train_data, num_samples, num_features, &device);
 
     // Perform a forward pass through the model to obtain the low-dimensional (local) representation
     let local = model.forward(global.clone());
