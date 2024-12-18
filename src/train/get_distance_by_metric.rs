@@ -1,4 +1,4 @@
-use burn::tensor::Tensor;
+use burn::tensor::{Tensor, TensorPrimitive};
 
 use crate::{kernels::AutodiffBackend, normalize_tensor};
 
@@ -36,7 +36,11 @@ pub fn get_distance_by_metric<B: AutodiffBackend>(
 ) -> Tensor<B, 1> {
     let distance = match config.metric {
         // Metric::Euclidean => euclidean(data),
-        Metric::Euclidean => B::euclidean_pairwise_distance(data),
+        Metric::Euclidean => {
+            let x = data.into_primitive().tensor();
+            let output = B::euclidean_pairwise_distance(x);
+            Tensor::from_primitive(TensorPrimitive::Float(output))
+        }
         Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
         Metric::Manhattan => manhattan(data),
         Metric::Cosine => cosine(data),
