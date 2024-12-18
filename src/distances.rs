@@ -1,5 +1,6 @@
-use burn::tensor::{backend::AutodiffBackend, Tensor};
+use burn::tensor::Tensor;
 
+use crate::kernels::AutodiffBackend;
 #[allow(unused)]
 use crate::print_tensor_with_title;
 

@@ -1,3 +1,4 @@
+use cubecl::wgpu::WgpuRuntime;
 use fast_umap::prelude::*;
 use rand::Rng;
 
@@ -18,6 +19,9 @@ fn main() {
         .chunks_exact(num_features) // Chunk the vector into rows of length `num_features`
         .map(|chunk| chunk.to_vec()) // Convert each chunk into a Vec<f64>
         .collect(); // Collect the rows into a vector of vectors
+
+    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
+    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
     // Fit the UMAP model to the data and reduce the data to a lower-dimensional space (default: 2D)
     let umap = umap(data.clone());

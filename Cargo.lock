@@ -427,6 +427,7 @@ version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d8af3155e5004a67ee0b378854912374c4b61e2d8d57fcd35794953dff336fc"
 dependencies = [
+ "burn-autodiff",
  "burn-common",
  "burn-fusion",
  "burn-tensor",
@@ -1491,7 +1492,9 @@ name = "fast-umap"
 version = "0.0.2"
 dependencies = [
  "burn",
+ "burn-jit",
  "ctrlc",
+ "cubecl",
  "indicatif",
  "mnist",
  "ndarray 0.16.1",
