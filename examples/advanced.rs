@@ -1,12 +1,13 @@
-use burn::{backend::*, module::*, prelude::*};
+use burn::{module::*, prelude::*};
+use cubecl::wgpu::WgpuRuntime;
 use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
 
 fn main() {
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
-    type MyBackend = Wgpu<f32, i32>;
+    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
 
     // Define the AutodiffBackend based on the custom MyBackend type
-    type MyAutodiffBackend = Autodiff<MyBackend>;
+    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
     // Initialize the GPU device for computation
     let device = burn::backend::wgpu::WgpuDevice::default();
@@ -32,7 +33,7 @@ fn main() {
     let metric = "euclidean_knn"; // Distance metric used for the nearest neighbor search
 
     // Seed the random number generator to ensure reproducibility
-    MyBackend::seed(seed);
+    MyAutodiffBackend::seed(seed);
 
     // Generate random test data for training
     let train_data = generate_test_data(num_samples, num_features);
@@ -46,10 +47,11 @@ fn main() {
         .unwrap();
 
     // Initialize the UMAP model with the defined configuration and the selected device
+    // let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
     let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
 
     // Set up the training configuration with the specified hyperparameters
-    let config = TrainingConfig::<MyAutodiffBackend>::builder()
+    let config = TrainingConfig::builder()
         .with_epochs(epochs) // Set the number of epochs for training
         .with_batch_size(batch_size) // Set the batch size for training
         .with_learning_rate(learning_rate) // Set the learning rate for the optimizer
@@ -66,7 +68,7 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training the UMAP model with the specified training data and configuration
-    let model = train::<MyAutodiffBackend>(
+    let (model, _) = train(
         model,              // The model to train
         num_samples,        // Total number of training samples
         num_features,       // Number of features per sample
@@ -75,7 +77,7 @@ fn main() {
     );
 
     // Validate the trained model after training
-    let (model, _) = model.valid();
+    let model = model.valid();
 
     // Convert the training data into a tensor for model input
     let global = convert_vector_to_tensor(train_data, num_samples, num_features, &config.device);
