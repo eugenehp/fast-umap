@@ -20,7 +20,7 @@ use burn::{
 };
 pub use config::*;
 use ctrlc;
-use get_distance_by_metric::get_distance_by_metric;
+use get_distance_by_metric::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive};
 use std::{sync::mpsc::channel, time::Duration};
@@ -167,10 +167,14 @@ where
             // Compute gradients and update the model parameters using the optimizer.
             losses.push(current_loss);
 
-            let batch_grads = GradientsParams::from_grads(loss.backward(), &model);
+            let grads = loss.backward();
+
+            let batch_grads = GradientsParams::from_grads(grads, &model);
 
             // Accumulate gradients.
             accumulator.accumulate(&model, batch_grads);
+
+            // println!("Train loop [{batch_idx}] - 6");
         }
 
         let current_loss = losses.last().unwrap().clone();
