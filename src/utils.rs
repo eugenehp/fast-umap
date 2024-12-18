@@ -4,9 +4,9 @@ use burn::{
     prelude::Backend,
     tensor::{backend::AutodiffBackend, Device, Tensor, TensorData},
 };
-use num::Float;
+use num::{Float, FromPrimitive};
 use prettytable::{row, Table};
-use rand::Rng;
+use rand::{distributions::uniform::SampleUniform, Rng};
 use rayon::prelude::*;
 
 /// Generates random test data with the given number of samples and features.
@@ -19,15 +19,19 @@ use rayon::prelude::*;
 /// A `Vec<f64>` containing the randomly generated data.
 ///
 /// This function uses the `rand` crate to generate a flat vector of random floating-point values.
-pub fn generate_test_data(
+pub fn generate_test_data<F: Float + FromPrimitive + SampleUniform>(
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample
-) -> Vec<f64> {
+) -> Vec<F> {
     let mut rng = rand::thread_rng();
 
-    // Generate random data for the tensor (size = num_features)
-    let data: Vec<f64> = (0..num_samples * num_features)
-        .map(|_| rng.gen::<f64>()) // Random number generation for each feature
+    // Define the range for random numbers (e.g., [0.0, 1.0))
+    let zero = F::from_f64(0.0).unwrap(); // 0.0 as a `F` type
+    let one = F::from_f64(1.0).unwrap(); // 1.0 as a `F` type
+
+    // Generate random data for the tensor (size = num_samples * num_features)
+    let data: Vec<F> = (0..num_samples * num_features)
+        .map(|_| rng.gen_range(zero..one)) // Generate random number from the range [0.0, 1.0)
         .collect();
 
     data

@@ -3,8 +3,9 @@ use cubecl::wgpu::WgpuRuntime;
 use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
 
 fn main() {
+    type F = f32;
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
-    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
+    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, F, i32>;
 
     // Define the AutodiffBackend based on the custom MyBackend type
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
@@ -29,14 +30,14 @@ fn main() {
     let min_desired_loss = 0.001; // Minimum loss threshold for early stopping
     let timeout = 60;
 
-    // let metric = Metric::EuclideanKNN; // Alternative metric for neighbors search
-    let metric = "euclidean_knn"; // Distance metric used for the nearest neighbor search
+    // let metric = "euclidean_knn"; // Distance metric used for the nearest neighbor search
+    let metric = Metric::Euclidean; // Alternative metric for neighbors search
 
     // Seed the random number generator to ensure reproducibility
     MyAutodiffBackend::seed(seed);
 
     // Generate random test data for training
-    let train_data = generate_test_data(num_samples, num_features);
+    let train_data: Vec<F> = generate_test_data(num_samples, num_features);
 
     // Configure the UMAP model with the specified input size, hidden layer size, and output size
     let model_config = UMAPModelConfigBuilder::default()

@@ -30,6 +30,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
+                println!("euclidean_pairwise_distance[backward]");
                 // Fetch the node and the gradient for the current node
                 let [node_lhs] = ops.parents;
                 let grad = grads.consume::<B>(&ops.node);
@@ -68,12 +69,12 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {
+                println!("euclidean_pairwise_distance - autodiff - Tracked");
                 // Register the backward step if needed (if node is tracked)
                 let lhs_state = prep.checkpoint(&x);
 
                 // Perform the forward pass for the pairwise Euclidean distance
-                let output = Self::euclidean_pairwise_distance(x.clone());
-                let output = output.into_primitive();
+                let output = B::euclidean_pairwise_distance(x.into_primitive());
 
                 let t: Tensor<B, 1, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
@@ -85,9 +86,10 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 x
             }
             OpsKind::UnTracked(prep) => {
+                let x = x.into_primitive();
+                println!("euclidean_pairwise_distance - autodiff - UnTracked {:?}", x);
                 // If not tracked, just perform the forward pass
-                let output = Self::euclidean_pairwise_distance(x.clone());
-                let output = output.into_primitive();
+                let output = B::euclidean_pairwise_distance(x);
                 prep.finish(output)
             }
         }
