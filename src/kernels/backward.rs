@@ -20,6 +20,8 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
         #[derive(Debug)]
         struct FusedEuclideanDistanceBackward;
 
+        println!("x {:?}", x);
+
         // Implement the backward computation for the pairwise Euclidean distance
         impl<B: Backend> Backward<B, 1> for FusedEuclideanDistanceBackward {
             type State = (NodeID, FloatTensor<B>);
@@ -30,7 +32,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
-                // println!("euclidean_pairwise_distance[backward]");
+                println!("euclidean_pairwise_distance[backward]");
                 // Fetch the node and the gradient for the current node
                 let [node_lhs] = ops.parents;
                 let grad = grads.consume::<B>(&ops.node);
@@ -39,33 +41,37 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let (lhs_state, output) = ops.state;
                 let lhs: FloatTensor<B> = checkpointer.retrieve_node_output(lhs_state);
 
-                // let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
-                // let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
-                // let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
+                let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
+                let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
+                let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
 
-                // // Fetch shapes of our tensor to support broadcasting.
-                // let shape_lhs = lhs.shape();
+                println!("[backward] lhs {:?}", lhs.to_data());
+                println!("[backward] output {:?}", output.to_data());
+                println!("[backward] grad {:?}", grad.to_data());
 
-                // // Add a small epsilon value to avoid division by zero
-                // let epsilon = 1e-6; // Adjust this value as needed
+                // Fetch shapes of our tensor to support broadcasting.
+                let shape_lhs = lhs.shape();
 
-                // // Clamp the output to a minimum value (epsilon) to avoid division by zero
-                // let output_clamped = output.clone().clamp_min(epsilon);
+                // Add a small epsilon value to avoid division by zero
+                let epsilon = 1e-6; // Adjust this value as needed
 
-                // // Now, we need to compute the gradient with respect to `lhs`
-                // // For pairwise Euclidean distance, the gradient is:
-                // // grad = (x_i - x_j) / distance(x_i, x_j)
-                // // let grad_output: Tensor<B, 1, Float> = grad / output.clone();
-                // let grad_output: Tensor<B, 1, Float> = grad / output_clamped;
+                // Clamp the output to a minimum value (epsilon) to avoid division by zero
+                let output_clamped = output.clone().clamp_min(epsilon);
 
-                // let grad = grad_output.clone() * lhs.clone();
+                // Now, we need to compute the gradient with respect to `lhs`
+                // For pairwise Euclidean distance, the gradient is:
+                // grad = (x_i - x_j) / distance(x_i, x_j)
+                // let grad_output: Tensor<B, 1, Float> = grad / output.clone();
+                let grad_output: Tensor<B, 1, Float> = grad / output_clamped;
 
-                // // Compute the gradient for the lhs tensor (x_i)
-                // let grad_lhs = broadcast_shape::<B>(grad.into_primitive().tensor(), &shape_lhs);
+                let grad = grad_output.clone() * lhs.clone();
+
+                // Compute the gradient for the lhs tensor (x_i)
+                let grad_lhs = broadcast_shape::<B>(grad.into_primitive().tensor(), &shape_lhs);
 
                 // Register the gradients
                 if let Some(node) = node_lhs {
-                    grads.register::<B>(node.id, lhs);
+                    grads.register::<B>(node.id, grad_lhs);
                     // grads.register::<B>(node.id, grad_lhs);
                 }
             }
@@ -84,6 +90,10 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 
                 // Perform the forward pass for the pairwise Euclidean distance
                 let output = B::euclidean_pairwise_distance(x.into_primitive());
+                let output2: Tensor<B, 1, Float> =
+                    Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
+
+                println!("[Tracked] output {:?}", output2.to_data());
 
                 let state = (lhs_state, output.clone());
 
