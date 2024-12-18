@@ -20,7 +20,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
         #[derive(Debug)]
         struct FusedEuclideanDistanceBackward;
 
-        println!("x {:?}", x);
+        // println!("x {:?}", x);
 
         // Implement the backward computation for the pairwise Euclidean distance
         impl<B: Backend> Backward<B, 1> for FusedEuclideanDistanceBackward {
@@ -45,9 +45,9 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
                 let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
 
-                println!("[backward] lhs {:?}", lhs.to_data());
-                println!("[backward] output {:?}", output.to_data());
-                println!("[backward] grad {:?}", grad.to_data());
+                // println!("[backward] lhs {:?}", lhs.to_data().to_vec::<f32>());
+                // println!("[backward] output {:?}", output.to_data().to_vec::<f32>());
+                // println!("[backward] grad {:?}", grad.to_data().to_vec::<f32>());
 
                 // Fetch shapes of our tensor to support broadcasting.
                 let shape_lhs = lhs.shape();
@@ -72,7 +72,6 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 // Register the gradients
                 if let Some(node) = node_lhs {
                     grads.register::<B>(node.id, grad_lhs);
-                    // grads.register::<B>(node.id, grad_lhs);
                 }
             }
         }
@@ -90,10 +89,10 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 
                 // Perform the forward pass for the pairwise Euclidean distance
                 let output = B::euclidean_pairwise_distance(x.into_primitive());
-                let output2: Tensor<B, 1, Float> =
-                    Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
+                // let output2: Tensor<B, 1, Float> =
+                //     Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
 
-                println!("[Tracked] output {:?}", output2.to_data());
+                // println!("[Tracked] output {:?}", output2.to_data());
 
                 let state = (lhs_state, output.clone());
 
