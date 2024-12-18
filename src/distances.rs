@@ -1,6 +1,6 @@
 use burn::tensor::Tensor;
 
-use crate::kernels::AutodiffBackend;
+use crate::kernels::Backend;
 #[allow(unused)]
 use crate::print_tensor_with_title;
 
@@ -14,7 +14,7 @@ use crate::print_tensor_with_title;
 ///
 /// This function computes the pairwise Euclidean distance between samples by using broadcasting
 /// to efficiently subtract the samples from each other, squaring the differences, and summing across the features.
-pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
+pub fn euclidean<B: Backend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
     let _n_features = x.dims()[1]; // Number of features (columns)
 
@@ -62,7 +62,7 @@ pub fn euclidean<B: AutodiffBackend>(x: Tensor<B, 2>) -> Tensor<B, 1> {
 /// let result = euclidean_knn(x, k);
 /// println!("{:?}", result); // Output: sum of squared distances for each sample to its 2 nearest neighbors
 /// ```
-pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
+pub fn euclidean_knn<B: Backend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
     let n_samples = x.dims()[0]; // Number of samples (rows)
 
     // Expand x to shapes that allow broadcasting for pairwise subtraction:
@@ -90,7 +90,7 @@ pub fn euclidean_knn<B: AutodiffBackend>(x: Tensor<B, 2>, k: usize) -> Tensor<B,
     sum_of_top_k_distances
 }
 
-pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
+pub fn manhattan<B: Backend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = tensor.dims()[0];
     // Sum the absolute difference along the rows (axis 1)
     let x = tensor
@@ -134,7 +134,7 @@ pub fn manhattan<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
 /// # Performance
 /// This function clones the tensor multiple times, which may impact performance for large tensors.
 /// Optimizations could be made to minimize memory allocations and cloning.
-pub fn cosine<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
+pub fn cosine<B: Backend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = tensor.dims()[0];
     let n_features = tensor.dims()[1];
     // First, get the first row to compare to
@@ -194,7 +194,7 @@ pub fn cosine<B: AutodiffBackend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
 /// The function clones the tensor to avoid modifying the original data. For large tensors, this may
 /// incur some overhead due to memory allocation. You may want to explore optimization techniques like
 /// in-place operations if memory usage is a concern.
-pub fn minkowski<B: AutodiffBackend>(tensor: Tensor<B, 2>, p: f64) -> Tensor<B, 1> {
+pub fn minkowski<B: Backend>(tensor: Tensor<B, 2>, p: f64) -> Tensor<B, 1> {
     let n_samples = tensor.dims()[0];
     let n_features = tensor.dims()[1];
 

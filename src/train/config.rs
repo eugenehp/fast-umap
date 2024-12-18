@@ -1,4 +1,3 @@
-use burn::tensor::{backend::AutodiffBackend, Device};
 use std::fmt;
 
 #[derive(Debug)]
@@ -57,7 +56,7 @@ impl fmt::Display for Metric {
 /// device configuration (e.g., CPU or GPU), and additional features like verbosity, early stopping,
 /// and time limits for training.
 #[derive(Debug)]
-pub struct TrainingConfig<B: AutodiffBackend> {
+pub struct TrainingConfig {
     /// The distance metric to use for training the model (e.g., "euclidean", "manhattan").
     pub metric: Metric,
 
@@ -69,9 +68,6 @@ pub struct TrainingConfig<B: AutodiffBackend> {
 
     /// The learning rate for the optimizer (controls the step size for parameter updates).
     pub learning_rate: f64,
-
-    /// The device on which to run the model (e.g., CPU or GPU).
-    pub device: Device<B>,
 
     /// The Beta1 parameter for the Adam optimizer (controls the first moment estimate).
     pub beta1: f64,
@@ -107,23 +103,22 @@ pub struct TrainingConfig<B: AutodiffBackend> {
     pub minkowski_p: f64,
 }
 
-impl<B: AutodiffBackend> TrainingConfig<B> {
+impl TrainingConfig {
     /// Creates a new builder for constructing a `TrainingConfig`.
     ///
     /// This method allows you to incrementally build a `TrainingConfig` by setting its fields.
-    pub fn builder() -> TrainingConfigBuilder<B> {
+    pub fn builder() -> TrainingConfigBuilder {
         TrainingConfigBuilder::default()
     }
 }
 
 /// Builder pattern for constructing a `TrainingConfig` with optional parameters.
 #[derive(Default)]
-pub struct TrainingConfigBuilder<B: AutodiffBackend> {
+pub struct TrainingConfigBuilder {
     metric: Option<Metric>,
     epochs: Option<usize>,
     batch_size: Option<usize>,
     learning_rate: Option<f64>,
-    device: Option<Device<B>>,
     beta1: Option<f64>,
     beta2: Option<f64>,
     penalty: Option<f64>,
@@ -137,7 +132,7 @@ pub struct TrainingConfigBuilder<B: AutodiffBackend> {
     minkowski_p: Option<f64>,
 }
 
-impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
+impl TrainingConfigBuilder {
     /// Set the distance metric for training (e.g., "Euclidean", "Manhattan").
     pub fn with_metric(mut self, metric: Metric) -> Self {
         self.metric = Some(metric);
@@ -162,13 +157,6 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
     /// The learning rate controls the step size for each parameter update during training.
     pub fn with_learning_rate(mut self, learning_rate: f64) -> Self {
         self.learning_rate = Some(learning_rate);
-        self
-    }
-
-    /// Set the device to run the model on (e.g., CPU or GPU).
-    /// This specifies the hardware where the model will be trained.
-    pub fn with_device(mut self, device: Device<B>) -> Self {
-        self.device = Some(device);
         self
     }
 
@@ -253,13 +241,12 @@ impl<B: AutodiffBackend> TrainingConfigBuilder<B> {
     ///
     /// This method returns an `Option<TrainingConfig>`. If any required parameters are missing,
     /// it returns `None`, and default values will be used for those parameters.
-    pub fn build(self) -> Option<TrainingConfig<B>> {
+    pub fn build(self) -> Option<TrainingConfig> {
         Some(TrainingConfig {
             metric: self.metric.unwrap_or(Metric::Euclidean), // Default to Euclidean if not set
             epochs: self.epochs?,                             // Will panic if not set
             batch_size: self.batch_size?,                     // Will panic if not set
             learning_rate: self.learning_rate.unwrap_or(0.001), // Default to 0.001 if not set
-            device: self.device?,                             // Will panic if not set
             beta1: self.beta1.unwrap_or(0.9),                 // Default beta1 if not set
             beta2: self.beta2.unwrap_or(0.999),               // Default beta2 if not set
             penalty: self.penalty.unwrap_or(5e-5),            // Default penalty if not set

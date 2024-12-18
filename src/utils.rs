@@ -2,7 +2,7 @@ use core::f64;
 
 use burn::{
     prelude::Backend,
-    tensor::{backend::AutodiffBackend, Device, Tensor, TensorData},
+    tensor::{Device, Tensor, TensorData},
 };
 use num::{Float, FromPrimitive};
 use prettytable::{row, Table};
@@ -257,7 +257,7 @@ where
 /// let tensor = Tensor::<B, 1>::from_data(vec![1.0, 2.0, 3.0], &device);
 /// let normalized_tensor = normalize_tensor(tensor);
 /// ```
-pub fn normalize_tensor<B: AutodiffBackend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
+pub fn normalize_tensor<B: Backend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
     let device = tensor.device();
 
     // Normalize the result using min-max normalization:

@@ -42,13 +42,14 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
                 let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
                 let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
+
                 // Fetch shapes of our tensor to support broadcasting.
                 let shape_lhs = lhs.shape();
 
                 // Now, we need to compute the gradient with respect to `lhs`
                 // For pairwise Euclidean distance, the gradient is:
                 // grad = (x_i - x_j) / distance(x_i, x_j)
-                let grad_output: Tensor<B, 2, Float> = grad / output.clone();
+                let grad_output: Tensor<B, 1, Float> = grad / output.clone();
 
                 let grad = grad_output.clone() * lhs.clone();
 
