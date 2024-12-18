@@ -1,21 +1,17 @@
 use super::{kernel::euclidean_pairwise_distance_kernel, Backend};
-use burn::tensor::{Shape, Tensor, TensorPrimitive};
-use burn_jit::{tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime};
+use burn::tensor::{ops::FloatTensor, Shape};
+use burn_jit::{
+    kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,
+};
 use cubecl::{CubeCount, CubeDim};
 
 impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F, I> {
-    fn euclidean_pairwise_distance(a: Tensor<Self, 2>) -> Tensor<Self, 1> {
-        let shape = a.shape();
-        let device = a.device();
-
-        // Convert the high-level Tensor<B, 2> to the backend-specific primitive type
-        let a_primitive = a.into_primitive();
-        let handle = a_primitive.clone().tensor().handle;
-        let client = a_primitive.tensor().client;
+    fn euclidean_pairwise_distance(a: FloatTensor<Self>) -> FloatTensor<Self> {
+        let client = a.clone().client;
+        let device = a.clone().device;
 
         // Ensure the tensor is contiguous in memory
-        let a_contiguous: JitTensor<R, F> =
-            JitTensor::new_contiguous(client.clone(), device.clone(), shape, handle);
+        let a_contiguous = into_contiguous(a);
 
         // Get the number of samples and features
         let n_samples = a_contiguous.shape.num_dims() - 1;
@@ -27,7 +23,9 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             .clone()
             .empty(shape_out.num_elements() * core::mem::size_of::<F>());
 
-        let output = JitTensor::new_contiguous(client.clone(), device, shape_out, buffer_out);
+        // Create the output tensor primitive.
+        let output =
+            JitTensor::new_contiguous(client.clone(), device.clone(), shape_out, buffer_out);
 
         // Define the workgroup size (adjust based on hardware capabilities)
         let cube_dim = CubeDim { x: 16, y: 16, z: 1 };
@@ -47,9 +45,8 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         );
 
         // Return the output tensor with the pairwise distances
-        // output
+        output
 
-        // Tensor::<_, 1>::new(output)
-        Tensor::from_primitive(TensorPrimitive::Float(output))
+        // Tensor::from_primitive(TensorPrimitive::Float(output))
     }
 }
