@@ -10,6 +10,8 @@ use burn::{
     },
     tensor::{ops::FloatTensor, Float, Shape, Tensor, TensorPrimitive},
 };
+use burn_jit::JitBackend;
+use cubecl::wgpu::WgpuRuntime;
 mod euclidian;
 mod kernel;
 
@@ -22,6 +24,8 @@ pub trait Backend: burn::tensor::backend::Backend {
 pub trait AutodiffBackend: Backend + burn::tensor::backend::AutodiffBackend {
     // fn euclidean_pairwise_distance(x: Tensor<Self, 2>) -> Tensor<Self, 1>;
 }
+
+impl AutodiffBackend for Autodiff<JitBackend<WgpuRuntime, f32, i32>> {}
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {

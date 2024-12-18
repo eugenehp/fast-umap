@@ -1,7 +1,6 @@
 use crate::kernels::AutodiffBackend;
 use crate::{chart, train, utils, UMAP};
 
-use burn_jit::FloatElement;
 // Re-export common utilities for easier use
 pub use chart::{chart_tensor, chart_vector};
 
