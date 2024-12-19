@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use burn::{
     backend::{
         autodiff::{
@@ -8,23 +10,21 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{ops::FloatTensor, Float, Tensor, TensorPrimitive},
+    tensor::{ops::FloatTensor, Float, Shape, Tensor, TensorPrimitive},
 };
+use ndarray::AssignElem;
 
 use super::Backend;
 
-// Implement our custom backend trait for any backend that also implements our custom backend trait.
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
-        // Create our zero-sized type that will implement the Backward trait.
+        // Define a struct for the backward pass.
         #[derive(Debug)]
-        struct FusedEuclideanDistanceBackward;
+        struct EuclideanPairwiseDistanceBackward;
 
-        // println!("x {:?}", x);
-
-        // Implement the backward computation for the pairwise Euclidean distance
-        impl<B: Backend> Backward<B, 1> for FusedEuclideanDistanceBackward {
-            type State = (NodeID, FloatTensor<B>);
+        // Implement the backward trait for the given backend B
+        impl<B: Backend> Backward<B, 1> for EuclideanPairwiseDistanceBackward {
+            type State = (NodeID, FloatTensor<B>, Shape);
 
             fn backward(
                 self,
@@ -32,78 +32,93 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
-                println!("euclidean_pairwise_distance[backward]");
-                // Fetch the node and the gradient for the current node
-                let [node_lhs] = ops.parents;
+                // Retrieve the parent nodes
+                let [node_x] = ops.parents;
+
+                // Fetch the gradient for the current node
                 let grad = grads.consume::<B>(&ops.node);
 
-                // Retrieve the state for each parent node
-                let (lhs_state, output) = ops.state;
-                let lhs: FloatTensor<B> = checkpointer.retrieve_node_output(lhs_state);
+                // Retrieve the state
+                let (x_state, output, shape_x) = ops.state;
+                let x: FloatTensor<B> = checkpointer.retrieve_node_output(x_state);
 
-                let lhs = Tensor::from_primitive(TensorPrimitive::Float(lhs.clone()));
-                let output = Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
-                let grad = Tensor::from_primitive(TensorPrimitive::Float(grad.clone()));
+                let x = Tensor::from_primitive(TensorPrimitive::Float(x.clone()));
+                let shape = x.shape();
+                let dims = shape.dims;
+                let device = x.device();
 
-                // println!("[backward] lhs {:?}", lhs.to_data().to_vec::<f32>());
-                // println!("[backward] output {:?}", output.to_data().to_vec::<f32>());
-                // println!("[backward] grad {:?}", grad.to_data().to_vec::<f32>());
+                let zero = Tensor::zeros([1], device);
 
-                // Fetch shapes of our tensor to support broadcasting.
-                let shape_lhs = lhs.shape();
+                // Compute the gradient for each pairwise distance entry
+                let grad_output = grad.clone(); // Gradient for the output distances
+                let grad_output =
+                    Tensor::from_primitive(TensorPrimitive::Float(grad_output.clone()));
+                let grad_dims = grad_output.shape().dims;
 
-                // Add a small epsilon value to avoid division by zero
-                let epsilon = 1e-6; // Adjust this value as needed
+                // Initialize the gradient tensor for x
+                let mut grad_x = vec![0.0; (dims[0] * dims[1]) as usize];
+                let n = dims[0];
 
-                // Clamp the output to a minimum value (epsilon) to avoid division by zero
-                let output_clamped = output.clone().clamp_min(epsilon);
+                // Iterate over each pair (i, j)
+                for i in 0..n {
+                    for j in i..n {
+                        // Use tensor operations to get rows x[i] and x[j]
+                        let xi = x.slice([i..i]);
+                        let xj = x.slice([j..j]);
 
-                // Now, we need to compute the gradient with respect to `lhs`
-                // For pairwise Euclidean distance, the gradient is:
-                // grad = (x_i - x_j) / distance(x_i, x_j)
-                // let grad_output: Tensor<B, 1, Float> = grad / output.clone();
-                let grad_output: Tensor<B, 1, Float> = grad / output_clamped;
+                        // Compute the difference between xi and xj
+                        let diff = xi - xj;
 
-                let grad = grad_output.clone() * lhs.clone();
+                        // Compute the Euclidean distance (norm)
+                        let diff_squared = diff.powf_scalar(2.0); // Square each element in the diff tensor
+                        let sum_of_squares = diff_squared.sum(); // Sum of squared differences
+                        let distance = sum_of_squares.sqrt(); // Take the square root of the sum
 
-                // Compute the gradient for the lhs tensor (x_i)
-                let grad_lhs = broadcast_shape::<B>(grad.into_primitive().tensor(), &shape_lhs);
+                        let eq = distance
+                            .equal(zero)
+                            .to_data()
+                            .to_vec::<bool>()
+                            .unwrap()
+                            .first()
+                            .unwrap();
 
-                // Register the gradients
-                if let Some(node) = node_lhs {
-                    grads.register::<B>(node.id, grad_lhs);
+                        if !eq {
+                            // Calculate the gradient for the inputs x[i] and x[j]
+                            let grad_ij =
+                                grad_output.slice([i..i + 1, 0..grad_dims[1]]) * diff / distance;
+                            let grad_ji =
+                                grad_output.slice([j..j + 1, 0..grad_dims[1]]) * diff / distance;
+
+                            // Store gradients in grad_x_vec
+                            grad_x[i * n + j] += grad_ij.to_data().to_vec(); // Assumes grad_ij is a scalar
+                            grad_x[j * n + i] -= grad_ji[0]; // Assumes grad_ji is a scalar
+                        }
+                    }
+                }
+
+                // Convert the gradient to a tensor and register it for the input x
+                let grad_tensor = FloatTensor::<B>::from_vec(grad_x, shape_x);
+                if let Some(node) = node_x {
+                    grads.register::<B>(node.id, grad_tensor);
                 }
             }
         }
 
-        // Here, we prepare the operation and perform the forward pass
-        match FusedEuclideanDistanceBackward
+        // Prepare the operation and determine whether to track the backward pass
+        match EuclideanPairwiseDistanceBackward
             .prepare::<C>([x.node.clone()])
             .compute_bound()
             .stateful()
         {
             OpsKind::Tracked(mut prep) => {
-                // println!("euclidean_pairwise_distance - autodiff - Tracked");
-                // Register the backward step if needed (if node is tracked)
-                let lhs_state = prep.checkpoint(&x);
+                let x_state = prep.checkpoint(&x);
+                let output = B::euclidean_pairwise_distance(x.primitive.clone());
+                let state = (x_state, output.clone(), x.primitive.shape());
 
-                // Perform the forward pass for the pairwise Euclidean distance
-                let output = B::euclidean_pairwise_distance(x.into_primitive());
-                // let output2: Tensor<B, 1, Float> =
-                //     Tensor::from_primitive(TensorPrimitive::Float(output.clone()));
-
-                // println!("[Tracked] output {:?}", output2.to_data());
-
-                let state = (lhs_state, output.clone());
-
-                let x = prep.finish(state, output);
-                x
+                prep.finish(state, output)
             }
             OpsKind::UnTracked(prep) => {
-                let x = x.into_primitive();
-                // println!("euclidean_pairwise_distance - autodiff - UnTracked");
-                // If not tracked, just perform the forward pass
-                let output = B::euclidean_pairwise_distance(x);
+                let output = B::euclidean_pairwise_distance(x.primitive);
                 prep.finish(output)
             }
         }

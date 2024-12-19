@@ -93,7 +93,9 @@ where
         // Compute the global distances for each batch (using the entire dataset).
         let global_tensor_data =
             convert_vector_to_tensor(data.clone(), batch_size, num_features, &device);
-        let global_distances = get_distance_by_metric(global_tensor_data.clone(), config);
+        let global_distances =
+            get_distance_by_metric(global_tensor_data.clone(), config, Some("global".into()));
+        // println!("global_distances - {:?}", global_distances.shape());
         // let global_distances = global_distances.set_require_grad(false);
         global_distances_batches.push(global_distances);
     }
@@ -161,14 +163,32 @@ where
             //     global_distances_all.shape()
             // );
 
-            let tensor_batch = tensor_batches_all.clone().slice([start_idx..end_idx]); // Slice the tensor
             let global_distances = global_distances_all.clone().slice([start_idx..end_idx]); // Slice the tensor
+
+            let batch_start_idx = batch_idx * batch_size;
+            let batch_end_idx = (batch_idx + 1) * batch_size;
+
+            let tensor_batch = tensor_batches_all
+                .clone()
+                .slice([batch_start_idx..batch_end_idx, 0..num_features]); // Slice the tensor
+
+            // println!("start_idx={start_idx}, end_idx={end_idx}, num_features={num_features}");
+            // println!("batch_start_idx={batch_start_idx}, batch_end_idx={batch_end_idx}");
+            // println!("tensor_batch - {:?}", tensor_batch.shape());
+            // println!("tensor_batches_all - {:?}", tensor_batches_all.shape());
 
             // Forward pass to get the local (low-dimensional) representation.
             let local = model.forward(tensor_batch.clone());
 
+            // println!(
+            //     "tensor_batch - {:?}, local - {:?}",
+            //     tensor_batch.shape(),
+            //     local.shape()
+            // );
+
             // Compute the loss for the batch.
-            let local_distances = get_distance_by_metric(local.clone(), config);
+            let local_distances =
+                get_distance_by_metric(local.clone(), config, Some("local".into()));
             // let local_distances = local_distances.set_require_grad(false);
 
             // println!(

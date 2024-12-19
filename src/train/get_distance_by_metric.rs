@@ -33,13 +33,23 @@ use super::*;
 pub fn get_distance_by_metric<B: Backend>(
     data: Tensor<B, 2>,
     config: &TrainingConfig,
+    verbose: Option<String>,
 ) -> Tensor<B, 1> {
+    let _verbose = verbose.unwrap_or("".into());
+    // println!(
+    //     "get_distance_by_metric - before - {:?} - {:?}",
+    //     verbose,
+    //     data.shape(),
+    // );
+
     let distance = match config.metric {
         // Metric::Euclidean => euclidean(data),
         Metric::Euclidean => {
-            let x = data.into_primitive().tensor();
+            let x = data.clone().into_primitive().tensor();
             let output = B::euclidean_pairwise_distance(x);
-            Tensor::from_primitive(TensorPrimitive::Float(output))
+            let output = Tensor::from_primitive(TensorPrimitive::Float(output));
+
+            output
         }
         Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
         Metric::Manhattan => manhattan(data),
@@ -47,6 +57,12 @@ pub fn get_distance_by_metric<B: Backend>(
         Metric::Minkowski => minkowski(data, config.minkowski_p),
         // _ => euclidean(data),
     };
+
+    // println!(
+    //     "get_distance_by_metric - after - {:?} - {:?}",
+    //     verbose,
+    //     distance.shape(),
+    // );
 
     match config.normalized {
         true => normalize_tensor(distance),
