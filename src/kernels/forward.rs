@@ -16,8 +16,15 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let n = x.shape.num_dims();
         let num_samples = x.shape.dims[n - 2]; // Number of rows (samples)
 
-        // The output is a 1D tensor with size N * (N - 1) / 2
         let output_size = num_samples * (num_samples - 1) / 2;
+        // if input shape has only 1 sample, i.e. [1,100], where n_samples = 1, and n_features = 100
+        let output_size = match output_size {
+            0 => 1,
+            _ => output_size,
+        };
+
+        // The output is a 1D tensor with size N * (N - 1) / 2
+        // let output_size = num_samples * (num_samples - 1) / 2;
         let output_shape = Shape::from(vec![output_size]);
 
         // Create a buffer for the output tensor.
@@ -34,6 +41,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let cubes_needed_in_y = f32::ceil(num_samples as f32 / cube_dim.y as f32) as u32;
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1); // Only one batch.
 
+        // println!("before");
         // Launch the kernel to compute pairwise distances.
         euclidean_pairwise_distance_kernel::launch::<F, R>(
             &x.client,
@@ -42,6 +50,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             x.as_tensor_arg(1),
             output.as_tensor_arg(1),
         );
+        // println!("after");
 
         // Return the output tensor (pairwise distance matrix).
         output
