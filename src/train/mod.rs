@@ -163,10 +163,12 @@ where
             //     global_distances_all.shape()
             // );
 
-            let global_distances = global_distances_all.clone().slice([start_idx..end_idx]); // Slice the tensor
-
             let batch_start_idx = batch_idx * batch_size;
             let batch_end_idx = (batch_idx + 1) * batch_size;
+
+            let global_distances = global_distances_all
+                .clone()
+                .slice([batch_start_idx..batch_end_idx]); // Slice the tensor
 
             let tensor_batch = tensor_batches_all
                 .clone()
@@ -193,11 +195,11 @@ where
 
             // println!(
             //     "global_distances[{batch_idx}] - {:?}",
-            //     global_distances.to_data()
+            //     global_distances.shape()
             // );
             // println!(
             //     "local_distances[{batch_idx}] - {:?}",
-            //     local_distances.to_data()
+            //     local_distances.shape()
             // );
 
             let loss = mse_loss.forward(
@@ -265,11 +267,11 @@ where
         }
 
         // Stop early if we reach the desired loss.
-        if let Some(min_desired_loss) = config.min_desired_loss {
-            if current_loss < min_desired_loss {
-                break;
-            }
-        }
+        // if let Some(min_desired_loss) = config.min_desired_loss {
+        //     if current_loss < min_desired_loss {
+        //         break;
+        //     }
+        // }
 
         const STEP: usize = 100;
         if epoch > 0 && epoch % STEP == 0 {

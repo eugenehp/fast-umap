@@ -1,4 +1,4 @@
-use super::{kernel::euclidean_pairwise_distance_kernel, Backend};
+use super::{kernel::*, Backend};
 use burn::tensor::{ops::FloatTensor, Shape};
 use burn_jit::{
     kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,

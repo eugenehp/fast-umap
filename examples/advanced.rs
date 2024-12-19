@@ -20,7 +20,7 @@ fn main() {
     let num_features = 90; // Number of features (dimensions) for each sample
     let k_neighbors = 10; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
-    let hidden_sizes = vec![50, 60, 70]; // Size of the hidden layer in the neural network
+    let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
     let learning_rate = 0.001; // Learning rate for optimization
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
