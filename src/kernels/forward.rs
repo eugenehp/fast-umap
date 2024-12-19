@@ -46,7 +46,6 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let cubes_needed_in_y = (n_samples as f32 / cube_dim.y as f32).ceil() as u32;
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
-        // println!("euclidean_pairwise_distance - forward - 7");
         // Launch the kernel to compute the pairwise Euclidean distances
         euclidean_pairwise_distance_kernel::launch::<F, R>(
             &client,

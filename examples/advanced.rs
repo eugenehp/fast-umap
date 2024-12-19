@@ -11,7 +11,8 @@ fn main() {
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
     // Initialize the GPU device for computation
-    let device = burn::backend::wgpu::WgpuDevice::default();
+    // let device = burn::backend::wgpu::WgpuDevice::default();
+    let device = Default::default();
 
     // Set training hyperparameters
     let batch_size = 1; // Number of samples per batch during training
