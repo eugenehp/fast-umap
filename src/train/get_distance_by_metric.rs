@@ -30,15 +30,17 @@ use super::*;
 /// let config = TrainingConfig { metric: Metric::Euclidean, k_neighbors: 5 };
 /// let distances = get_distance_by_metric(data, &config);
 /// ```
+#[allow(unused)]
 pub fn get_distance_by_metric<B: Backend>(
     data: Tensor<B, 2>,
     config: &TrainingConfig,
     verbose: Option<String>,
 ) -> Tensor<B, 1> {
-    let _verbose = verbose.unwrap_or("".into());
+    type F = f32;
+    // let verbose = verbose.unwrap_or("".into());
+    // let before = data.to_data().to_vec::<F>().unwrap();
     // println!(
-    //     "get_distance_by_metric - before - {:?} - {:?}",
-    //     verbose,
+    //     "get_distance_by_metric - before - {verbose} - {:?}",
     //     data.shape(),
     // );
 
@@ -58,9 +60,9 @@ pub fn get_distance_by_metric<B: Backend>(
         // _ => euclidean(data),
     };
 
+    // let after = distance.to_data().to_vec::<F>().unwrap();
     // println!(
-    //     "get_distance_by_metric - after - {:?} - {:?}",
-    //     verbose,
+    //     "get_distance_by_metric - after - {verbose} - {:?}",
     //     distance.shape(),
     // );
 

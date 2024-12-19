@@ -23,14 +23,14 @@ fn main() {
 
     // Set training hyperparameters
     let batch_size = 1_000; // Number of samples per batch during training
-    let num_samples = 2_000 as usize; // Total number of samples in the dataset
+    let num_samples = 10_000 as usize; // Total number of samples in the dataset
 
     // let num_samples = 50_000 as usize; // Total number of samples in the dataset
 
     let num_features = 28 * 28; // Number of features (dimensions) for each sample, size of each mnist image
     let k_neighbors = 15; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
-    let hidden_sizes = vec![100]; // Size of the hidden layer in the neural network
+    let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
     let learning_rate = 0.001; // Learning rate for optimization
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
@@ -87,12 +87,12 @@ fn main() {
         .with_beta1(beta1) // Set the beta1 parameter for the Adam optimizer
         .with_beta2(beta2) // Set the beta2 parameter for the Adam optimizer
         .with_verbose(verbose) // Enable or disable the progress bar
-        .with_patience(patience) // Set the patience for early stopping
+        // .with_patience(patience) // Set the patience for early stopping
         .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
         .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
         .with_loss_reduction(loss_reduction)
-        .with_timeout(timeout) // set timeout in seconds
+        // .with_timeout(timeout) // set timeout in seconds
         .with_minkowski_p(minkowski_p)
         .with_normalized(normalized)
         .build()
