@@ -11,7 +11,7 @@ version = "0.0.2"
 edition = "2021"
 
 [dependencies]
-burn = { version = "~0.15", features = ["train", "wgpu"] }
+burn = { version = "~0.15", features = ["train", "wgpu", "autodiff", "autotune"] }
 burn-jit = { version = "0.15.0", features = ["burn-autodiff"] }
 ctrlc = "3.4.5"
 cubecl = { version = "0.3.0", features = ["wgpu", "cubecl-wgpu"] }
