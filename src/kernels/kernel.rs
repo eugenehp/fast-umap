@@ -1,7 +1,4 @@
-use std::{cmp::Reverse, collections::BinaryHeap};
-
-use cubecl::{cube, prelude::Numeric, prelude::*};
-use num::Num;
+use cubecl::{cube, prelude::*};
 
 /// Euclidean pairwise distance kernel for a 2D tensor.
 #[cube(launch)]
