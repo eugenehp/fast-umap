@@ -81,7 +81,7 @@ where
 
     // Step 2: Precompute the tensor representations and global distances for each batch.
     let mut tensor_batches: Vec<Tensor<B, 2>> = Vec::new();
-    let mut global_distances_batches: Vec<Tensor<B, 1>> = Vec::new();
+    let mut global_distances_batches: Vec<Tensor<B, 2>> = Vec::new();
 
     // store the size of the Tensor after the distance has been calculated
     let mut global_distance_size: Shape = Shape::from([0, 0]);
@@ -105,7 +105,7 @@ where
         global_distances_batches.push(global_distances);
     }
 
-    let global_distances_all = Tensor::<B, 1>::cat(global_distances_batches, 0); // Concatenate along the 0-axis
+    let global_distances_all = Tensor::<B, 2>::cat(global_distances_batches, 0); // Concatenate along the 0-axis
     let tensor_batches_all = Tensor::<B, 2>::cat(tensor_batches, 0); // Concatenate along the 0-axis
 
     // Initialize the Adam optimizer with weight decay (L2 regularization).
