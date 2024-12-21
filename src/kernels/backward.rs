@@ -18,7 +18,13 @@ use super::Backend;
 const VERBOSE: bool = false;
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
-impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
+impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
+// where
+//     TensorPrimitive<B>: std::ops::Mul<
+//         <B as burn::prelude::Backend>::FloatTensorPrimitive,
+//         Output = <B as burn::prelude::Backend>::FloatTensorPrimitive,
+//     >,
+{
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
         // Create our zero-sized type that will implement the Backward trait.
         #[derive(Debug)]
@@ -41,196 +47,93 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 checkpointer: &mut Checkpointer,
             ) {
                 if VERBOSE {
-                    println!("backward")
+                    println!("backward start")
                 }
-                // Get the nodes of each variable.
+
                 let [node_x] = ops.parents;
-                // Fetch the gradient for the current node.
-                if VERBOSE {
-                    println!("backward - 1");
-                }
                 let grad = grads.consume::<B>(&ops.node);
 
-                if VERBOSE {
-                    println!("backward - 2");
-                }
-                // Set our state.
                 let (x_state, output) = ops.state;
-                if VERBOSE {
-                    println!("backward - 3");
-                }
                 let x: FloatTensor<B> = checkpointer.retrieve_node_output(x_state);
 
-                if VERBOSE {
-                    println!("backward - 4");
-                }
                 let xx: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(x.clone()));
-                if VERBOSE {
-                    println!("backward - 5");
-                }
-                let shape = xx.shape();
-                if VERBOSE {
-                    println!("backward - 6");
-                }
-
-                // Fetch shapes of our tensor to support broadcasting.
-                // let shape_x = x.shape();
-                let shape_x = shape;
-                if VERBOSE {
-                    println!("backward - 7");
-                }
-
+                let shape_x = xx.clone().shape();
                 let dims = &shape_x.dims;
-
-                // Compute the gradient of the output using the already existing `relu_backward`
-                // function in the basic Burn backend trait.
-                let grad_output = B::relu_backward(output, grad.clone());
-                if VERBOSE {
-                    println!("backward - 8 {grad_output:?}");
-                }
-                if VERBOSE {
-                    println!("x shape {:?}", shape_x);
-                }
-
-                // Compute the lhs gradient, which is the derivative of matmul with support for
-                // broadcasting.
-                // let grad_x = B::float_expand(
-                //     B::float_matmul(grad_output.clone(), B::float_transpose(x)),
-                //     shape_x,
-                // );
-                // let grad_x = B::float_expand(
-                //     B::float_matmul(B::float_transpose(x), grad_output.clone()),
-                //     shape_x,
-                // );
-
                 let n = dims[0]; // Number of rows (samples)
                 let d = dims[1]; // Dimensionality (2 in this case)
 
-                let mut grad_x = Tensor::zeros_like(&xx); // Initialize gradient tensor with the same shape as x
+                let grad_output = B::relu_backward(output, grad.clone());
+                let grad_output: Tensor<B, 2, Float> =
+                    Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
-                if VERBOSE {
-                    println!("backward - 9");
-                }
-                let grad: Tensor<B, 2, Float> =
-                    Tensor::from_primitive(TensorPrimitive::Float(grad));
+                // Compute the pairwise difference matrix: diff[i,j] = x[i,:] - x[j,:]
+                let mut diff = Tensor::zeros_like(&(xx.clone())); // Shape [n, n, d]
 
-                if VERBOSE {
-                    println!("backward - 10");
-                }
-                let mut grad_index = 0;
                 for i in 0..n {
-                    for j in i + 1..n {
-                        println!("{i}/{j}");
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 1");
-                        }
-                        let lhs = xx.clone().slice([i..i + 1, 0..d]).into_primitive().tensor();
-                        let rhs = xx.clone().slice([j..j + 1, 0..d]).into_primitive().tensor();
-                        // Compute the gradient for pair (i, j)
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 2");
-                        }
-                        let diff = B::float_sub(lhs, rhs); // Difference between the two points
+                    let xx = xx.clone();
+                    let lhs = xx.clone().slice([i..i + 1, 0..d]); // Shape [1, d]
+                    for j in 0..n {
+                        let xx = xx.clone();
+                        let rhs = xx.slice([j..j + 1, 0..d]); // Shape [1, d]
 
-                        // let dist = diff.norm(); // Euclidean distance
-                        // Step 1: Square each element of `diff`
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 3");
-                        }
-                        let squared = B::float_mul(diff.clone(), diff.clone());
+                        // Compute difference for pair (i, j)
+                        let diff_ij = B::float_sub(
+                            lhs.clone().into_primitive().tensor(),
+                            rhs.clone().into_primitive().tensor(),
+                        ); // Shape [1, d]
 
-                        // Step 2: Sum the squared elements (across the last dimension)
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 4");
-                        }
-                        let sum_of_squares = B::float_sum(squared); // Sum over the columns (dim 1)
-
-                        // Step 3: Take the square root of the sum of squares
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 5");
-                        }
-                        let dist = B::float_sqrt(sum_of_squares); // Take the square root to get the Euclidean norm
-                        let diff_shape = Tensor::<B, 1, Float>::from_primitive(
-                            TensorPrimitive::Float(diff.clone()),
-                        )
-                        .shape();
-
-                        let dist = B::float_expand(dist, diff_shape);
-                        if VERBOSE {
-                            println!("diff - {diff:?}, dist - {dist:?}");
-                        }
-
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 6");
-                        }
-                        let grad_i = B::float_div(diff, dist); // Gradient with respect to x_i
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 7");
-                        }
-                        let grad_j = B::float_neg(grad_i.clone()); // Gradient with respect to x_j (negative of grad_i)
-
-                        // Access the gradient for this pair using slice
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 8 - {grad:?}");
-                        }
-                        if VERBOSE {
-                            println!("grad_index - {grad_index}");
-                        }
-                        let grad_value = grad.clone().slice([grad_index..grad_index + 1]); // Get scalar value from flattened gradient tensor
-
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 9");
-                        }
-                        if VERBOSE {
-                            println!("grad_i - {grad_i:?}");
-                        }
-                        let grad_i_shape = Tensor::<B, 1, Float>::from_primitive(
-                            TensorPrimitive::Float(grad_i.clone()),
-                        )
-                        .shape();
-                        let grad_value =
-                            B::float_expand(grad_value.into_primitive().tensor(), grad_i_shape);
-                        if VERBOSE {
-                            println!("grad_value - {grad_value:?}");
-                        }
-                        let values = Tensor::from_primitive(TensorPrimitive::Float(B::float_mul(
-                            grad_i,
-                            grad_value.clone(),
-                            // grad_value.clone().into_primitive().tensor(),
-                        )));
-                        // Using slice_assign to update grad_x at the correct positions
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 10");
-                        }
-                        grad_x = grad_x.slice_assign([i..i + 1, 0..d], values);
-
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 11");
-                        }
-                        let values = Tensor::from_primitive(TensorPrimitive::Float(B::float_mul(
-                            grad_j, grad_value,
-                        )));
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 12");
-                        }
-                        grad_x = grad_x.slice_assign([j..j + 1, 0..d], values);
-
-                        if VERBOSE {
-                            println!("backward - [{i},{j}] - 13");
-                        }
-                        grad_index += 1;
+                        // Correct the slice range to match the shape of diff_ij ([1, d])
+                        // Use the correct slice range for the 3D tensor `diff`: [i..i+1, j..j+1, 0..d]
+                        diff = diff.slice_assign(
+                            [i..i + 1, j..j + 1, 0..d], // Correct slice range
+                            Tensor::from_primitive(TensorPrimitive::Float(diff_ij)),
+                        );
                     }
                 }
 
-                // Register the gradient for each variable based on whether they are marked as
-                // `tracked`.
+                // Compute the squared L2 norm (Euclidean distance) for each pair: ||diff[i,j]||^2
+                let squared = B::float_mul(
+                    diff.clone().into_primitive().tensor(),
+                    diff.clone().into_primitive().tensor(),
+                ); // Shape [n, n, d]
+                let squared: Tensor<B, 3, Float> =
+                    Tensor::from_primitive(TensorPrimitive::Float(squared));
+
+                let sum_of_squares =
+                    B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Sum over the last dimension, resulting in [n, n]
+                let dist = B::float_sqrt(sum_of_squares); // Shape [n, n]
+
+                // Avoid dividing by zero (set small values to a small epsilon)
+                let dist_safe = B::float_max(dist.clone());
+                let dist_safe: Tensor<B, 3, Float> =
+                    Tensor::from_primitive(TensorPrimitive::Float(dist_safe));
+
+                // Compute the gradient of the distance with respect to x[i] and x[j]
+                let grad_diff = B::float_div(
+                    diff.clone().into_primitive().tensor(),
+                    dist_safe
+                        .slice([0..n, 0..n, 0..d])
+                        .into_primitive()
+                        .tensor(),
+                ); // Shape [n, n, d]
+
+                // Compute gradients for all pairs at once
+                let grad_x = B::float_sum(B::float_mul(
+                    grad_output
+                        .slice([0..n, 0..d, 0..1])
+                        .into_primitive()
+                        .tensor(),
+                    grad_diff,
+                )); // Shape [n, d]
+
+                // Register the gradient for x
                 if let Some(node) = node_x {
-                    grads.register::<B>(node.id, grad_x.into_primitive().tensor());
+                    grads.register::<B>(node.id, grad_x);
                 }
 
                 if VERBOSE {
-                    println!("backward end");
+                    println!("backward end")
                 }
             }
         }
