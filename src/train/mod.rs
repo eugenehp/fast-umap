@@ -222,16 +222,12 @@ where
 
             // println!("current_loss[{batch_idx}] - {:?}", current_loss);
 
-            println!("train - 1");
             let grads = loss.backward();
-            println!("train - 2");
 
             let batch_grads = GradientsParams::from_grads(grads, &model);
-            println!("train - 3");
 
             // Accumulate gradients.
             accumulator.accumulate(&model, batch_grads);
-            println!("train - 4");
 
             // println!("Train loop [{batch_idx}] - 6");
         }

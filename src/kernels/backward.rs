@@ -15,7 +15,7 @@ use burn::{
 
 use super::Backend;
 
-const VERBOSE: bool = true;
+const VERBOSE: bool = false;
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
@@ -71,14 +71,14 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
 
                 // Step 1: Compute grad_output for ReLU backward (should have shape [499500])
                 let grad_output = B::relu_backward(output, grad.clone());
-                let grad_output: Tensor<B, 1, Float> =
+                let grad_output: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
                 // Step 2: Generate the upper triangular indices of the full n x n matrix
                 let grad_output_exp = grad_output.clone(); // Gradient output stays the same, but we need to apply it into the gradient matrix
 
                 // Step 3: Create an empty n x n gradient matrix and fill in the upper triangular values
-                let mut grad_matrix: Tensor<B, 1> =
+                let mut grad_matrix: Tensor<B, 2> =
                     Tensor::zeros(Shape::from([n, n]), &xx.device()); // Shape [n, n]
 
                 // Create a vector of pairs (i, j) for the upper triangular part
@@ -146,15 +146,17 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
 
                 // Step 11: Apply gradients to the correct elements
                 // We already have the pairwise gradients in grad_matrix, so we directly apply it.
-                let grad_x = B::float_sum_dim(grad_matrix.into_primitive().tensor(), 0); // Summing over the rows (first dimension)
+                let grad_x = B::float_sum_dim(grad_matrix.into_primitive().tensor(), 1); // Summing over the rows (first dimension)
+
+                let grad_x = B::float_reshape(grad_x, xx.shape());
 
                 // Register the gradient for x
                 if let Some(node) = node_x {
-                    grads.register::<B>(node.id, grad_x);
+                    grads.register::<B>(node.id, grad_x.clone());
                 }
 
                 if VERBOSE {
-                    println!("backward end");
+                    println!("backward end {grad_x:?}");
                 }
             }
         }
