@@ -16,7 +16,7 @@ use burn::{
     optim::{
         decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
     },
-    tensor::{cast::ToElement, Device, Tensor},
+    tensor::{cast::ToElement, Device, Shape, Tensor},
 };
 pub use config::*;
 use ctrlc;
@@ -47,7 +47,7 @@ pub fn train<B: AutodiffBackend, F: Float>(
     mut data: Vec<F>,        // Training data.
     config: &TrainingConfig, // Configuration parameters for training.
     device: Device<B>,
-) -> (UMAPModel<B>, Vec<f64>)
+) -> (UMAPModel<B>, Vec<F>)
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
 {
@@ -83,6 +83,9 @@ where
     let mut tensor_batches: Vec<Tensor<B, 2>> = Vec::new();
     let mut global_distances_batches: Vec<Tensor<B, 1>> = Vec::new();
 
+    // store the size of the Tensor after the distance has been calculated
+    let mut global_distance_size: Shape = Shape::from([0, 0]);
+
     for batch_data in &batches {
         // Convert each batch to tensor format.
         let tensor_batch =
@@ -97,6 +100,8 @@ where
             get_distance_by_metric(global_tensor_data.clone(), config, Some("global".into()));
         // println!("global_distances - {:?}", global_distances.shape());
         // let global_distances = global_distances.set_require_grad(false);
+
+        global_distance_size = global_distances.shape();
         global_distances_batches.push(global_distances);
     }
 
@@ -131,8 +136,8 @@ where
     };
 
     let mut epoch = 0;
-    let mut losses: Vec<f64> = vec![];
-    let mut best_loss = f64::INFINITY;
+    let mut losses: Vec<F> = vec![];
+    let mut best_loss = F::infinity();
     let mut epochs_without_improvement = 0;
 
     let mse_loss = MseLoss::new();
@@ -166,9 +171,12 @@ where
             let batch_start_idx = batch_idx * batch_size;
             let batch_end_idx = (batch_idx + 1) * batch_size;
 
+            let global_start_idx = batch_idx * global_distance_size.dims[0];
+            let global_end_idx = (batch_idx + 1) * global_distance_size.dims[0];
+
             let global_distances = global_distances_all
                 .clone()
-                .slice([batch_start_idx..batch_end_idx]); // Slice the tensor
+                .slice([global_start_idx..global_end_idx]); // Slice the tensor
 
             let tensor_batch = tensor_batches_all
                 .clone()
@@ -208,18 +216,22 @@ where
                 burn::nn::loss::Reduction::Mean,
             );
 
-            let current_loss = loss.clone().into_scalar().to_f64();
+            let current_loss = F::from(loss.clone().into_scalar().to_f64()).unwrap();
             // Compute gradients and update the model parameters using the optimizer.
             losses.push(current_loss);
 
             // println!("current_loss[{batch_idx}] - {:?}", current_loss);
 
+            println!("train - 1");
             let grads = loss.backward();
+            println!("train - 2");
 
             let batch_grads = GradientsParams::from_grads(grads, &model);
+            println!("train - 3");
 
             // Accumulate gradients.
             accumulator.accumulate(&model, batch_grads);
+            println!("train - 4");
 
             // println!("Train loop [{batch_idx}] - 6");
         }

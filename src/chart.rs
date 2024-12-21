@@ -207,15 +207,23 @@ pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
 /// # Arguments
 /// * `losses` - A vector of loss values over multiple epochs
 /// * `output_path` - Path where the plot will be saved
-pub fn plot_loss(losses: Vec<f64>, output_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn plot_loss<F: num::Float>(
+    losses: Vec<F>,
+    output_path: &str,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    F:,
+{
     // Calculate the min and max loss values
-    let min_loss = losses.iter().cloned().fold(f64::INFINITY, f64::min);
-    let max_loss = losses.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let min_loss = losses.iter().cloned().fold(F::infinity(), F::min);
+    let max_loss = losses.iter().cloned().fold(F::neg_infinity(), F::max);
 
     // Add padding to the min and max values for better visualization
-    let padding = 0.1; // 10% padding, adjust as needed
+    let padding = F::from(0.1).unwrap(); // 10% padding, adjust as needed
     let min_loss_with_padding = min_loss - padding * min_loss.abs();
     let max_loss_with_padding = max_loss + padding * max_loss.abs();
+    let min_loss_with_padding = min_loss_with_padding.to_f64().unwrap();
+    let max_loss_with_padding = max_loss_with_padding.to_f64().unwrap();
 
     // Create a drawing area with a width of 800px and a height of 600px
     let root = BitMapBackend::new(output_path, (800, 600)).into_drawing_area();
@@ -241,7 +249,7 @@ pub fn plot_loss(losses: Vec<f64>, output_path: &str) -> Result<(), Box<dyn std:
     // Plot the losses as a line
     chart
         .draw_series(LineSeries::new(
-            (0..losses.len()).map(|x| (x as u32, losses[x])),
+            (0..losses.len()).map(|x| (x as u32, losses[x].to_f64().unwrap())),
             &BLUE,
         ))?
         .label("Loss")
