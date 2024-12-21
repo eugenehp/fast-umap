@@ -44,6 +44,9 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let (x_state, output) = ops.state;
                 let x: FloatTensor<B> = checkpointer.retrieve_node_output(x_state);
 
+                println!("output - {output:?}");
+                println!("grad - {grad:?}");
+
                 // Ensure xx is a 2D tensor (shape: [n, d])
                 let xx: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(x.clone()));
