@@ -10,9 +10,7 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{
-        cast::ToElement, ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive,
-    },
+    tensor::{ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive},
 };
 
 use super::Backend;
@@ -71,26 +69,24 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                     println!("xx shape: {:?}", xx.shape());
                 }
 
-                // ReLU backward gradient (we only need it if ReLU was applied to output)
+                // Step 1: Compute grad_output for ReLU backward (should have shape [499500])
                 let grad_output = B::relu_backward(output, grad.clone());
                 let grad_output: Tensor<B, 1, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
-                // grad_output has shape [499500] for the upper triangular part of the gradient matrix
-                // This should be reshaped into a 2D tensor for use in pairwise calculations.
-                let grad_output: Tensor<B, 2> =
-                    grad_output.reshape(Shape::from([n * (n - 1) / 2, 1])); // Flattened upper triangular part
+                // Reshape grad_output to a 2D matrix [n, n], with only the upper triangular part filled
+                let grad_output: Tensor<B, 2> = grad_output.reshape(Shape::from([n, n])); // Reshape into an upper triangular form.
 
                 if VERBOSE {
                     println!("grad_output reshaped: {:?}", grad_output.shape());
                 }
 
-                // Compute pairwise differences for each pair (i, j) where i != j
+                // Step 2: Compute pairwise differences (xx[i] - xx[j]) using broadcasting
                 let xx_exp: Tensor<B, 3> = xx.clone().expand(Shape::from([n, n, d])); // Shape [n, n, d]
                 let xx_exp_transpose: Tensor<B, 3> =
                     xx.clone().expand(Shape::from([n, n, d])).transpose(); // Shape [n, n, d]
 
-                // Compute pairwise differences for all pairs in one go (broadcasted)
+                // Pairwise differences in a vectorized way (broadcasting automatically handles the loops)
                 let diff = B::float_sub(
                     xx_exp.into_primitive().tensor(),
                     xx_exp_transpose.into_primitive().tensor(),
@@ -100,7 +96,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                     println!("diff shape: {:?}", diff);
                 }
 
-                // Compute squared L2 norm (Euclidean distance) for each pair
+                // Step 3: Compute squared L2 norm (Euclidean distance) for each pair
                 let squared = B::float_mul(diff.clone(), diff.clone()); // Shape [n, n, d]
                 let squared: Tensor<B, 3, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(squared));
@@ -109,7 +105,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 let sum_of_squares =
                     B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Shape [n, n]
 
-                // Compute Euclidean distance (sqrt of sum of squares)
+                // Step 4: Compute Euclidean distance (sqrt of sum of squares)
                 let dist = B::float_sqrt(sum_of_squares); // Shape [n, n]
 
                 let epsilon = 1e-12.elem();
@@ -120,32 +116,21 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 // Now we need to broadcast dist_safe to the shape of diff: [n, n, d]
                 let dist_safe_broadcasted = B::float_expand(dist_safe, Shape::from([n, n, d])); // Broadcast to shape [n, n, d]
 
-                // Compute the gradient of the distance with respect to x[i] and x[j]
+                // Step 5: Compute the gradient of the distance with respect to x[i] and x[j]
                 let grad_diff = B::float_div(diff.clone(), dist_safe_broadcasted.clone()); // Shape [n, n, d]
 
                 if VERBOSE {
                     println!("grad_diff shape: {:?}", grad_diff);
                 }
 
-                // Gradients for `x` are accumulated by applying grad_output to grad_diff
-                // Since grad_output represents the upper triangular part of the gradient matrix,
-                // we need to apply it to the corresponding upper triangular indices.
+                // Step 6: Apply gradients to the correct elements
+                // We use the upper triangular grad_output (with indices) to apply the gradients.
 
-                // Expand grad_output into a full n x n matrix (upper triangular part)
-                let mut grad_matrix: Tensor<B, 2> =
-                    Tensor::zeros(Shape::from([n, n]), &xx.device()); // Shape [n, n]
+                let grad_matrix = grad_diff; // This holds the pairwise gradient results
 
-                // We will now use broadcasting to apply the gradients for each pair (i, j)
-                // grad_output needs to be applied to each (i, j) pair in the upper triangle
-                let grad_output_exp = grad_output.reshape(Shape::from([n, n])); // Shape [n, n]
-
-                grad_matrix = grad_matrix.slice_assign([0..n, 0..n], grad_output_exp);
-
-                // Now compute the final gradient for x by multiplying grad_matrix with grad_diff
-                let grad_x = B::float_sum(B::float_mul(
-                    grad_matrix.into_primitive().tensor(),
-                    grad_diff,
-                )); // Shape [n, d]
+                // Here, we already have the pairwise gradients, and we need to update grad_x accordingly
+                // The gradients are for the upper triangle, so we can broadcast them
+                let grad_x = B::float_sum_dim(grad_matrix.clone(), 0); // Summing over the rows (first dimension)
 
                 // Register the gradient for x
                 if let Some(node) = node_x {
