@@ -10,12 +10,14 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive},
+    tensor::{
+        cast::ToElement, ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive,
+    },
 };
 
 use super::Backend;
 
-const VERBOSE: bool = false;
+const VERBOSE: bool = true;
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
@@ -62,102 +64,73 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 let shape_x = xx.shape();
                 let dims = &shape_x.dims;
 
-                if VERBOSE {
-                    println!("xx shape: {:?}", xx.shape());
-                } // Check the shape to ensure it's correct
-
                 let n = dims[0]; // Number of rows (samples)
                 let d = dims[1]; // Dimensionality
+
+                if VERBOSE {
+                    println!("xx shape: {:?}", xx.shape());
+                }
 
                 // ReLU backward gradient
                 let grad_output = B::relu_backward(output, grad.clone());
                 let grad_output: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
-                // Broadcasting xx to a 3D tensor with shape [n, n, d]
-                let x_broad =
-                    B::float_expand(xx.clone().into_primitive().tensor(), Shape::from([n, n, d]));
-                let x_broad = Tensor::from_primitive(TensorPrimitive::Float(x_broad));
+                if VERBOSE {
+                    println!("grad_output - {grad_output:?}");
+                }
 
-                // Ensure diff is a 3D tensor with shape [n, n, d]
-                let mut diff: Tensor<B, 3, Float> = Tensor::zeros_like(&x_broad); // Shape [n, n, d]
+                // Broadcasting xx to create pairwise differences
+                let xx_exp: Tensor<B, 3> = xx.clone().expand(Shape::from([n, n, d])); // Shape [n, n, d]
+                let diff = B::float_sub(
+                    xx_exp.clone().into_primitive().tensor(),
+                    xx_exp.transpose().into_primitive().tensor(),
+                ); // Shape [n, n, d]
+
                 if VERBOSE {
                     println!("diff - {diff:?}");
                 }
 
-                // Calculate pairwise differences for each pair (i, j)
-                for i in 0..n {
-                    let xx = xx.clone();
-                    let lhs = xx.clone().slice([i..i + 1, 0..d]); // Shape [1, d]
-                    for j in 0..n {
-                        // if VERBOSE {
-                        // Debugging statement
-                        println!("Accessing pair (i, j): ({}, {})", i, j);
-                        // }
-
-                        let xx = xx.clone();
-                        let rhs = xx.slice([j..j + 1, 0..d]); // Shape [1, d]
-
-                        if VERBOSE {
-                            println!("lhs - {lhs:?}");
-                        }
-                        if VERBOSE {
-                            println!("rhs - {rhs:?}");
-                        }
-
-                        // Compute the difference for pair (i, j)
-                        let diff_ij = B::float_sub(
-                            lhs.clone().into_primitive().tensor(),
-                            rhs.clone().into_primitive().tensor(),
-                        ); // Shape [1, d]
-
-                        if VERBOSE {
-                            println!("diff_ij - {diff_ij:?}");
-                        }
-
-                        // let ranges = [i..i + 1, j..j + 1, 0..d]; // Ensure we're matching dimensions [i, j, 0..d]
-                        let ranges = [i..i + 1, 0..d]; // Ensure we're matching dimensions [i, j, 0..d]
-
-                        if VERBOSE {
-                            println!("ranges - {ranges:?}");
-                        }
-
-                        // Ensure correct dimensionality for slice assignment
-                        diff = diff.slice_assign(
-                            ranges,
-                            Tensor::from_primitive(TensorPrimitive::Float(diff_ij)),
-                        );
-
-                        if VERBOSE {
-                            println!("diff - {diff:?}");
-                        }
-                    }
-                }
-
-                // Compute the squared L2 norm (Euclidean distance) for each pair
-                let squared = B::float_mul(
-                    diff.clone().into_primitive().tensor(),
-                    diff.clone().into_primitive().tensor(),
-                ); // Shape [n, n, d]
-
+                // Compute squared L2 norm (Euclidean distance) for each pair
+                let squared = B::float_mul(diff.clone(), diff.clone()); // Shape [n, n, d]
                 let squared: Tensor<B, 3, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(squared));
 
-                // Sum the squared differences over the last dimension (d)
-                let sum_of_squares =
-                    B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Sum over the last dimension, resulting in [n, n]
+                if VERBOSE {
+                    println!("squared - {squared:?}");
+                }
 
-                // Compute the Euclidean distance (square root of the sum of squares)
+                // Sum squared differences over the last dimension (d)
+                let sum_of_squares =
+                    B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Shape [n, n]
+
+                if VERBOSE {
+                    println!("sum_of_squares - {sum_of_squares:?}");
+                }
+
+                // Compute Euclidean distance (sqrt of sum of squares)
                 let dist = B::float_sqrt(sum_of_squares); // Shape [n, n]
+
+                if VERBOSE {
+                    println!("dist - {dist:?}");
+                }
 
                 let epsilon = 1e-12.elem();
 
-                // Avoid division by zero by using a small epsilon
+                // Avoid division by zero using epsilon
                 let dist_safe = B::float_clamp_max(dist.clone(), epsilon);
+                // let dist_safe = B::float_expand(dist_safe, Shape::from([n, n, d]));
 
-                // Compute the gradient of the distance with respect to x[i] and x[j]
-                let grad_diff =
-                    B::float_div(diff.clone().into_primitive().tensor(), dist_safe.clone()); // Shape [n, n, d]
+                if VERBOSE {
+                    println!("dist_safe - {:?}", dist_safe);
+                }
+
+                // Compute gradient of the distance with respect to x[i] and x[j]
+                let grad_diff = B::float_div(diff.clone(), dist_safe.clone()); // Shape [n, n, d]
+
+                if VERBOSE {
+                    println!("grad_diff - {grad_diff:?}");
+                }
 
                 // Compute gradients for all pairs at once
                 let grad_x = B::float_sum(B::float_mul(
@@ -167,6 +140,10 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                         .tensor(),
                     grad_diff,
                 )); // Shape [n, d]
+
+                if VERBOSE {
+                    println!("grad_x - {grad_x:?}");
+                }
 
                 // Register the gradient for x
                 if let Some(node) = node_x {
