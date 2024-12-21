@@ -37,15 +37,16 @@ fn main() {
     let epochs = 1000; // Number of training epochs
     let seed = 9999; // Random seed to ensure reproducibility
     let verbose = true; // Whether to enable the progress bar during training
-    let patience = 100; // Number of epochs without improvement before early stopping
+
+    // let patience = 100; // Number of epochs without improvement before early stopping
     let min_desired_loss = 0.0001; // Minimum loss threshold for early stopping
-    let metric = Metric::Minkowski; // Alternative metric for neighbors search
+    let metric = Metric::Euclidean; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Sum;
     // below 1.0 gives NaN loss. Mind that it's rounded to integer inside the function
     let minkowski_p = 3.0; // 1 is manhattan, 2 is Euclidean
     let normalized = true; // to reduce math, and keep it at float
 
-    let timeout = 30; // timeout in seconds
+    // let timeout = 30; // timeout in seconds
 
     // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);

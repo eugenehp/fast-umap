@@ -80,7 +80,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             .expect("Failed to build TrainingConfig");
 
         // Start training
-        let model = train(
+        let (model, _losses): (UMAPModel<B>, Vec<F>) = train(
             model,
             num_samples,
             num_features,
@@ -90,7 +90,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         );
 
         // Validate the trained model
-        let (model, _) = model.valid();
+        let model: UMAPModel<B::InnerBackend> = model.valid();
 
         // Return the fitted UMAP model wrapped in the UMAP struct
         let umap = UMAP { model, device };

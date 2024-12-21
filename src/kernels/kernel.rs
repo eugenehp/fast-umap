@@ -55,4 +55,8 @@ pub fn euclidean_pairwise_distance_sum_kernel<F: Float>(x: &Tensor<F>, output: &
     if row_i == 0 && row_j == 0 {
         output[0] = total_distance;
     }
+
+    // Store the square root of the sum of squared differences
+    let index = (row_j * (row_j - 1)) / 2 + row_i; // Store in upper triangular form
+    output[index] = F::sqrt(sum);
 }
