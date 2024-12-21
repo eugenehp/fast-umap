@@ -43,8 +43,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
 
         // println!("before");
         // Launch the kernel to compute pairwise distances.
-        euclidean_pairwise_distance_sum_kernel::launch::<F, R>(
-            // euclidean_pairwise_distance_kernel::launch::<F, R>(
+        euclidean_pairwise_distance_kernel::launch::<F, R>(
             &x.client,
             cube_count,
             cube_dim,
