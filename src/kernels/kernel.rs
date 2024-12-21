@@ -1,62 +1,44 @@
 use cubecl::{cube, prelude::*};
 
-/// Euclidean pairwise distance kernel for a 2D tensor.
 #[cube(launch)]
-pub fn euclidean_pairwise_distance_kernel<F: Float>(x: &Tensor<F>, output: &mut Tensor<F>) {
-    let row_i = ABSOLUTE_POS_X;
-    let row_j = ABSOLUTE_POS_Y;
+pub fn euclidean_pairwise_distance_kernel<F: Float>(
+    x: &Tensor<F>, // Input tensor of shape (n, d) representing n vectors of dimension d
+    output: &mut Tensor<F>, // Output tensor of shape (n, n) to store pairwise distances
+) {
+    let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
+    let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
 
-    let n = x.shape(x.rank() - 2); // Number of rows (samples)
-    let d = x.shape(x.rank() - 1); // Dimensionality of each sample
+    let n = output.shape(output.rank() - 2); // Number of vectors (rows) in the output tensor
+    let d = x.shape(x.rank() - 1); // Dimension of each vector (features) in the input tensor
 
-    if row_i >= n || row_j >= n || row_i >= row_j {
-        return; // Only compute the upper triangular part of the distance matrix
+    if row >= n || col >= n {
+        return; // Skip threads that are out of bounds
     }
 
-    let mut sum = F::new(0.0);
-    for k in 0..d {
-        let diff = x[row_i * d + k] - x[row_j * d + k];
+    let mut sum = F::new(0.0); // Sum of squared differences
+
+    // Compute the squared differences between vectors row and col
+    for i in 0..d {
+        let index_row = row * d + i; // Linear index for row, dimension i
+        let index_col = col * d + i; // Linear index for col, dimension i
+
+        let diff = x[index_row] - x[index_col];
         sum += diff * diff;
     }
 
-    // Store the square root of the sum of squared differences
-    let index = (row_j * (row_j - 1)) / 2 + row_i; // Store in upper triangular form
-    output[index] = F::sqrt(sum);
-}
+    // Calculate Euclidean distance (square root of sum of squared differences)
+    let dist = F::sqrt(sum);
 
-/// Euclidean pairwise distance kernel for a 2D tensor.
-/// This kernel computes the sum of all pairwise Euclidean distances between rows in the input tensor.
-#[cube(launch)]
-pub fn euclidean_pairwise_distance_sum_kernel<F: Float>(x: &Tensor<F>, output: &mut Tensor<F>) {
-    let row_i = ABSOLUTE_POS_X;
-    let row_j = ABSOLUTE_POS_Y;
+    // Linear index for the output tensor
+    let output_index = row * n + col;
 
-    let n = x.shape(x.rank() - 2); // Number of rows (samples)
-    let d = x.shape(x.rank() - 1); // Dimensionality of each sample
+    // Store the pairwise Euclidean distance in the output tensor
+    output[output_index] = dist;
 
-    // Initialize the sum of pairwise distances
-    let mut total_distance = F::new(0.0);
-
-    // Only compute for pairs where i < j (upper triangular part)
-    if row_i >= n || row_j >= n || row_i >= row_j {
-        return; // Skip if out of bounds or on the diagonal
+    // Symmetry: dist(i, j) = dist(j, i)
+    if row != col {
+        // Avoid redundant assignments when row == col
+        let output_index_sym = col * n + row;
+        output[output_index_sym] = dist;
     }
-
-    let mut sum = F::new(0.0);
-    for k in 0..d {
-        let diff = x[row_i * d + k] - x[row_j * d + k];
-        sum += diff * diff;
-    }
-
-    // Add the square root of the sum of squared differences to the total distance
-    total_distance += F::sqrt(sum);
-
-    // Since this kernel computes only one scalar, store the result in the first position of the output tensor
-    if row_i == 0 && row_j == 0 {
-        output[0] = total_distance;
-    }
-
-    // Store the square root of the sum of squared differences
-    let index = (row_j * (row_j - 1)) / 2 + row_i; // Store in upper triangular form
-    output[index] = F::sqrt(sum);
 }
