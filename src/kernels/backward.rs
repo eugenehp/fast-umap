@@ -10,7 +10,7 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{ops::FloatTensor, Float, Tensor, TensorPrimitive},
+    tensor::{ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive},
 };
 
 use super::Backend;
@@ -47,7 +47,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 checkpointer: &mut Checkpointer,
             ) {
                 if VERBOSE {
-                    println!("backward start")
+                    println!("backward start");
                 }
 
                 let [node_x] = ops.parents;
@@ -56,20 +56,28 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 let (x_state, output) = ops.state;
                 let x: FloatTensor<B> = checkpointer.retrieve_node_output(x_state);
 
+                // Ensure xx is a 2D tensor (shape: [n, d])
                 let xx: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(x.clone()));
-                let shape_x = xx.clone().shape();
+                let shape_x = xx.shape();
                 let dims = &shape_x.dims;
                 let n = dims[0]; // Number of rows (samples)
-                let d = dims[1]; // Dimensionality (2 in this case)
+                let d = dims[1]; // Dimensionality
 
+                // ReLU backward gradient
                 let grad_output = B::relu_backward(output, grad.clone());
                 let grad_output: Tensor<B, 2, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
-                // Compute the pairwise difference matrix: diff[i,j] = x[i,:] - x[j,:]
-                let mut diff = Tensor::zeros_like(&(xx.clone())); // Shape [n, n, d]
+                // Broadcasting xx to a 3D tensor with shape [n, n, d]
+                let x_broad =
+                    B::float_expand(xx.clone().into_primitive().tensor(), Shape::from([n, n, d]));
+                let x_broad = Tensor::from_primitive(TensorPrimitive::Float(x_broad));
 
+                // Ensure diff is a 3D tensor with shape [n, n, d]
+                let mut diff: Tensor<B, 3, Float> = Tensor::zeros_like(&x_broad); // Shape [n, n, d]
+
+                // Calculate pairwise differences for each pair (i, j)
                 for i in 0..n {
                     let xx = xx.clone();
                     let lhs = xx.clone().slice([i..i + 1, 0..d]); // Shape [1, d]
@@ -77,46 +85,44 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                         let xx = xx.clone();
                         let rhs = xx.slice([j..j + 1, 0..d]); // Shape [1, d]
 
-                        // Compute difference for pair (i, j)
+                        // Compute the difference for pair (i, j)
                         let diff_ij = B::float_sub(
                             lhs.clone().into_primitive().tensor(),
                             rhs.clone().into_primitive().tensor(),
                         ); // Shape [1, d]
 
-                        // Correct the slice range to match the shape of diff_ij ([1, d])
-                        // Use the correct slice range for the 3D tensor `diff`: [i..i+1, j..j+1, 0..d]
+                        // Ensure correct dimensionality for slice assignment
                         diff = diff.slice_assign(
-                            [i..i + 1, j..j + 1, 0..d], // Correct slice range
+                            [i..i + 1, j..j + 1, 0..d], // Ensure we're matching dimensions [i, j, 0..d]
                             Tensor::from_primitive(TensorPrimitive::Float(diff_ij)),
                         );
                     }
                 }
 
-                // Compute the squared L2 norm (Euclidean distance) for each pair: ||diff[i,j]||^2
+                // Compute the squared L2 norm (Euclidean distance) for each pair
                 let squared = B::float_mul(
                     diff.clone().into_primitive().tensor(),
                     diff.clone().into_primitive().tensor(),
                 ); // Shape [n, n, d]
+
                 let squared: Tensor<B, 3, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(squared));
 
+                // Sum the squared differences over the last dimension (d)
                 let sum_of_squares =
                     B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Sum over the last dimension, resulting in [n, n]
+
+                // Compute the Euclidean distance (square root of the sum of squares)
                 let dist = B::float_sqrt(sum_of_squares); // Shape [n, n]
 
-                // Avoid dividing by zero (set small values to a small epsilon)
-                let dist_safe = B::float_max(dist.clone());
-                let dist_safe: Tensor<B, 3, Float> =
-                    Tensor::from_primitive(TensorPrimitive::Float(dist_safe));
+                let epsilon = 1e-12.elem();
+
+                // Avoid division by zero by using a small epsilon
+                let dist_safe = B::float_clamp_max(dist.clone(), epsilon);
 
                 // Compute the gradient of the distance with respect to x[i] and x[j]
-                let grad_diff = B::float_div(
-                    diff.clone().into_primitive().tensor(),
-                    dist_safe
-                        .slice([0..n, 0..n, 0..d])
-                        .into_primitive()
-                        .tensor(),
-                ); // Shape [n, n, d]
+                let grad_diff =
+                    B::float_div(diff.clone().into_primitive().tensor(), dist_safe.clone()); // Shape [n, n, d]
 
                 // Compute gradients for all pairs at once
                 let grad_x = B::float_sum(B::float_mul(
@@ -133,7 +139,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 }
 
                 if VERBOSE {
-                    println!("backward end")
+                    println!("backward end");
                 }
             }
         }
