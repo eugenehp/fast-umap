@@ -67,7 +67,8 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 // let grad_output = B::float_mul(grad, B::float_div(x.clone(), output)); // This will need adjustment based on your Euclidean implementation.
 
                 // Ensure grad_output matches the shape of x
-                let grad_output = B::float_mul(grad, B::float_div(x.clone(), output)); // Adjust this as needed for proper gradient computation
+                // let grad_output = B::float_mul(grad, B::float_div(x.clone(), output)); // Adjust this as needed for proper gradient computation
+                let grad_output = B::relu_backward(output, grad);
 
                 if VERBOSE {
                     println!("backward - 2 - grad_output - {grad_output:?}");
@@ -77,13 +78,10 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let reshaped_grad_output = B::float_reshape(grad_output, shape_x.clone()); // Reshaping grad_output to match x's shape
 
                 // Ensure that you reshape x for matrix multiplication correctly
-                let reshaped_x = B::float_reshape(x.clone(), Shape::from([1000, 2])); // Adjust shape as necessary
+                let reshaped_x = B::float_reshape(x.clone(), shape_x.clone()); // Adjust shape as necessary
 
                 // Matrix multiplication of the gradient with the reshaped input tensor.
-                let tensor = B::float_matmul(
-                    reshaped_grad_output.clone(),
-                    B::float_reshape(reshaped_x, Shape::from([1000, 2])),
-                );
+                let tensor = B::float_matmul(reshaped_grad_output.clone(), reshaped_x);
 
                 if VERBOSE {
                     println!("backward - 3");
