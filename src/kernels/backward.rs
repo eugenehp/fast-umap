@@ -10,7 +10,7 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{ops::FloatTensor, ElementConversion, Float, Shape, Tensor, TensorPrimitive},
+    tensor::{ops::FloatTensor, ElementConversion, Float, Int, Shape, Tensor, TensorPrimitive},
 };
 
 use super::Backend;
@@ -74,14 +74,35 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 let grad_output: Tensor<B, 1, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(grad_output));
 
-                // Reshape grad_output to a 2D matrix [n, n], with only the upper triangular part filled
-                let grad_output: Tensor<B, 2> = grad_output.reshape(Shape::from([n, n])); // Reshape into an upper triangular form.
+                // Step 2: Generate the upper triangular indices of the full n x n matrix
+                let grad_output_exp = grad_output.clone(); // Gradient output stays the same, but we need to apply it into the gradient matrix
 
-                if VERBOSE {
-                    println!("grad_output reshaped: {:?}", grad_output.shape());
-                }
+                // Step 3: Create an empty n x n gradient matrix and fill in the upper triangular values
+                let mut grad_matrix: Tensor<B, 1> =
+                    Tensor::zeros(Shape::from([n, n]), &xx.device()); // Shape [n, n]
 
-                // Step 2: Compute pairwise differences (xx[i] - xx[j]) using broadcasting
+                // Create a vector of pairs (i, j) for the upper triangular part
+                let upper_triangular_indices: Vec<(usize, usize)> = (0..n)
+                    .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+                    .collect();
+
+                // Convert to a format compatible with the backend
+                let indices_data: Vec<usize> = upper_triangular_indices
+                    .iter()
+                    .flat_map(|(i, j)| vec![*i as usize, *j as usize]) // Convert to i32 for indices
+                    .collect();
+
+                // Create a tensor for indices with the correct backend-specific type
+                let indices = Tensor::<B, 1, Int>::from_data(indices_data.as_slice(), &xx.device()); // Use from_data instead of from_primitive
+
+                // Step 5: We need to select and assign the gradients using select_assign
+                grad_matrix = grad_matrix.select_assign(0, indices.clone(), grad_output_exp); // This applies the gradient output to the grad_matrix
+
+                // Step 6: Symmetrically assign values to the lower triangular part
+                let grad_matrix_lower = grad_matrix.clone();
+                grad_matrix = grad_matrix.select_assign(1, indices, grad_matrix_lower); // For the lower triangular part
+
+                // Step 7: Compute pairwise differences (xx[i] - xx[j]) using broadcasting
                 let xx_exp: Tensor<B, 3> = xx.clone().expand(Shape::from([n, n, d])); // Shape [n, n, d]
                 let xx_exp_transpose: Tensor<B, 3> =
                     xx.clone().expand(Shape::from([n, n, d])).transpose(); // Shape [n, n, d]
@@ -96,7 +117,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                     println!("diff shape: {:?}", diff);
                 }
 
-                // Step 3: Compute squared L2 norm (Euclidean distance) for each pair
+                // Step 8: Compute squared L2 norm (Euclidean distance) for each pair
                 let squared = B::float_mul(diff.clone(), diff.clone()); // Shape [n, n, d]
                 let squared: Tensor<B, 3, Float> =
                     Tensor::from_primitive(TensorPrimitive::Float(squared));
@@ -105,7 +126,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 let sum_of_squares =
                     B::float_sum(squared.slice([0..n, 0..n, 0..d]).into_primitive().tensor()); // Shape [n, n]
 
-                // Step 4: Compute Euclidean distance (sqrt of sum of squares)
+                // Step 9: Compute Euclidean distance (sqrt of sum of squares)
                 let dist = B::float_sqrt(sum_of_squares); // Shape [n, n]
 
                 let epsilon = 1e-12.elem();
@@ -116,21 +137,16 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                 // Now we need to broadcast dist_safe to the shape of diff: [n, n, d]
                 let dist_safe_broadcasted = B::float_expand(dist_safe, Shape::from([n, n, d])); // Broadcast to shape [n, n, d]
 
-                // Step 5: Compute the gradient of the distance with respect to x[i] and x[j]
+                // Step 10: Compute the gradient of the distance with respect to x[i] and x[j]
                 let grad_diff = B::float_div(diff.clone(), dist_safe_broadcasted.clone()); // Shape [n, n, d]
 
                 if VERBOSE {
                     println!("grad_diff shape: {:?}", grad_diff);
                 }
 
-                // Step 6: Apply gradients to the correct elements
-                // We use the upper triangular grad_output (with indices) to apply the gradients.
-
-                let grad_matrix = grad_diff; // This holds the pairwise gradient results
-
-                // Here, we already have the pairwise gradients, and we need to update grad_x accordingly
-                // The gradients are for the upper triangle, so we can broadcast them
-                let grad_x = B::float_sum_dim(grad_matrix.clone(), 0); // Summing over the rows (first dimension)
+                // Step 11: Apply gradients to the correct elements
+                // We already have the pairwise gradients in grad_matrix, so we directly apply it.
+                let grad_x = B::float_sum_dim(grad_matrix.into_primitive().tensor(), 0); // Summing over the rows (first dimension)
 
                 // Register the gradient for x
                 if let Some(node) = node_x {
