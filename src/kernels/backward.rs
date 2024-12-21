@@ -15,7 +15,7 @@ use burn::{
 
 use super::Backend;
 
-const VERBOSE: bool = true;
+const VERBOSE: bool = false;
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
@@ -140,17 +140,42 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 
                 // Step 11: Apply gradients to the correct elements
                 // We already have the pairwise gradients in grad_matrix, so we directly apply it.
-                let grad_x = B::float_sum_dim(grad_matrix.into_primitive().tensor(), 1); // Summing over the rows (first dimension)
+                // let grad_x = B::float_sum_dim(grad_matrix.into_primitive().tensor(), 1); // Summing over the rows (first dimension)
 
-                let grad_x = B::float_reshape(grad_x, xx.shape());
+                // // let grad_x = B::float_reshape(grad_x, xx.shape());
+                // let grad_x = B::float_expand(grad_x, xx.shape());
+
+                // Step 5: Reverse the gradients for x[i] and x[j]
+                // Accumulate the gradients for x[i] and x[j] in reverse (this is critical for backprop)
+                let grad_x = B::float_sum_dim(grad_diff.clone(), 1); // Summing over j for x[i]
+                let grad_x_transpose = B::float_sum_dim(grad_diff.clone(), 0); // Summing over i for x[j]
+
+                // Step 6: Register gradients
+                let grad_x = B::float_reshape(grad_x, xx.shape()); // Reshape to match the original shape of x
+                let grad_x_transpose = B::float_reshape(grad_x_transpose, xx.shape()); // Reshape to match the original shape of x
+
+                let grad_xx: Tensor<B, 2, Float> =
+                    Tensor::from_primitive(TensorPrimitive::Float(grad_x.clone()));
+
+                if VERBOSE {
+                    println!("grad_xx: {:?}", grad_xx.to_data());
+                }
 
                 // Register the gradient for x
-                if let Some(node) = node_x {
+                // if let Some(node) = node_x {
+                //     grads.register::<B>(node.id, grad_x);
+                // }
+
+                // Register gradients for both x[i] and x[j]
+                if let Some(node) = node_x.clone() {
                     grads.register::<B>(node.id, grad_x.clone());
+                }
+                if let Some(node) = node_x.clone() {
+                    grads.register::<B>(node.id, grad_x_transpose.clone());
                 }
 
                 if VERBOSE {
-                    println!("backward end {grad_x:?}");
+                    println!("backward end");
                 }
             }
         }
