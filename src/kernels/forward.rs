@@ -38,7 +38,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             output.as_tensor_arg(1),
         );
 
-        // println!("forward {output:?}");
+        println!("forward {output:?}");
 
         output
     }
