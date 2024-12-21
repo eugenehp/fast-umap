@@ -61,6 +61,11 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                     Tensor::from_primitive(TensorPrimitive::Float(x.clone()));
                 let shape_x = xx.shape();
                 let dims = &shape_x.dims;
+
+                if VERBOSE {
+                    println!("xx shape: {:?}", xx.shape());
+                } // Check the shape to ensure it's correct
+
                 let n = dims[0]; // Number of rows (samples)
                 let d = dims[1]; // Dimensionality
 
@@ -76,14 +81,29 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
 
                 // Ensure diff is a 3D tensor with shape [n, n, d]
                 let mut diff: Tensor<B, 3, Float> = Tensor::zeros_like(&x_broad); // Shape [n, n, d]
+                if VERBOSE {
+                    println!("diff - {diff:?}");
+                }
 
                 // Calculate pairwise differences for each pair (i, j)
                 for i in 0..n {
                     let xx = xx.clone();
                     let lhs = xx.clone().slice([i..i + 1, 0..d]); // Shape [1, d]
                     for j in 0..n {
+                        // if VERBOSE {
+                        // Debugging statement
+                        println!("Accessing pair (i, j): ({}, {})", i, j);
+                        // }
+
                         let xx = xx.clone();
                         let rhs = xx.slice([j..j + 1, 0..d]); // Shape [1, d]
+
+                        if VERBOSE {
+                            println!("lhs - {lhs:?}");
+                        }
+                        if VERBOSE {
+                            println!("rhs - {rhs:?}");
+                        }
 
                         // Compute the difference for pair (i, j)
                         let diff_ij = B::float_sub(
@@ -91,11 +111,26 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
                             rhs.clone().into_primitive().tensor(),
                         ); // Shape [1, d]
 
+                        if VERBOSE {
+                            println!("diff_ij - {diff_ij:?}");
+                        }
+
+                        // let ranges = [i..i + 1, j..j + 1, 0..d]; // Ensure we're matching dimensions [i, j, 0..d]
+                        let ranges = [i..i + 1, 0..d]; // Ensure we're matching dimensions [i, j, 0..d]
+
+                        if VERBOSE {
+                            println!("ranges - {ranges:?}");
+                        }
+
                         // Ensure correct dimensionality for slice assignment
                         diff = diff.slice_assign(
-                            [i..i + 1, j..j + 1, 0..d], // Ensure we're matching dimensions [i, j, 0..d]
+                            ranges,
                             Tensor::from_primitive(TensorPrimitive::Float(diff_ij)),
                         );
+
+                        if VERBOSE {
+                            println!("diff - {diff:?}");
+                        }
                     }
                 }
 
