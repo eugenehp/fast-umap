@@ -15,16 +15,10 @@ use burn::{
 
 use super::Backend;
 
-const VERBOSE: bool = false;
+const VERBOSE: bool = true;
 
 // Implement our custom backend trait for any backend that also implements our custom backend trait.
-impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C>
-// where
-//     TensorPrimitive<B>: std::ops::Mul<
-//         <B as burn::prelude::Backend>::FloatTensorPrimitive,
-//         Output = <B as burn::prelude::Backend>::FloatTensorPrimitive,
-//     >,
-{
+impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
         // Create our zero-sized type that will implement the Backward trait.
         #[derive(Debug)]
