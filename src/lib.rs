@@ -12,6 +12,7 @@ pub mod distances;
 pub mod kernels;
 pub mod macros;
 pub mod model;
+pub mod normalizer;
 pub mod prelude;
 pub mod train;
 pub mod utils;

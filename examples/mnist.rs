@@ -23,7 +23,7 @@ fn main() {
 
     // Set training hyperparameters
     let batch_size = 1_000; // Number of samples per batch during training
-    let num_samples = 10_000 as usize; // Total number of samples in the dataset
+    let num_samples = 1_000 as usize; // Total number of samples in the dataset
 
     // let num_samples = 50_000 as usize; // Total number of samples in the dataset
 
