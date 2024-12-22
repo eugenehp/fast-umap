@@ -13,9 +13,7 @@ use burn::{
     tensor::ops::FloatTensor,
 };
 
-use crate::{print_if, print_primitive_tensor};
-
-use super::Backend;
+use crate::{backend::Backend, print_if, print_primitive_tensor};
 
 const VERBOSE: bool = true;
 
