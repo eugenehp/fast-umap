@@ -5,6 +5,8 @@ use burn_jit::{
 };
 use cubecl::{CubeCount, CubeDim};
 
+const DEFAULT_CUBE_DIM: CubeDim = CubeDim { x: 32, y: 32, z: 1 }; // Example cube size
+
 impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F, I> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
         let xx = into_contiguous(x.clone());
@@ -20,7 +22,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             JitTensor::new_contiguous(client.clone(), device.clone(), output_shape, buffer);
 
         // Launch the Euclidean pairwise distance kernel
-        let cube_dim = CubeDim { x: 16, y: 16, z: 1 }; // Example cube size
+        let cube_dim = DEFAULT_CUBE_DIM;
         let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
         let cubes_needed_in_y = (n as f32 / cube_dim.y as f32).ceil() as u32;
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
@@ -58,7 +60,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         );
 
         // Launch the Euclidean pairwise distance kernel
-        let cube_dim = CubeDim { x: 16, y: 16, z: 1 }; // Example cube size
+        let cube_dim = DEFAULT_CUBE_DIM;
         let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
         let cubes_needed_in_y = (d as f32 / cube_dim.y as f32).ceil() as u32;
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
