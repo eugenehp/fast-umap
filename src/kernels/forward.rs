@@ -1,4 +1,5 @@
-use super::{kernel::*, Backend};
+use super::kernel::*;
+use crate::backend::Backend;
 use burn::tensor::{ops::FloatTensor, Shape};
 use burn_jit::{
     kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,

@@ -2,9 +2,9 @@ mod config;
 mod get_distance_by_metric;
 
 use crate::{
+    backend::AutodiffBackend,
     chart::{self, plot_loss, ChartConfigBuilder},
     format_duration,
-    kernels::AutodiffBackend,
     model::UMAPModel,
     normalize_data,
     utils::convert_vector_to_tensor,

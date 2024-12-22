@@ -1,4 +1,4 @@
-use crate::kernels::AutodiffBackend;
+use crate::backend::AutodiffBackend;
 use crate::{chart, train, utils, UMAP};
 
 // Re-export common utilities for easier use

@@ -1,5 +1,6 @@
+use backend::AutodiffBackend;
 use burn::module::AutodiffModule;
-use kernels::AutodiffBackend;
+
 use model::{UMAPModel, UMAPModelConfigBuilder};
 use num::Float;
 use train::*;
@@ -7,6 +8,7 @@ use utils::*;
 
 use burn::tensor::{Device, Tensor};
 
+pub mod backend;
 pub mod chart;
 pub mod distances;
 pub mod kernels;
