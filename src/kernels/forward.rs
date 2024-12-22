@@ -11,11 +11,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let client = xx.client;
         let device = xx.device;
         let dims = xx.shape.dims;
-        let n = dims[0]; // Number of vectors (rows)
-
-        // let d = dims[1]; // Dimension of each vector (columns)
-
-        // println!("euclidean_pairwise_distance {dims:?}");
+        let n = dims[0];
 
         // Allocate output tensor of shape (N, N) to hold pairwise distances
         let output_shape = Shape::from(vec![n, n]);
@@ -37,8 +33,6 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             x.as_tensor_arg(1),
             output.as_tensor_arg(1),
         );
-
-        println!("forward {output:?}");
 
         output
     }

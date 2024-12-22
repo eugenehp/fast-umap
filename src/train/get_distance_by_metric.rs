@@ -1,6 +1,6 @@
 use burn::tensor::{Tensor, TensorPrimitive};
 
-use crate::{kernels::Backend, normalize_tensor};
+use crate::kernels::Backend;
 
 use super::*;
 

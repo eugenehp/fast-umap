@@ -10,6 +10,7 @@ use burn::tensor::{Device, Tensor};
 pub mod chart;
 pub mod distances;
 pub mod kernels;
+pub mod macros;
 pub mod model;
 pub mod prelude;
 pub mod train;

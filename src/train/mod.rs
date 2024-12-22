@@ -3,7 +3,6 @@ mod get_distance_by_metric;
 
 use crate::{
     chart::{self, plot_loss, ChartConfigBuilder},
-    distances::*,
     format_duration,
     kernels::AutodiffBackend,
     model::UMAPModel,
