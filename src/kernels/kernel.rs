@@ -15,6 +15,29 @@ pub fn euclidean_pairwise_distance_kernel<F: Float>(
         return; // Skip threads that are out of bounds
     }
 
+    // Edge case 1: Handle empty input tensor (n == 0 or d == 0)
+    if n == 0 || d == 0 {
+        return; // No computation needed for empty tensor
+    }
+
+    // Edge case 2: Handle single vector case (n == 1)
+    if n == 1 {
+        output[0] = F::new(0.0); // Distance between the only vector and itself is 0
+        return;
+    }
+
+    // Edge case 3: Handle zero-dimensional vectors (d == 0)
+    if d == 0 {
+        // If vectors have 0 dimensions, the distance between any two vectors is trivially 0
+        for i in 0..n {
+            for j in i..n {
+                output[i * n + j] = F::new(0.0);
+                output[j * n + i] = F::new(0.0); // Symmetry: dist(i, j) = dist(j, i)
+            }
+        }
+        return;
+    }
+
     let mut sum = F::new(0.0); // Sum of squared differences
 
     // Compute the squared differences between vectors row and col
