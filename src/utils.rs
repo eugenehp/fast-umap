@@ -2,10 +2,10 @@ use core::f64;
 
 use burn::{
     prelude::Backend,
-    tensor::{Device, Tensor, TensorData},
+    tensor::{ops::FloatTensor, Device, Tensor, TensorData, TensorPrimitive},
 };
 use num::{Float, FromPrimitive};
-use prettytable::{row, Table};
+// use prettytable::{row, Table};
 use rand::{distributions::uniform::SampleUniform, Rng};
 use rayon::prelude::*;
 
@@ -293,6 +293,12 @@ pub fn normalize_tensor<B: Backend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
     normalized
 }
 
+pub fn print_primitive_tensor<B: Backend>(tensor: &FloatTensor<B>, rows: usize, cols: usize) {
+    let tensor: Tensor<B, 2> = Tensor::from_primitive(TensorPrimitive::Float(tensor.clone()));
+    print_tensor(&tensor, rows, cols)
+}
+
+const MIN_SIZE: usize = 10;
 pub fn print_tensor<B: Backend>(tensor: &Tensor<B, 2>, rows: usize, cols: usize) {
     let shape = tensor.shape().dims;
     let n = shape[0]; // Number of rows
@@ -300,9 +306,12 @@ pub fn print_tensor<B: Backend>(tensor: &Tensor<B, 2>, rows: usize, cols: usize)
 
     let data = tensor.to_data().to_vec::<f32>().unwrap();
 
+    let nn = n.min(rows.max(MIN_SIZE)); // Ensure nn is at least MIN_SIZE if rows > 0
+    let dd = d.min(cols.max(MIN_SIZE)); // Ensure dd is at least MIN_SIZE if cols > 0
+
     // Print first few rows and columns with scientific notation
-    for i in 0..n.min(rows) {
-        for j in 0..d.min(cols) {
+    for i in 0..nn {
+        for j in 0..dd {
             // Print each element with scientific notation, limited to 3 decimal places
             print!("{:10.3e}", data[i * d + j]);
         }

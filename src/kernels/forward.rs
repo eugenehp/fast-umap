@@ -1,5 +1,5 @@
 use super::{kernel::*, Backend};
-use burn::tensor::{ops::FloatTensor, Shape, Tensor};
+use burn::tensor::{ops::FloatTensor, Shape};
 use burn_jit::{
     kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,
 };
@@ -42,16 +42,21 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         grad_x: FloatTensor<Self>,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self> {
-        println!("backend - euclidean_pairwise_distance_backward");
+        // println!("backend - euclidean_pairwise_distance_backward");
         let x = into_contiguous(x);
         let n = x.shape.dims[0];
+        let d = x.shape.dims[1];
 
-        let output_shape = Shape::from(vec![n, n]);
+        let grad_output_shape = Shape::from(vec![n, d]);
         let buffer = x
             .client
-            .empty(output_shape.num_elements() * std::mem::size_of::<F>());
-        let grad_output: JitTensor<R, F> =
-            JitTensor::new_contiguous(x.client.clone(), x.device.clone(), output_shape, buffer);
+            .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
+        let grad_output: JitTensor<R, F> = JitTensor::new_contiguous(
+            x.client.clone(),
+            x.device.clone(),
+            grad_output_shape,
+            buffer,
+        );
 
         // Launch the Euclidean pairwise distance kernel
         let cube_dim = CubeDim { x: 16, y: 16, z: 1 }; // Example cube size
@@ -72,6 +77,6 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             );
         }
 
-        grad_x
+        grad_output
     }
 }
