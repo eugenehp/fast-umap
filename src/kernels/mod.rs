@@ -9,7 +9,6 @@ mod kernel;
 pub trait Backend: burn::tensor::backend::Backend {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self>;
     fn euclidean_pairwise_distance_backward(
-        x: FloatTensor<Self>,
         grad_x: FloatTensor<Self>,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self>;

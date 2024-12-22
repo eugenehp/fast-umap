@@ -8,8 +8,8 @@ pub fn euclidean_pairwise_distance_kernel<F: Float>(
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
     let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
 
-    let n = output.shape(output.rank() - 2); // Number of vectors (rows) in the output tensor
-    let d = x.shape(x.rank() - 1); // Dimension of each vector (features) in the input tensor
+    let n = x.shape(0); // Number of vectors (rows) in the output tensor
+    let d = x.shape(1); // Dimension of each vector (features) in the input tensor
 
     if row >= n || col >= n {
         return; // Skip threads that are out of bounds
@@ -66,19 +66,18 @@ pub fn euclidean_pairwise_distance_kernel<F: Float>(
     }
 }
 
-#[cube(launch_unchecked)]
-pub fn euclidean_pairwise_distance_backward_kernel<E: Numeric>(
-    x: &Tensor<E>,               // Input tensor (n, d)
-    output: &Tensor<E>,          // Output tensor (n, n), pairwise distances
-    grad_output: &mut Tensor<E>, // Gradient of the loss with respect to output tensor (n, n)
-    grad_x: &Tensor<E>,          // Gradient of the loss with respect to input tensor (n, d)
+#[cube(launch)]
+pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
+    output: &Tensor<F>,          // Output tensor (n, d), pairwise distances
+    grad_output: &mut Tensor<F>, // Gradient of the loss with respect to output tensor (n, d)
+    grad_x: &Tensor<F>,          // Gradient of the loss with respect to input tensor (n, n)
 ) {
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
     let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
 
     // Get the number of vectors (n) and the dimension (d) of each vector
-    let n = x.shape(0); // Number of vectors (rows) in the input tensor
-    let d = x.shape(1); // Dimension of each vector (features) in the input tensor
+    let n = output.shape(0); // Number of vectors (rows) in the input tensor
+    let d = output.shape(1); // Dimension of each vector (features) in the input tensor
 
     // Edge case 1: Handle empty input tensor (n == 0 or d == 0)
     if n == 0 || d == 0 {
@@ -87,7 +86,7 @@ pub fn euclidean_pairwise_distance_backward_kernel<E: Numeric>(
 
     // Edge case 2: Handle zero-dimensional vectors (d == 0)
     if d == 0 {
-        return; // grad_x should already be zeroed out
+        return; // grad_output should already be zeroed out
     }
 
     // Edge case: Ensure row and col are within bounds
@@ -99,28 +98,27 @@ pub fn euclidean_pairwise_distance_backward_kernel<E: Numeric>(
     let dist = output[row * n + col];
 
     // Handle small distances (to avoid division by zero)
-    let epsilon = E::cast_from(1e-10); // Define a small epsilon value
-    let dist = if dist < epsilon { epsilon } else { dist }; // Ensure dist is never less than epsilon
+    let epsilon = F::cast_from(1e-10); // Define a small epsilon value
+    let dist = F::max(dist, epsilon); // Ensure dist is never less than epsilon
 
     // Skip if the distance is 0 (identical vectors)
-    if dist == E::cast_from(0.0) {
+    if dist < epsilon {
         return; // No gradient to propagate for identical vectors
     }
 
     // Compute the gradient of the pairwise distance w.r.t the input vectors
-    let grad_dist = grad_x[row * n + col]; // Gradient of the loss w.r.t dist(i, j)
-
-    // Gradient of the distance with respect to the vectors (i, j)
     for i in 0..d {
         let index_row = row * d + i; // Linear index for row, dimension i
         let index_col = col * d + i; // Linear index for col, dimension i
 
-        let diff = x[index_row] - x[index_col];
-        let grad_dist_i = grad_dist * (diff / dist); // Gradient of distance w.r.t x_{i,k}
+        let diff = output[index_row] - output[index_col]; // Difference between the vectors
+
+        // Gradient of the distance w.r.t x_{i,k}
+        let grad_dist_i = grad_x[row * n + col] * (diff / dist); // Scale the gradient
 
         // Propagate the gradient to the input tensor
-        // Ensure grad_x has the correct shape: [n, d] (1000, 2)
-        grad_output[row * d + i] += grad_dist_i; // Gradient w.r.t row vector (x_i)
-        grad_output[col * d + i] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
+        // grad_output is the gradient of the loss with respect to input tensor
+        grad_output[index_row] += grad_dist_i; // Gradient w.r.t row vector (x_i)
+        grad_output[index_col] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
     }
 }
