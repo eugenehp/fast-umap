@@ -10,14 +10,14 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::ops::FloatTensor,
+    tensor::{ops::FloatTensor, Float, Tensor, TensorPrimitive},
 };
 
 use crate::{print_if, print_primitive_tensor};
 
 use super::Backend;
 
-const VERBOSE: bool = false;
+const VERBOSE: bool = true;
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
@@ -28,7 +28,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
 
         // Implement the backward trait for the given backend B
         impl<B: Backend> Backward<B, 1> for EuclideanPairwiseDistanceBackward {
-            type State = (NodeID, FloatTensor<B>);
+            type State = NodeID; // , FloatTensor<B>
 
             fn backward(
                 self,
@@ -36,22 +36,20 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 grads: &mut Gradients,
                 checkpointer: &mut Checkpointer,
             ) {
-                let (node_x, x) = ops.state; // Retrieve x and output from the state
+                let node_x = ops.state; // Retrieve x and output from the state
 
                 // Fetch the gradient for the current node.
                 let grad_x = grads.consume::<B>(&ops.node);
                 let output: FloatTensor<B> = checkpointer.retrieve_node_output(node_x);
 
                 if VERBOSE {
-                    println!("x {grad_x:?}");
-                    print_primitive_tensor::<B>(&x, 10, 10);
                     println!("grad_x {grad_x:?}");
                     print_primitive_tensor::<B>(&grad_x, 10, 10);
                     println!("output {output:?}");
                     print_primitive_tensor::<B>(&output, 10, 10);
                 }
 
-                let grad_output = B::euclidean_pairwise_distance_backward(x, grad_x, output);
+                let grad_output = B::euclidean_pairwise_distance_backward(grad_x, output);
 
                 if VERBOSE {
                     println!("===grad_output=== {grad_output:?}");
@@ -79,7 +77,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 let output = B::euclidean_pairwise_distance(x.clone().primitive); // Forward pass calculation
                 print_if!(VERBOSE, "Forward pass output (Tracked): {:?}", output); // Debug: Print output shape
 
-                let state = (x_state, x.into_primitive());
+                let state = x_state;
 
                 // The state now includes the checkpointed x and the output
                 prep.finish(state, output) // Finish with the computed output
@@ -94,7 +92,6 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     }
 
     fn euclidean_pairwise_distance_backward(
-        _x: FloatTensor<Self>,
         _grad_x: FloatTensor<Self>,
         _output: FloatTensor<Self>,
     ) -> FloatTensor<Self> {
