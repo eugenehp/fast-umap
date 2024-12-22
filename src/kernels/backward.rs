@@ -10,7 +10,7 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::{ops::FloatTensor, Float, Tensor, TensorPrimitive},
+    tensor::ops::FloatTensor,
 };
 
 use crate::{print_if, print_primitive_tensor};
@@ -59,7 +59,6 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
                 // let grad_output = B::float_matmul(grad_x, output);
                 // println!("===grad_output=== {:?}", grad_output);
                 // print_primitive_tensor::<B>(&grad_output, 10, 10);
-
                 grads.register::<B>(node_x, grad_output);
             }
         }
