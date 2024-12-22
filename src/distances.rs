@@ -1,8 +1,6 @@
 use burn::tensor::Tensor;
 
 use crate::kernels::Backend;
-#[allow(unused)]
-use crate::print_tensor_with_title;
 
 /// Calculate the pairwise Euclidean distance matrix for a given 2D tensor
 ///

@@ -70,31 +70,31 @@ where
 ///
 /// This function prints the tensor's data in a table with each row corresponding to one sample.
 /// The tensor data is printed in a format that makes it easy to inspect.
-pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
-    let dims = data.dims();
-    let n_samples = match dims.len() > 0 {
-        true => dims[0],
-        false => 0,
-    };
+// pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
+//     let dims = data.dims();
+//     let n_samples = match dims.len() > 0 {
+//         true => dims[0],
+//         false => 0,
+//     };
 
-    let mut table = Table::new();
-    table.add_row(row!["Index", "Tensor"]);
+//     let mut table = Table::new();
+//     table.add_row(row!["Index", "Tensor"]);
 
-    for index in 0..n_samples {
-        let row = data.clone().slice([index..index + 1]);
-        let row = row.to_data().to_vec::<f32>().unwrap();
-        let row = format!("{row:?}");
-        table.add_row(row![index, format!("{:?}", row)]);
-    }
+//     for index in 0..n_samples {
+//         let row = data.clone().slice([index..index + 1]);
+//         let row = row.to_data().to_vec::<f32>().unwrap();
+//         let row = format!("{row:?}");
+//         table.add_row(row![index, format!("{:?}", row)]);
+//     }
 
-    if dims.len() == 0 {
-        let row = data.to_data().to_vec::<f32>().unwrap();
-        let row = row.get(0).unwrap();
-        table.add_row(row![0, format!("{:?}", row)]);
-    }
+//     if dims.len() == 0 {
+//         let row = data.to_data().to_vec::<f32>().unwrap();
+//         let row = row.get(0).unwrap();
+//         table.add_row(row![0, format!("{:?}", row)]);
+//     }
 
-    table.printstd();
-}
+//     table.printstd();
+// }
 
 /// Prints the content of a tensor with a title.
 ///
@@ -103,10 +103,10 @@ pub fn print_tensor<B: Backend, const D: usize>(data: &Tensor<B, D>) {
 /// * `data` - The tensor to print.
 ///
 /// This function is similar to `print_tensor`, but with an added title to help distinguish different tensor prints.
-pub fn print_tensor_with_title<B: Backend, const D: usize>(title: &str, data: &Tensor<B, D>) {
-    println!("{title}");
-    print_tensor(data);
-}
+// pub fn print_tensor_with_title<B: Backend, const D: usize>(title: &str, data: &Tensor<B, D>) {
+//     println!("{title}");
+//     print_tensor(data);
+// }
 
 /// Converts a 2D tensor into a `Vec<Vec<f64>>` for easier inspection or manipulation.
 ///
@@ -291,4 +291,21 @@ pub fn normalize_tensor<B: Backend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
 
     // Return the normalized sum of the top K distances
     normalized
+}
+
+pub fn print_tensor<B: Backend>(tensor: &Tensor<B, 2>, rows: usize, cols: usize) {
+    let shape = tensor.shape().dims;
+    let n = shape[0]; // Number of rows
+    let d = shape[1]; // Number of columns
+
+    let data = tensor.to_data().to_vec::<f32>().unwrap();
+
+    // Print first few rows and columns with scientific notation
+    for i in 0..n.min(rows) {
+        for j in 0..d.min(cols) {
+            // Print each element with scientific notation, limited to 3 decimal places
+            print!("{:10.3e}", data[i * d + j]);
+        }
+        println!();
+    }
 }
