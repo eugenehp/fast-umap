@@ -56,6 +56,7 @@ where
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
 
+    // you can also store in memory using BytesRecorder
     let recorder = BinFileRecorder::<FullPrecisionSettings>::new();
     let model_path = format!("./{name}.bin");
 
