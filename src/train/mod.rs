@@ -10,11 +10,12 @@ use crate::{
     utils::convert_vector_to_tensor,
 };
 use burn::{
-    module::AutodiffModule,
+    module::{AutodiffModule, Module},
     nn::loss::MseLoss,
     optim::{
         decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
     },
+    record::{BinFileRecorder, FullPrecisionSettings},
     tensor::{cast::ToElement, Device, Shape, Tensor},
 };
 pub use config::*;
@@ -40,6 +41,7 @@ use std::{thread, time::Instant};
 ///   sequence of `num_features` values.
 /// * `config`: The `TrainingConfig` containing training hyperparameters and options.
 pub fn train<B: AutodiffBackend, F: Float>(
+    name: &str,
     mut model: UMAPModel<B>,
     num_samples: usize,      // Number of samples in the dataset.
     num_features: usize,     // Number of features (columns) in each sample.
@@ -53,6 +55,9 @@ where
     if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
+
+    let recorder = BinFileRecorder::<FullPrecisionSettings>::new();
+    let model_path = format!("./{name}.bin");
 
     let (exit_tx, exit_rx) = channel();
 
@@ -260,6 +265,11 @@ where
         if current_loss <= best_loss {
             best_loss = current_loss;
             epochs_without_improvement = 0;
+
+            model
+                .clone()
+                .save_file(model_path.clone(), &recorder)
+                .expect("Should be able to save the model");
         } else {
             epochs_without_improvement += 1;
         }
@@ -334,6 +344,14 @@ where
         pb.finish();
     }
 
-    // Return the trained model.
+    // Return last trained model.
+    // (model, losses)
+
+    // let record = BinFileRecorder::<FullPrecisionSettings>::default();
+    model = model
+        .load_file(model_path, &recorder, &device)
+        .expect("Load model from the best weights file");
+
+    // Return best trained model
     (model, losses)
 }

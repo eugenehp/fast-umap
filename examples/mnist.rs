@@ -101,6 +101,7 @@ fn main() {
 
     // Start training the UMAP model with the specified training data and configuration
     let (model, _) = train(
+        "mnist",
         model,              // The model to train
         num_samples,        // Total number of training samples
         num_features,       // Number of features per sample
@@ -129,6 +130,6 @@ fn main() {
         .path("mnist.png")
         .build();
 
-    // // Visualize the 2D embedding (local representation) using a chart
+    // Visualize the 2D embedding (local representation) using a chart
     chart::chart_tensor(local, Some(chart_config));
 }

@@ -4,7 +4,7 @@ use burn::tensor::{ops::FloatTensor, Shape};
 use burn_jit::{
     kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,
 };
-use cubecl::{CubeCount, CubeDim};
+use cubecl::prelude::*;
 
 const DEFAULT_CUBE_DIM: CubeDim = CubeDim { x: 32, y: 32, z: 1 }; // Example cube size
 
@@ -67,7 +67,6 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
         // Launch the kernel
-
         euclidean_pairwise_distance_backward_kernel::launch::<F, R>(
             &output.client,
             cube_count,
