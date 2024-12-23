@@ -66,6 +66,9 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         let cubes_needed_in_y = (d as f32 / cube_dim.y as f32).ceil() as u32;
         let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
+        let clip_value = 1e-20;
+        let clip_value = ScalarArg::new(F::new(clip_value));
+
         // Launch the kernel
         euclidean_pairwise_distance_backward_kernel::launch::<F, R>(
             &output.client,
@@ -74,6 +77,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
             output.as_tensor_arg(1),
             grad_output.as_tensor_arg(1),
             grad_x.as_tensor_arg(1),
+            clip_value,
         );
 
         grad_output
