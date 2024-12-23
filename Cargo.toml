@@ -15,6 +15,7 @@ burn = { version = "~0.15", features = ["train", "wgpu", "autodiff", "autotune"]
 burn-jit = { version = "0.15.0", features = ["burn-autodiff"] }
 ctrlc = "3.4.5"
 cubecl = { version = "0.3.0", features = ["wgpu", "cubecl-wgpu"] }
+hsl = "0.1.1"
 indicatif = "0.17.9"
 ndarray = "0.16.1"
 num = "0.4.3"

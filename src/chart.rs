@@ -1,5 +1,6 @@
 use crate::utils::*;
 use burn::prelude::*;
+use hsl::HSL;
 use plotters::prelude::*;
 
 /// The default caption for the chart
@@ -103,103 +104,14 @@ type Float = f64;
 /// # Arguments
 /// * `data` - A 2D tensor of data points to plot
 /// * `config` - Optional custom chart configuration
-pub fn chart_tensor<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
+pub fn chart_tensor<B: Backend>(
+    data: Tensor<B, 2>,
+    labels: Option<Vec<String>>,
+    config: Option<ChartConfig>,
+) {
+    // pub fn chart_tensor<B: Backend>(data: Tensor<B, 2>, config: Option<ChartConfig>) {
     let data: Vec<Vec<Float>> = convert_tensor_to_vector(data);
-    chart_vector(data, config);
-}
-
-/// Plot the 2D chart using the provided data and configuration
-///
-/// # Arguments
-/// * `data` - A 2D vector of data points to plot
-/// * `config` - Optional custom chart configuration
-pub fn chart_vector(data: Vec<Vec<Float>>, config: Option<ChartConfig>) {
-    let config = config.unwrap_or(ChartConfig::default());
-
-    // Create a drawing area with a size of 800x600 pixels
-    let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();
-    root.fill(&WHITE).unwrap();
-
-    // Define the range for x and y axes (include negative values)
-    let min_x = data
-        .iter()
-        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
-        .cloned()
-        .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap() as Float;
-
-    let max_x = data
-        .iter()
-        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
-        .cloned()
-        .max_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap() as Float;
-
-    let min_y = data
-        .iter()
-        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
-        .cloned()
-        .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap() as Float;
-
-    let max_y = data
-        .iter()
-        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
-        .cloned()
-        .max_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap() as Float;
-
-    // Create a chart builder with specific size and axis ranges
-    let mut chart = ChartBuilder::on(&root)
-        .caption(config.caption, ("sans-serif", 30))
-        .margin(40)
-        .x_label_area_size(30)
-        .y_label_area_size(30)
-        .build_cartesian_2d(min_x..max_x, min_y..max_y)
-        .unwrap();
-
-    // Draw the x and y axis
-    chart
-        .configure_mesh()
-        .x_desc("X Axis")
-        .y_desc("Y Axis")
-        .x_labels(10)
-        .y_labels(10)
-        .draw()
-        .unwrap();
-
-    // Plot each vector in the Vec<Vec<F>> as a series of dots
-    chart
-        .draw_series(data.iter().map(|values| {
-            Circle::new(
-                (values[0], values[1]),
-                3,
-                ShapeStyle {
-                    color: RED.to_rgba(),
-                    filled: false,
-                    stroke_width: 1,
-                },
-            )
-        }))
-        .unwrap()
-        .label("UMAP")
-        .legend(move |(x, y)| {
-            Circle::new(
-                (x, y),
-                5,
-                ShapeStyle {
-                    color: RED.to_rgba(),
-                    filled: true,
-                    stroke_width: 1,
-                },
-            )
-        });
-
-    // Draw the legend
-    chart.configure_mesh().draw().unwrap();
-
-    // Save the chart to a file
-    root.present().unwrap();
+    chart_vector(data, labels, config);
 }
 
 /// Plot the loss curve over epochs and save it to a file
@@ -262,4 +174,140 @@ where
     chart.configure_mesh().y_labels(10).draw()?;
 
     Ok(())
+}
+
+use plotters::prelude::*;
+
+pub fn chart_vector(
+    data: Vec<Vec<Float>>,
+    labels: Option<Vec<String>>,
+    config: Option<ChartConfig>,
+) {
+    let config = config.unwrap_or(ChartConfig::default());
+
+    // Create the drawing area
+    let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();
+    root.fill(&WHITE).unwrap();
+
+    // Define min and max for x and y axes
+    let min_x = data
+        .iter()
+        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
+        .cloned()
+        .min_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap() as Float;
+
+    let max_x = data
+        .iter()
+        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
+        .cloned()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap() as Float;
+
+    let min_y = data
+        .iter()
+        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
+        .cloned()
+        .min_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap() as Float;
+
+    let max_y = data
+        .iter()
+        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
+        .cloned()
+        .max_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap() as Float;
+
+    // Assign unique HSL colors to each label
+    let mut label_colors: Vec<(String, RGBColor)> = Vec::new();
+    if let Some(labels) = labels.clone() {
+        let unique_labels: Vec<String> = labels.iter().cloned().collect();
+        let unique_labels = unique_labels
+            .into_iter()
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+
+        for (i, label) in unique_labels.iter().enumerate() {
+            // Generate unique color using HSL, keeping saturation and lightness constant
+            let hue = i as f64 * 360.0 / unique_labels.len() as f64; // Evenly distribute hues across the spectrum
+            let color = HSL {
+                h: hue,
+                s: 0.7,
+                l: 0.6,
+            }
+            .to_rgb();
+
+            label_colors.push((label.clone(), RGBColor(color.0, color.1, color.2)));
+        }
+    }
+
+    // Build chart
+    let mut chart = ChartBuilder::on(&root)
+        .caption(config.caption, ("sans-serif", 30))
+        .margin(40)
+        .x_label_area_size(30)
+        .y_label_area_size(30)
+        .build_cartesian_2d(min_x..max_x, min_y..max_y)
+        .unwrap();
+
+    // Configure the mesh (axes)
+    chart
+        .configure_mesh()
+        .x_desc("X Axis")
+        .y_desc("Y Axis")
+        .x_labels(10)
+        .y_labels(10)
+        .draw()
+        .unwrap();
+
+    // Draw the data points and labels
+    chart
+        .draw_series(data.iter().enumerate().map(|(i, values)| {
+            let label = match labels.clone() {
+                Some(labels) => labels.get(i).unwrap().clone(),
+                None => "".into(),
+            };
+            let color = label_colors
+                .iter()
+                .find(|(l, _)| *l == label)
+                .map(|(_, color)| *color)
+                .unwrap_or(RED);
+
+            // Create a group to hold both the circle and label
+            let circle = Circle::new(
+                (values[0], values[1]),
+                3,
+                ShapeStyle {
+                    color: color.into(),
+                    filled: false,
+                    stroke_width: 1,
+                },
+            );
+
+            // Create the label text
+            let label_text = if !label.is_empty() {
+                Text::new(
+                    label.clone(),
+                    (values[0] + 0.2, values[1] + 0.2), // Offset label slightly for clarity
+                    ("sans-serif", 15).into_font(),
+                )
+            } else {
+                Text::new("".into(), (0.0_f64, 0.0_f64), ("sans-serif", 1).into_font())
+                // Empty label to avoid errors
+            };
+
+            // Return both the circle and the label as a group of elements
+            // (circle, label_text)
+            circle
+        }))
+        .unwrap();
+
+    // Draw the legend (if labels are available)
+    if labels.is_some() {
+        chart.configure_series_labels().draw().unwrap();
+    }
+
+    // Save the chart to file
+    root.present().unwrap();
 }
