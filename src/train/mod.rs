@@ -307,7 +307,7 @@ where
                     .build();
 
                 // Visualize the 2D embedding (local representation) using a chart
-                chart::chart_tensor(embeddings_for_entire_dataset, Some(chart_config));
+                chart::chart_tensor(embeddings_for_entire_dataset, None, Some(chart_config));
                 // Print only last losses
                 plot_loss(losses.clone()[STEP..].to_vec(), "losses.png").unwrap();
             });

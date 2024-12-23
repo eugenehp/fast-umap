@@ -133,5 +133,5 @@ fn main() {
     let labels: Vec<String> = trn_lbl.iter().map(|digit| format!("{digit}")).collect();
 
     // Visualize the 2D embedding (local representation) using a chart
-    chart::chart_tensor(local, Some(chart_config));
+    chart::chart_tensor(local, Some(labels), Some(chart_config));
 }

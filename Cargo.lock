@@ -1495,6 +1495,7 @@ dependencies = [
  "burn-jit",
  "ctrlc",
  "cubecl",
+ "hsl",
  "indicatif",
  "mnist",
  "ndarray 0.16.1",
@@ -2065,6 +2066,12 @@ checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
 dependencies = [
  "digest",
 ]
+
+[[package]]
+name = "hsl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "575fb7f1167f3b88ed825e90eb14918ac460461fdeaa3965c6a50951dee1c970"
 
 [[package]]
 name = "iana-time-zone"
