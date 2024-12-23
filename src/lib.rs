@@ -45,6 +45,7 @@ impl<B: AutodiffBackend> UMAP<B> {
     where
         F: num::FromPrimitive + burn::tensor::Element,
     {
+        let default_name = "model";
         // Set training parameters
         let batch_size = 1;
         let num_samples = data.len();
@@ -85,6 +86,7 @@ impl<B: AutodiffBackend> UMAP<B> {
 
         // Start training
         let (model, _losses): (UMAPModel<B>, Vec<F>) = train(
+            default_name,
             model,
             num_samples,
             num_features,
