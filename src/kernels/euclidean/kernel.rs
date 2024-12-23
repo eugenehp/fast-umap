@@ -70,71 +70,11 @@ pub fn euclidean_pairwise_distance_kernel<F: Float>(
     }
 }
 
-// #[cube(launch)]
-// pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
-//     output: &Tensor<F>,          // Output tensor (n, d), pairwise distances
-//     grad_output: &mut Tensor<F>, // Gradient of the loss with respect to output tensor (n, d)
-//     grad_x: &Tensor<F>,          // Gradient of the loss with respect to input tensor (n, n)
-// ) {
-//     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
-//     let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
-
-//     // Get the number of vectors (n) and the dimension (d) of each vector
-//     let n = output.shape(0); // Number of vectors (rows) in the input tensor
-//     let d = output.shape(1); // Dimension of each vector (features) in the input tensor
-
-//     // Edge case 1: Handle empty input tensor (n == 0 or d == 0)
-//     if n == 0 || d == 0 {
-//         return; // No computation needed for empty tensor
-//     }
-
-//     // Edge case 2: Handle zero-dimensional vectors (d == 0)
-//     if d == 0 {
-//         return; // grad_output should already be zeroed out
-//     }
-
-//     // Edge case: Ensure row and col are within bounds
-//     if row >= n || col >= n || row > col {
-//         return; // Skip threads that are out of bounds
-//     }
-
-//     // Get the pairwise distance between vectors row and col
-//     let dist = output[row * n + col];
-
-//     // Handle small distances (to avoid division by zero)
-//     let epsilon = F::cast_from(1e-8); // Define a small epsilon value
-//     let dist = F::max(dist, epsilon); // Ensure dist is never less than epsilon
-
-//     // Skip if the distance is 0 (identical vectors)
-//     if dist < epsilon {
-//         return; // No gradient to propagate for identical vectors
-//     }
-
-//     if row != col {
-//         // Compute the gradient of the pairwise distance w.r.t the input vectors
-//         for i in 0..d {
-//             let index_row = row * d + i; // Linear index for row, dimension i
-//             let index_col = col * d + i; // Linear index for col, dimension i
-
-//             let diff = output[index_row] - output[index_col]; // Difference between the vectors
-
-//             // Gradient of the distance w.r.t x_{i,k}
-//             let grad_dist_i = grad_x[row * n + col] * (diff / dist); // Scale the gradient
-
-//             // Propagate the gradient to the input tensor
-//             // grad_output is the gradient of the loss with respect to input tensor
-//             grad_output[index_row] += grad_dist_i; // Gradient w.r.t row vector (x_i)
-//             grad_output[index_col] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
-//         }
-//     }
-// }
-
 #[cube(launch)]
 pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
-    output: &Tensor<F>,          // Output tensor (n, n), pairwise distances
-    grad_output: &mut Tensor<F>, // Gradient of the loss with respect to output tensor (n, n)
-    grad_x: &mut Tensor<F>,      // Gradient of the loss with respect to input tensor (n, d)
-    clip_value: F,               // Gradient clipping threshold
+    output: &Tensor<F>,          // Output tensor (n, d), pairwise distances
+    grad_output: &mut Tensor<F>, // Gradient of the loss with respect to output tensor (n, d)
+    grad_x: &Tensor<F>,          // Gradient of the loss with respect to input tensor (n, n)
 ) {
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
     let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
@@ -167,50 +107,43 @@ pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
 
     // Skip if the distance is 0 (identical vectors)
     if dist < epsilon {
+        for i in 0..d {
+            let index_row = row * d + i; // Linear index for row, dimension i
+            let index_col = col * d + i; // Linear index for col, dimension i
+            grad_output[index_row] = F::new(0.0);
+            grad_output[index_col] = F::new(0.0);
+        }
         return; // No gradient to propagate for identical vectors
     }
 
-    // Initialize gradient accumulation
-    let mut grad_row = F::new(0.0); // Gradient for row vector
-    let mut grad_col = F::new(0.0); // Gradient for col vector
+    if row != col {
+        // Compute the gradient of the pairwise distance w.r.t the input vectors
+        for i in 0..d {
+            let index_row = row * d + i; // Linear index for row, dimension i
+            let index_col = col * d + i; // Linear index for col, dimension i
 
-    // Compute the gradient for row and col in parallel to avoid redundant loops
-    for i in 0..d {
-        let index_row = row * d + i; // Linear index for row, dimension i
-        let index_col = col * d + i; // Linear index for col, dimension i
+            let diff = output[index_row] - output[index_col]; // Difference between the vectors
 
-        let diff = output[index_row] - output[index_col]; // Difference between the vectors
+            // Gradient of the distance w.r.t x_{i,k}
+            let grad_dist_i = grad_x[row * n + col] * (diff / dist); // Scale the gradient
 
-        // Gradient of the distance w.r.t x_{i,k}
-        let grad_dist_i = grad_output[row * n + col] * (diff / dist); // Scale the gradient
-
-        // Accumulate the gradients for row and col
-        grad_row += grad_dist_i;
-        grad_col -= grad_dist_i;
+            // Propagate the gradient to the input tensor
+            // grad_output is the gradient of the loss with respect to input tensor
+            grad_output[index_row] += grad_dist_i; // Gradient w.r.t row vector (x_i)
+            grad_output[index_col] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
+        }
     }
 
-    // Apply gradient clipping (normalize gradients if the norm is too high)
-    let norm_row = grad_row * grad_row;
-    let norm_col = grad_col * grad_col;
+    // let max_grad = F::new(1e3); // Set a reasonable maximum gradient value
 
-    let norm_row = F::sqrt(norm_row);
-    let norm_col = F::sqrt(norm_col);
+    // // clamp gradients
+    // if row != col {
+    //     for i in 0..d {
+    //         let index_row = row * d + i; // Linear index for row, dimension i
+    //         let index_col = col * d + i; // Linear index for col, dimension i
 
-    if norm_row > clip_value {
-        grad_row *= clip_value / norm_row; // Scale gradient for row
-    }
-
-    if norm_col > clip_value {
-        grad_col *= clip_value / norm_col; // Scale gradient for column
-    }
-
-    // Now propagate the gradients back to grad_x
-    for i in 0..d {
-        let index_row = row * d + i;
-        let index_col = col * d + i;
-
-        // Update grad_x for both row and col with the clipped gradients
-        grad_x[index_row] += grad_row; // Gradient w.r.t row vector (x_i)
-        grad_x[index_col] += grad_col; // Gradient w.r.t col vector (x_j)
-    }
+    //         grad_output[index_row] = F::min(grad_output[index_row], max_grad);
+    //         grad_output[index_col] = F::min(grad_output[index_col], max_grad);
+    //     }
+    // }
 }

@@ -70,6 +70,7 @@ fn main() {
 
     // Start training the UMAP model with the specified training data and configuration
     let (model, _) = train(
+        "advanced",
         model,              // The model to train
         num_samples,        // Total number of training samples
         num_features,       // Number of features per sample

@@ -39,7 +39,7 @@ fn main() {
     let verbose = true; // Whether to enable the progress bar during training
 
     // let patience = 100; // Number of epochs without improvement before early stopping
-    let min_desired_loss = 0.0001; // Minimum loss threshold for early stopping
+    let min_desired_loss = 1e-4; // Minimum loss threshold for early stopping
     let metric = Metric::Euclidean; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Mean;
     // below 1.0 gives NaN loss. Mind that it's rounded to integer inside the function
@@ -53,7 +53,7 @@ fn main() {
 
     let Mnist {
         trn_img,
-        // trn_lbl,
+        trn_lbl,
         // tst_img,
         // tst_lbl,
         ..
@@ -129,6 +129,8 @@ fn main() {
         .caption("MNIST")
         .path("mnist.png")
         .build();
+
+    let labels: Vec<String> = trn_lbl.iter().map(|digit| format!("{digit}")).collect();
 
     // Visualize the 2D embedding (local representation) using a chart
     chart::chart_tensor(local, Some(chart_config));
