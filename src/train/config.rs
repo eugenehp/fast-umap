@@ -249,7 +249,7 @@ impl TrainingConfigBuilder {
             learning_rate: self.learning_rate.unwrap_or(0.001), // Default to 0.001 if not set
             beta1: self.beta1.unwrap_or(0.9),                 // Default beta1 if not set
             beta2: self.beta2.unwrap_or(0.999),               // Default beta2 if not set
-            penalty: self.penalty.unwrap_or(5e-5),            // Default penalty if not set
+            penalty: self.penalty.unwrap_or(1e-5),            // Default penalty if not set
             verbose: self.verbose.unwrap_or(false),           // Default to false if not set
             patience: self.patience,                          // Optional, no default
             loss_reduction: self.loss_reduction.unwrap_or(LossReduction::Sum), // Default to Sum if not set
