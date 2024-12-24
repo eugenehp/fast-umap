@@ -1,7 +1,11 @@
 use crate::utils::*;
 use burn::prelude::*;
 use hsl::HSL;
-use plotters::prelude::*;
+use plotters::{
+    prelude::*,
+    style::text_anchor::{HPos, Pos, VPos},
+};
+use std::collections::HashSet;
 
 /// The default caption for the chart
 const CAPTION: &str = "fast-umap";
@@ -176,8 +180,6 @@ where
     Ok(())
 }
 
-use plotters::prelude::*;
-
 pub fn chart_vector(
     data: Vec<Vec<Float>>,
     labels: Option<Vec<String>>,
@@ -189,55 +191,48 @@ pub fn chart_vector(
     let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();
     root.fill(&WHITE).unwrap();
 
-    // Define min and max for x and y axes
+    // Calculate min and max for x and y axes
     let min_x = data
         .iter()
-        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
+        .flat_map(|v| v.iter().step_by(2))
         .cloned()
         .min_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap() as Float;
-
     let max_x = data
         .iter()
-        .flat_map(|v| v.iter().step_by(2)) // x values are at even indices
+        .flat_map(|v| v.iter().step_by(2))
         .cloned()
         .max_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap() as Float;
-
     let min_y = data
         .iter()
-        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
+        .flat_map(|v| v.iter().skip(1).step_by(2))
         .cloned()
         .min_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap() as Float;
-
     let max_y = data
         .iter()
-        .flat_map(|v| v.iter().skip(1).step_by(2)) // y values are at odd indices
+        .flat_map(|v| v.iter().skip(1).step_by(2))
         .cloned()
         .max_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap() as Float;
 
-    // Assign unique HSL colors to each label
+    // Assign colors to unique labels if provided
     let mut label_colors: Vec<(String, RGBColor)> = Vec::new();
     if let Some(labels) = labels.clone() {
-        let unique_labels: Vec<String> = labels.iter().cloned().collect();
-        let unique_labels = unique_labels
+        let unique_labels: Vec<String> = labels
             .into_iter()
-            .collect::<std::collections::HashSet<String>>()
+            .collect::<HashSet<String>>()
             .into_iter()
-            .collect::<Vec<String>>();
-
+            .collect();
         for (i, label) in unique_labels.iter().enumerate() {
-            // Generate unique color using HSL, keeping saturation and lightness constant
-            let hue = i as f64 * 360.0 / unique_labels.len() as f64; // Evenly distribute hues across the spectrum
+            let hue = i as f64 * 360.0 / unique_labels.len() as f64; // Even distribution of hues
             let color = HSL {
                 h: hue,
                 s: 0.7,
                 l: 0.6,
             }
             .to_rgb();
-
             label_colors.push((label.clone(), RGBColor(color.0, color.1, color.2)));
         }
     }
@@ -251,7 +246,7 @@ pub fn chart_vector(
         .build_cartesian_2d(min_x..max_x, min_y..max_y)
         .unwrap();
 
-    // Configure the mesh (axes)
+    // Configure and draw the mesh (axes)
     chart
         .configure_mesh()
         .x_desc("X Axis")
@@ -261,21 +256,34 @@ pub fn chart_vector(
         .draw()
         .unwrap();
 
-    // Draw the data points and labels
+    // Store series for later adding to the legend
+    let mut series_list: Vec<(String, Vec<(f64, f64)>, RGBColor)> = Vec::new();
+
+    // Draw data points and labels
     chart
         .draw_series(data.iter().enumerate().map(|(i, values)| {
-            let label = match labels.clone() {
-                Some(labels) => labels.get(i).unwrap().clone(),
-                None => "".into(),
-            };
+            let label = labels
+                .clone()
+                .map(|l| l.get(i).cloned())
+                .flatten()
+                .unwrap_or_else(|| "".into());
             let color = label_colors
                 .iter()
                 .find(|(l, _)| *l == label)
-                .map(|(_, color)| *color)
+                .map(|(_, c)| *c)
                 .unwrap_or(RED);
 
-            // Create a group to hold both the circle and label
-            let circle = Circle::new(
+            // Store series data for the legend
+            if !label.is_empty() {
+                let series_data = series_list.iter_mut().find(|(l, _, _)| *l == label);
+                match series_data {
+                    Some((_, series_points, _)) => series_points.push((values[0], values[1])),
+                    None => series_list.push((label.clone(), vec![(values[0], values[1])], color)),
+                }
+            }
+
+            // Draw circle for each point
+            Circle::new(
                 (values[0], values[1]),
                 3,
                 ShapeStyle {
@@ -283,29 +291,60 @@ pub fn chart_vector(
                     filled: false,
                     stroke_width: 1,
                 },
-            );
-
-            // Create the label text
-            let label_text = if !label.is_empty() {
-                Text::new(
-                    label.clone(),
-                    (values[0] + 0.2, values[1] + 0.2), // Offset label slightly for clarity
-                    ("sans-serif", 15).into_font(),
-                )
-            } else {
-                Text::new("".into(), (0.0_f64, 0.0_f64), ("sans-serif", 1).into_font())
-                // Empty label to avoid errors
-            };
-
-            // Return both the circle and the label as a group of elements
-            // (circle, label_text)
-            circle
+            )
         }))
         .unwrap();
 
-    // Draw the legend (if labels are available)
+    // Add the legend manually
     if labels.is_some() {
-        chart.configure_series_labels().draw().unwrap();
+        // Sort the series list alphabetically by label
+        series_list.sort_by(|a, b| {
+            let a = a.0.parse::<usize>().unwrap();
+            let b = b.0.parse::<usize>().unwrap();
+            a.cmp(&b)
+            // a.0.cmp(&b.0)
+        });
+
+        let spacing_y = (max_y - min_y) / (series_list.len() * 2) as f64;
+
+        // Define the starting position for the legend
+        let mut legend_position = (min_x + (max_x - min_x) * 0.8, max_y - (max_y - min_y) * 0.1);
+        // let spacing = 10.0; // Increase the spacing
+        let size = 5.0; // Make the circles slightly larger
+        let font_size = 15.0;
+
+        for (label, _, color) in series_list {
+            // Draw a colored circle for each label in the legend
+            chart
+                .draw_series(std::iter::once(Circle::new(
+                    legend_position,
+                    size,
+                    ShapeStyle {
+                        color: color.into(),
+                        filled: true,
+                        stroke_width: 1,
+                    },
+                )))
+                .unwrap();
+
+            let style = TextStyle {
+                font: ("sans-serif", font_size).into_font(),
+                color: BLACK.to_backend_color(),
+                pos: Pos::new(HPos::Left, VPos::Center),
+            };
+
+            // Draw the label text next to the circle
+            chart
+                .draw_series(std::iter::once(Text::new(
+                    label,
+                    (legend_position.0 + spacing_y / 4.0, legend_position.1),
+                    style,
+                )))
+                .unwrap();
+
+            // Move the position for the next legend item downwards
+            legend_position.1 -= spacing_y;
+        }
     }
 
     // Save the chart to file
