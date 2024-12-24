@@ -31,7 +31,7 @@ fn main() {
     let reduced_dimensions_vector = umap.transform(data.clone());
 
     // Visualize the reduced dimensions as a vector, plots only 2D for now
-    chart_vector(reduced_dimensions_vector, None);
+    chart_vector(reduced_dimensions_vector, None, None);
 
     // Optionally, you can also visualize the reduced dimensions as a tensor
     // let reduced_dimensions_tensor = umap.transform_to_tensor(data.clone());

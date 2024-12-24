@@ -95,5 +95,5 @@ fn main() {
     // }
 
     // Visualize the 2D embedding (local representation) using a chart
-    chart::chart_tensor(local, None);
+    chart::chart_tensor(local, None, None);
 }
