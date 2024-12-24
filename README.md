@@ -20,10 +20,10 @@ See [documentation](https://docs.rs/crate/fast-umap/latest) for more.
 
 - [x] Add MNIST dataset example. add intermediary plots.
 - [ ] move charting into a feature.
-- [ ] add labels in the plots.
+- [x] add labels in the plots.
 - [x] Implement batches, **accumulated gradient**
 - [ ] precompute inital local fitting with the PCA
-- [ ] implement distances in CubeCL kernels
+- [x] implement distances in CubeCL kernels
 - [ ] Create testbench to compare different hyper parameters (`patience` vs `n_features` vs `epochs` etc.)
 
 ## Installation
