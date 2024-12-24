@@ -31,10 +31,10 @@ fn main() {
     let k_neighbors = 15; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
     let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
-    let learning_rate = 0.001; // Learning rate for optimization
+    let learning_rate = 1e-4; // Learning rate for optimization
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
-    let epochs = 1000; // Number of training epochs
+    let epochs = 1_000; // Number of training epochs
     let seed = 9999; // Random seed to ensure reproducibility
     let verbose = true; // Whether to enable the progress bar during training
 
