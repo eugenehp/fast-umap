@@ -285,11 +285,11 @@ where
         }
 
         // Stop early if we reach the desired loss.
-        // if let Some(min_desired_loss) = config.min_desired_loss {
-        //     if current_loss < min_desired_loss {
-        //         break;
-        //     }
-        // }
+        if let Some(min_desired_loss) = config.min_desired_loss {
+            if current_loss < F::from(min_desired_loss).unwrap() {
+                break;
+            }
+        }
 
         const STEP: usize = 100;
         if epoch > 0 && epoch % STEP == 0 {
