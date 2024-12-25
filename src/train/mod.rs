@@ -192,6 +192,8 @@ where
 
             if !current_loss.is_nan() {
                 losses.push(current_loss);
+            } else {
+                println!("Loss is nan");
             }
 
             // TODO: if loss is NaN, do something else. FIXME
