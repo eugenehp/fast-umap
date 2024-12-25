@@ -53,7 +53,7 @@ fn execute<B: AutodiffBackend>(
     let model: UMAPModel<B> = UMAPModel::new(&model_config, &device);
 
     // Start training the UMAP model with the specified training data and configuration
-    let (model, losses) = train(
+    let (model, _, best_loss) = train(
         name.as_str(),
         model,              // The model to train
         num_samples,        // Total number of training samples
@@ -80,13 +80,7 @@ fn execute<B: AutodiffBackend>(
     // Visualize the 2D embedding (local representation) using a chart
     chart::chart_tensor(local, Some(labels), Some(chart_config));
 
-    let min_loss = losses
-        .into_iter()
-        .filter(|loss| !loss.is_nan()) // TODO: check the kernels to prevent NaN in the loss!
-        .min_by(|a, b| a.partial_cmp(b).unwrap())
-        .unwrap();
-
-    min_loss
+    best_loss
 }
 
 fn find_best_hyperparameters<B: AutodiffBackend>(
