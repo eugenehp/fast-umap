@@ -26,6 +26,8 @@ use num::{Float, FromPrimitive};
 use std::{sync::mpsc::channel, time::Duration};
 use std::{thread, time::Instant};
 
+const VERBOSE: bool = false;
+
 /// Train the UMAP model over multiple epochs.
 ///
 /// This function trains the UMAP model by iterating over the dataset for the specified
@@ -291,6 +293,8 @@ where
             }
         }
 
+        let output_path = format!("losses_{name}.png");
+
         const STEP: usize = 100;
         if epoch > 0 && epoch % STEP == 0 {
             let losses = losses.clone();
@@ -300,17 +304,20 @@ where
             // this is still slow
 
             let embeddings_for_entire_dataset = model.forward(tensor_data);
-            thread::spawn(move || {
-                let chart_config = ChartConfigBuilder::default()
-                    .caption("MNIST")
-                    .path(format!("mnist_{epoch}.png").as_str())
-                    .build();
+            if VERBOSE {
+                let output_path = output_path.clone();
+                thread::spawn(move || {
+                    let chart_config = ChartConfigBuilder::default()
+                        .caption("MNIST")
+                        .path(format!("mnist_{epoch}.png").as_str())
+                        .build();
 
-                // Visualize the 2D embedding (local representation) using a chart
-                chart::chart_tensor(embeddings_for_entire_dataset, None, Some(chart_config));
-                // Print only last losses
-                plot_loss(losses.clone()[STEP..].to_vec(), "losses.png").unwrap();
-            });
+                    // Visualize the 2D embedding (local representation) using a chart
+                    chart::chart_tensor(embeddings_for_entire_dataset, None, Some(chart_config));
+                    // Print only last losses
+                    plot_loss(losses.clone()[STEP..].to_vec(), &output_path).unwrap();
+                });
+            }
         }
 
         epoch += 1;
@@ -326,7 +333,7 @@ where
 
         // If verbose mode is enabled, plot the loss curve after training.
         if config.verbose {
-            plot_loss(losses.clone(), "losses.png").unwrap();
+            plot_loss(losses.clone(), &output_path).unwrap();
         }
 
         // Finish the progress bar if it was used.

@@ -1,5 +1,5 @@
-use burn::{backend::*, module::*, prelude::*};
-use fast_umap::chart;
+use burn::{backend::*, module::AutodiffModule as _, prelude::*};
+use fast_umap::{backend::AutodiffBackend, chart};
 #[allow(unused)]
 use fast_umap::{
     chart::*,
@@ -10,6 +10,82 @@ use fast_umap::{
 };
 use mnist::*;
 use wgpu::WgpuRuntime;
+
+fn generate_model_name(
+    prefix: &str,
+    learning_rate: f64,
+    batch_size: usize,
+    penalty: f64,
+    hidden_sizes: &Vec<usize>,
+) -> String {
+    let hidden_sizes = hidden_sizes
+        .iter()
+        .map(|size| format!("{size}"))
+        .collect::<Vec<String>>()
+        .join("_");
+    format!(
+        "{prefix}_lr_{:.0e}_bs_{:04}_pen_{:.0e}_hs_{hidden_sizes}",
+        learning_rate, batch_size, penalty
+    )
+}
+
+fn execute<B: AutodiffBackend>(
+    name: String,
+    num_features: usize,
+    num_samples: usize,
+    hidden_sizes: Vec<usize>,
+    output_size: usize,
+    device: Device<B>,
+    train_data: Vec<f64>,
+    labels: Vec<String>,
+    config: TrainingConfig,
+) -> f64 {
+    // Configure the UMAP model with the specified input size, hidden layer size, and output size
+    let model_config = UMAPModelConfigBuilder::default()
+        .input_size(num_features)
+        .hidden_sizes(hidden_sizes)
+        .output_size(output_size)
+        .build()
+        .unwrap();
+
+    // Initialize the UMAP model with the defined configuration and the selected device
+    let model: UMAPModel<B> = UMAPModel::new(&model_config, &device);
+
+    // Start training the UMAP model with the specified training data and configuration
+    let (model, losses) = train(
+        name.as_str(),
+        model,              // The model to train
+        num_samples,        // Total number of training samples
+        num_features,       // Number of features per sample
+        train_data.clone(), // The training data
+        &config,            // The training configuration
+        device.clone(),
+    );
+
+    // Validate the trained model after training
+    let model = model.valid();
+
+    // Convert the training data into a tensor for model input
+    let global = convert_vector_to_tensor(train_data, num_samples, num_features, &device);
+
+    // Perform a forward pass through the model to obtain the low-dimensional (local) representation
+    let local = model.forward(global.clone());
+
+    let chart_config = ChartConfigBuilder::default()
+        .caption(name.as_str())
+        .path(format!("{name}.png").as_str())
+        .build();
+
+    // Visualize the 2D embedding (local representation) using a chart
+    chart::chart_tensor(local, Some(labels), Some(chart_config));
+
+    let min_loss = losses
+        .into_iter()
+        .min_by(|a, b| a.partial_cmp(b).unwrap())
+        .unwrap();
+
+    min_loss
+}
 
 fn main() {
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
@@ -43,6 +119,8 @@ fn main() {
     let loss_reduction = LossReduction::Mean;
     let normalized = true; // to reduce math, and keep it at float
 
+    let name = generate_model_name("mnist", learning_rate, batch_size, penalty, &hidden_sizes);
+
     // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);
 
@@ -55,17 +133,7 @@ fn main() {
         .finalize();
 
     let train_data: Vec<f64> = trn_img.into_iter().map(|byte| byte as f64).collect();
-
-    // Configure the UMAP model with the specified input size, hidden layer size, and output size
-    let model_config = UMAPModelConfigBuilder::default()
-        .input_size(num_features)
-        .hidden_sizes(hidden_sizes)
-        .output_size(output_size)
-        .build()
-        .unwrap();
-
-    // Initialize the UMAP model with the defined configuration and the selected device
-    let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(&model_config, &device);
+    let labels: Vec<String> = trn_lbl.iter().map(|digit| format!("{digit}")).collect();
 
     // Set up the training configuration with the specified hyperparameters
     let config = TrainingConfig::builder()
@@ -84,33 +152,15 @@ fn main() {
         .build()
         .expect("Failed to build TrainingConfig");
 
-    // Start training the UMAP model with the specified training data and configuration
-    let (model, _) = train(
-        "mnist",
-        model,              // The model to train
-        num_samples,        // Total number of training samples
-        num_features,       // Number of features per sample
-        train_data.clone(), // The training data
-        &config,            // The training configuration
-        device.clone(),
+    execute::<MyAutodiffBackend>(
+        name,
+        num_features,
+        num_samples,
+        hidden_sizes,
+        output_size,
+        device,
+        train_data,
+        labels,
+        config,
     );
-
-    // Validate the trained model after training
-    let model = model.valid();
-
-    // Convert the training data into a tensor for model input
-    let global = convert_vector_to_tensor(train_data, num_samples, num_features, &device);
-
-    // Perform a forward pass through the model to obtain the low-dimensional (local) representation
-    let local = model.forward(global.clone());
-
-    let chart_config = ChartConfigBuilder::default()
-        .caption("MNIST")
-        .path("mnist.png")
-        .build();
-
-    let labels: Vec<String> = trn_lbl.iter().map(|digit| format!("{digit}")).collect();
-
-    // Visualize the 2D embedding (local representation) using a chart
-    chart::chart_tensor(local, Some(labels), Some(chart_config));
 }
