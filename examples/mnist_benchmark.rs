@@ -98,6 +98,7 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
 ) -> (String, f64) {
     let mut best_loss = f64::MAX;
     let mut best_config = String::new();
+    let output_size = 2; // 2D UMAP 2 dimensions
 
     // let (exit_tx, exit_rx) = channel();
 
@@ -133,7 +134,7 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
                             num_features,
                             num_samples,
                             hidden_sizes.clone(),
-                            2, // output size (2D for UMAP)
+                            output_size,
                             device.clone(),
                             train_data.clone(),
                             labels.clone(),
@@ -215,9 +216,9 @@ fn main() {
     let batch_sizes = vec![500, 1000, 2000];
     let penalties = vec![1e-6, 1e-7, 1e-8];
     let hidden_size_options = vec![
-        // vec![100],
-        // vec![200],
-        // vec![300],
+        vec![100],
+        vec![200],
+        vec![300],
         vec![500],  // One hidden layer with 500 neurons
         vec![1000], // One hidden layer with 1000 neurons
         vec![1500], // One hidden layer with 1500 neurons
