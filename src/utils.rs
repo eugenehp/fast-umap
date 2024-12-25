@@ -138,7 +138,9 @@ where
             v.into_iter()
                 .map(|v| {
                     if v.is_nan() {
-                        F::infinity() // if NaN variables, replaces them with Infinity
+                        // TODO: fix this on a different level in the loss function!
+                        // if NaN variables, replaces them with 0
+                        F::from(0.0).unwrap()
                     } else {
                         F::from(v).unwrap()
                     }
