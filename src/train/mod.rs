@@ -50,7 +50,7 @@ pub fn train<B: AutodiffBackend, F: Float>(
     mut data: Vec<F>,        // Training data.
     config: &TrainingConfig, // Configuration parameters for training.
     device: Device<B>,
-) -> (UMAPModel<B>, Vec<F>)
+) -> (UMAPModel<B>, Vec<F>, F)
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
 {
@@ -100,8 +100,6 @@ where
             convert_vector_to_tensor(data.clone(), batch_size, num_features, &device);
         let global_distances =
             get_distance_by_metric(global_tensor_data.clone(), config, Some("global".into()));
-        // println!("global_distances - {:?}", global_distances.shape());
-        // let global_distances = global_distances.set_require_grad(false);
 
         global_distance_size = global_distances.shape();
         global_distances_batches.push(global_distances);
@@ -152,9 +150,6 @@ where
             //     break 'main;
             // }
 
-            // let tensor_batch: &Tensor<B, 2> = &tensor_batches[batch_idx];
-            // let global_distances: &Tensor<B, 1> = &global_distances_batches[batch_idx];
-
             // Slice the corresponding part of the global_distances_all tensor for this batch
             let start_idx = batch_idx * batch_size * num_features; // Calculate the starting index
             let end_idx = (batch_idx + 1) * batch_size * num_features; // Calculate the ending index
@@ -164,12 +159,6 @@ where
             if start_idx > end_idx {
                 continue;
             }
-
-            // println!(
-            //     "start_idx={start_idx}, end_idx={end_idx}, tensor_batches_all={:?}, global_distances_all={:?}",
-            //     tensor_batches_all.shape(),
-            //     global_distances_all.shape()
-            // );
 
             let batch_start_idx = batch_idx * batch_size;
             let batch_end_idx = (batch_idx + 1) * batch_size;
@@ -185,33 +174,12 @@ where
                 .clone()
                 .slice([batch_start_idx..batch_end_idx, 0..num_features]); // Slice the tensor
 
-            // println!("start_idx={start_idx}, end_idx={end_idx}, num_features={num_features}");
-            // println!("batch_start_idx={batch_start_idx}, batch_end_idx={batch_end_idx}");
-            // println!("tensor_batch - {:?}", tensor_batch.shape());
-            // println!("tensor_batches_all - {:?}", tensor_batches_all.shape());
-
             // Forward pass to get the local (low-dimensional) representation.
             let local = model.forward(tensor_batch.clone());
-
-            // println!(
-            //     "tensor_batch - {:?}, local - {:?}",
-            //     tensor_batch.shape(),
-            //     local.shape()
-            // );
 
             // Compute the loss for the batch.
             let local_distances =
                 get_distance_by_metric(local.clone(), config, Some("local".into()));
-            // let local_distances = local_distances.set_require_grad(false);
-
-            // println!(
-            //     "global_distances[{batch_idx}] - {:?}",
-            //     global_distances.shape()
-            // );
-            // println!(
-            //     "local_distances[{batch_idx}] - {:?}",
-            //     local_distances.shape()
-            // );
 
             let loss = mse_loss.forward(
                 global_distances.clone(),
@@ -221,18 +189,18 @@ where
 
             let current_loss = F::from(loss.clone().into_scalar().to_f64()).unwrap();
             // Compute gradients and update the model parameters using the optimizer.
-            losses.push(current_loss);
 
-            // println!("current_loss[{batch_idx}] - {:?}", current_loss);
+            if !current_loss.is_nan() {
+                losses.push(current_loss);
+            }
 
+            // TODO: if loss is NaN, do something else. FIXME
             let grads = loss.backward();
 
             let batch_grads = GradientsParams::from_grads(grads, &model);
 
             // Accumulate gradients.
             accumulator.accumulate(&model, batch_grads);
-
-            // println!("Train loop [{batch_idx}] - 6");
         }
 
         let current_loss = losses.last().unwrap().clone();
@@ -357,5 +325,5 @@ where
         .expect("Load model from the best weights file");
 
     // Return best trained model
-    (model, losses)
+    (model, losses, best_loss)
 }

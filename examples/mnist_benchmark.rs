@@ -221,9 +221,9 @@ fn main() {
     let batch_sizes = vec![500, 1000, 2000];
     let penalties = vec![1e-6, 1e-7, 1e-8];
     let hidden_size_options = vec![
-        vec![100],
-        vec![200],
-        vec![300],
+        // vec![100],
+        // vec![200],
+        // vec![300],
         vec![500],  // One hidden layer with 500 neurons
         vec![1000], // One hidden layer with 1000 neurons
         vec![1500], // One hidden layer with 1500 neurons
@@ -238,7 +238,8 @@ fn main() {
         vec![300, 300, 300],
         vec![500, 500, 500],
     ];
-    let epochs_options = vec![100, 200, 500, 1000, 2000, 5000]; // Different epochs options to test
+    // let epochs_options = vec![100, 200, 500, 1000, 2000, 5000]; // Different epochs options to test
+    let epochs_options = vec![500];
 
     // Find the best hyperparameters
     let (best_config, best_loss) = find_best_hyperparameters::<MyAutodiffBackend>(
