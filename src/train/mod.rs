@@ -19,11 +19,11 @@ use burn::{
     tensor::{cast::ToElement, Device, Shape, Tensor},
 };
 pub use config::*;
-use ctrlc;
+
 use get_distance_by_metric::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive};
-use std::{sync::mpsc::channel, time::Duration};
+use std::time::Duration;
 use std::{thread, time::Instant};
 
 const VERBOSE: bool = false;
@@ -61,11 +61,6 @@ where
     // you can also store in memory using BytesRecorder
     let recorder = BinFileRecorder::<FullPrecisionSettings>::new();
     let model_path = format!("./{name}.bin");
-
-    let (exit_tx, exit_rx) = channel();
-
-    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
-        .expect("Error setting Ctrl-C handler");
 
     let batch_size = config.batch_size;
 
@@ -152,9 +147,10 @@ where
     'main: loop {
         // println!("batch {}", format_duration(start_time.elapsed()));
         for (batch_idx, _) in batches.iter().enumerate() {
-            if let Ok(_) = exit_rx.try_recv() {
-                break 'main;
-            }
+            // TODO: uncomment this and allow ctrlc feature
+            // if let Ok(_) = exit_rx.try_recv() {
+            //     break 'main;
+            // }
 
             // let tensor_batch: &Tensor<B, 2> = &tensor_batches[batch_idx];
             // let global_distances: &Tensor<B, 1> = &global_distances_batches[batch_idx];
