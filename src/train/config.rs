@@ -1,12 +1,12 @@
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LossReduction {
     Mean,
     Sum,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Metric {
     Euclidean,
     EuclideanKNN,
@@ -55,7 +55,7 @@ impl fmt::Display for Metric {
 /// It includes options for the optimizer (e.g., learning rate, batch size, and beta parameters),
 /// device configuration (e.g., CPU or GPU), and additional features like verbosity, early stopping,
 /// and time limits for training.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TrainingConfig {
     /// The distance metric to use for training the model (e.g., "euclidean", "manhattan").
     pub metric: Metric,
@@ -244,8 +244,8 @@ impl TrainingConfigBuilder {
     pub fn build(self) -> Option<TrainingConfig> {
         Some(TrainingConfig {
             metric: self.metric.unwrap_or(Metric::Euclidean), // Default to Euclidean if not set
-            epochs: self.epochs?,                             // Will panic if not set
-            batch_size: self.batch_size?,                     // Will panic if not set
+            epochs: self.epochs.unwrap_or(1000),              // Will panic if not set
+            batch_size: self.batch_size.unwrap_or(1000),      // Will panic if not set
             learning_rate: self.learning_rate.unwrap_or(0.001), // Default to 0.001 if not set
             beta1: self.beta1.unwrap_or(0.9),                 // Default beta1 if not set
             beta2: self.beta2.unwrap_or(0.999),               // Default beta2 if not set

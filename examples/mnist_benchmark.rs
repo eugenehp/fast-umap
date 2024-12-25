@@ -17,6 +17,7 @@ fn generate_model_name(
     batch_size: usize,
     penalty: f64,
     hidden_sizes: &Vec<usize>,
+    epochs: usize,
 ) -> String {
     let hidden_sizes = hidden_sizes
         .iter()
@@ -24,7 +25,7 @@ fn generate_model_name(
         .collect::<Vec<String>>()
         .join("_");
     format!(
-        "{prefix}_lr_{:.0e}_bs_{:04}_pen_{:.0e}_hs_{hidden_sizes}",
+        "{prefix}_lr_{:.0e}_bs_{:04}_pen_{:.0e}_hs_{hidden_sizes}_ep_{epochs}",
         learning_rate, batch_size, penalty
     )
 }
@@ -87,6 +88,77 @@ fn execute<B: AutodiffBackend>(
     min_loss
 }
 
+fn find_best_hyperparameters<B: AutodiffBackend>(
+    num_features: usize,
+    num_samples: usize,
+    train_data: Vec<f64>,
+    labels: Vec<String>,
+    device: Device<B>,
+    config: TrainingConfig,
+    learning_rates: Vec<f64>,
+    batch_sizes: Vec<usize>,
+    penalties: Vec<f64>,
+    hidden_size_options: Vec<Vec<usize>>,
+    epochs_options: Vec<usize>, // Added epochs as an array of values
+) -> (String, f64) {
+    let mut best_loss = f64::MAX;
+    let mut best_config = String::new();
+
+    // let (exit_tx, exit_rx) = channel();
+
+    // ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+    //     .expect("Error setting Ctrl-C handler");
+
+    // Iterate over all combinations of the hyperparameters
+    for &learning_rate in &learning_rates {
+        for &batch_size in &batch_sizes {
+            for &penalty in &penalties {
+                for hidden_sizes in &hidden_size_options {
+                    for &epochs in &epochs_options {
+                        // Generate a model name for the current combination
+                        let model_name = generate_model_name(
+                            "mnist",
+                            learning_rate,
+                            batch_size,
+                            penalty,
+                            hidden_sizes,
+                            epochs,
+                        );
+
+                        // Modify the configuration with the current batch_size and epochs
+                        let mut current_config = config.clone(); // Copy the config for each iteration
+                        current_config.batch_size = batch_size;
+                        current_config.epochs = epochs;
+
+                        // Execute training and get the loss for this configuration
+                        let loss = execute::<B>(
+                            model_name.clone(),
+                            num_features,
+                            num_samples,
+                            hidden_sizes.clone(),
+                            2, // output size (2D for UMAP)
+                            device.clone(),
+                            train_data.clone(),
+                            labels.clone(),
+                            current_config,
+                        );
+
+                        // Update the best configuration if the current loss is smaller
+                        if loss < best_loss {
+                            best_loss = loss;
+                            best_config = model_name;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (best_config, best_loss)
+}
+
+// Example usage in main:
+
 fn main() {
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
     type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
@@ -97,29 +169,20 @@ fn main() {
     // Initialize the GPU device for computation
     let device = burn::backend::wgpu::WgpuDevice::default();
 
-    // Set training hyperparameters
-    let batch_size = 1_000; // Number of samples per batch during training
-    let num_samples = 10_000 as usize; // Total number of samples in the dataset
-
-    // let num_samples = 50_000 as usize; // Total number of samples in the dataset
-
-    let num_features = 28 * 28; // Number of features (dimensions) for each sample, size of each mnist image
-    let k_neighbors = 15; // Number of nearest neighbors for the UMAP algorithm
-    let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
-    let hidden_sizes = vec![1000]; // Size of the hidden layer in the neural network
-    let learning_rate = 1e-4; // Learning rate for optimization
-    let penalty = 1e-6; // penalty for the Adam optimizer
-    let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
-    let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
-    let epochs = 1_000; // Number of training epochs
-    let seed = 9999; // Random seed to ensure reproducibility
-    let verbose = true; // Whether to enable the progress bar during training
-    let min_desired_loss = 1e-4; // Minimum loss threshold for early stopping
-    let metric = Metric::Euclidean; // Alternative metric for neighbors search
+    // Set training parameters and configuration
+    let num_samples = 10_000 as usize;
+    let num_features = 28 * 28;
+    let k_neighbors = 15;
+    let learning_rate = 1e-4;
+    let penalty = 1e-6;
+    let beta1 = 0.9;
+    let beta2 = 0.999;
+    let seed = 9999;
+    let verbose = true;
+    let min_desired_loss = 1e-4;
+    let metric = Metric::Euclidean;
     let loss_reduction = LossReduction::Mean;
-    let normalized = true; // to reduce math, and keep it at float
-
-    let name = generate_model_name("mnist", learning_rate, batch_size, penalty, &hidden_sizes);
+    let normalized = true;
 
     // Seed the random number generator to ensure reproducibility
     MyBackend::seed(seed);
@@ -136,31 +199,49 @@ fn main() {
     let labels: Vec<String> = trn_lbl.iter().map(|digit| format!("{digit}")).collect();
 
     // Set up the training configuration with the specified hyperparameters
-    let config = TrainingConfig::builder()
-        .with_epochs(epochs) // Set the number of epochs for training
-        .with_batch_size(batch_size) // Set the batch size for training
-        .with_learning_rate(learning_rate) // Set the learning rate for the optimizer
-        .with_beta1(beta1) // Set the beta1 parameter for the Adam optimizer
-        .with_beta2(beta2) // Set the beta2 parameter for the Adam optimizer
-        .with_verbose(verbose) // Enable or disable the progress bar
-        .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
-        .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
-        .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
+    let config = TrainingConfig::builder() // This is a default value; will be overridden in the search
+        .with_learning_rate(learning_rate)
+        .with_beta1(beta1)
+        .with_beta2(beta2)
+        .with_verbose(verbose)
+        .with_metric(metric.into())
+        .with_k_neighbors(k_neighbors)
+        .with_min_desired_loss(min_desired_loss)
         .with_loss_reduction(loss_reduction)
         .with_normalized(normalized)
         .with_penalty(penalty)
         .build()
         .expect("Failed to build TrainingConfig");
 
-    execute::<MyAutodiffBackend>(
-        name,
+    // Define the arrays of hyperparameters to search
+    let learning_rates = vec![1e-4, 1e-3, 1e-5];
+    let batch_sizes = vec![500, 1000, 2000];
+    let penalties = vec![1e-6, 1e-7, 1e-8];
+    let hidden_size_options = vec![
+        vec![500],       // One hidden layer with 500 neurons
+        vec![1000],      // One hidden layer with 1000 neurons
+        vec![500, 500],  // Two hidden layers, each with 500 neurons
+        vec![1000, 500], // One hidden layer with 1000 neurons, another with 500
+        vec![1500],      // One hidden layer with 1500 neurons
+    ];
+    let epochs_options = vec![1000, 2000, 5000]; // Different epochs options to test
+
+    // Find the best hyperparameters
+    let (best_config, best_loss) = find_best_hyperparameters::<MyAutodiffBackend>(
         num_features,
         num_samples,
-        hidden_sizes,
-        output_size,
-        device,
         train_data,
         labels,
+        device,
         config,
+        learning_rates,
+        batch_sizes,
+        penalties,
+        hidden_size_options,
+        epochs_options,
     );
+
+    // Print the best configuration and its corresponding loss
+    println!("Best model configuration: {}", best_config);
+    println!("Best loss: {}", best_loss);
 }
