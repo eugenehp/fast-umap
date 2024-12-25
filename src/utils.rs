@@ -134,7 +134,17 @@ where
 
     let data: Vec<Vec<F>> = data
         .into_iter()
-        .map(|v| v.into_iter().map(|v| F::from(v).unwrap()).collect())
+        .map(|v| {
+            v.into_iter()
+                .map(|v| {
+                    if v.is_nan() {
+                        F::infinity() // if NaN variables, replaces them with Infinity
+                    } else {
+                        F::from(v).unwrap()
+                    }
+                })
+                .collect()
+        })
         .collect();
 
     data
