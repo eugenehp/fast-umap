@@ -102,7 +102,7 @@ fn main() {
         .expect("Failed to build TrainingConfig");
 
     // Start training the UMAP model with the specified training data and configuration
-    let (model, _) = train(
+    let (model, _, _) = train(
         "mnist",
         model,              // The model to train
         num_samples,        // Total number of training samples

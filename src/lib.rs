@@ -85,7 +85,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             .expect("Failed to build TrainingConfig");
 
         // Start training
-        let (model, _losses): (UMAPModel<B>, Vec<F>) = train(
+        let (model, _losses, _best_loss): (UMAPModel<B>, Vec<F>, F) = train(
             default_name,
             model,
             num_samples,
