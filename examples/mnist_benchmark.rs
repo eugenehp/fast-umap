@@ -126,6 +126,8 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
                             epochs,
                         );
 
+                        println!("{model_name}");
+
                         // Modify the configuration with the current batch_size and epochs
                         let mut current_config = config.clone(); // Copy the config for each iteration
                         current_config.batch_size = batch_size;
