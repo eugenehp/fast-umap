@@ -23,15 +23,16 @@ fn main() {
 
     // Set training hyperparameters
     let batch_size = 1_000; // Number of samples per batch during training
-    let num_samples = 1_000 as usize; // Total number of samples in the dataset
+    let num_samples = 10_000 as usize; // Total number of samples in the dataset
 
     // let num_samples = 50_000 as usize; // Total number of samples in the dataset
 
     let num_features = 28 * 28; // Number of features (dimensions) for each sample, size of each mnist image
     let k_neighbors = 15; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
-    let hidden_sizes = vec![1000, 1000, 1000]; // Size of the hidden layer in the neural network
+    let hidden_sizes = vec![1000]; // Size of the hidden layer in the neural network
     let learning_rate = 1e-4; // Learning rate for optimization
+    let penalty = 1e-6; // penalty for the Adam optimizer
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
     let epochs = 1_000; // Number of training epochs
@@ -43,9 +44,8 @@ fn main() {
     let metric = Metric::Euclidean; // Alternative metric for neighbors search
     let loss_reduction = LossReduction::Mean;
     // below 1.0 gives NaN loss. Mind that it's rounded to integer inside the function
-    let minkowski_p = 3.0; // 1 is manhattan, 2 is Euclidean
+    // let minkowski_p = 3.0; // 1 is manhattan, 2 is Euclidean
     let normalized = true; // to reduce math, and keep it at float
-    let penalty = 1e-7; // penalty for the Adam optimizer
 
     // let timeout = 30; // timeout in seconds
 
@@ -95,7 +95,7 @@ fn main() {
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping
         .with_loss_reduction(loss_reduction)
         // .with_timeout(timeout) // set timeout in seconds
-        .with_minkowski_p(minkowski_p)
+        // .with_minkowski_p(minkowski_p)
         .with_normalized(normalized)
         .with_penalty(penalty)
         .build()

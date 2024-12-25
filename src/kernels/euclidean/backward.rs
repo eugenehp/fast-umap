@@ -15,7 +15,7 @@ use burn::{
 
 use crate::{backend::Backend, print_if, print_primitive_tensor};
 
-const VERBOSE: bool = true;
+const VERBOSE: bool = false;
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
