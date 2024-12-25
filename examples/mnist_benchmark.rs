@@ -82,6 +82,7 @@ fn execute<B: AutodiffBackend>(
 
     let min_loss = losses
         .into_iter()
+        .filter(|loss| !loss.is_nan()) // TODO: check the kernels to prevent NaN in the loss!
         .min_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap();
 

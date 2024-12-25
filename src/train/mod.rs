@@ -339,9 +339,9 @@ where
     }
 
     // If verbose mode is enabled, plot the loss curve after training.
-    if config.verbose {
-        plot_loss(losses.clone(), "losses.png").unwrap();
-    }
+    // if config.verbose {
+    //     plot_loss(losses.clone(), "losses.png").unwrap();
+    // }
 
     // Finish the progress bar if it was used.
     if let Some(pb) = pb {
