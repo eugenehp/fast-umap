@@ -6,7 +6,7 @@ use burn_jit::{
 };
 use cubecl::prelude::*;
 
-fn knn<R: JitRuntime, F: FloatElement, I: IntElement>(
+pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     pairwise_distances: FloatTensor<JitBackend<R, F, I>>,
     k: u32,
 ) -> (
