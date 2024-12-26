@@ -1,6 +1,13 @@
 use core::f32;
 use cubecl::{cube, prelude::*};
 
+#[cube]
+pub fn u32_to_float(x: u32) -> f32 {
+    f32::cast_from(x)
+}
+
+const INFINITY: f32 = 3.40282347e+38; // Maximum value for f32, used as infinity
+
 #[cube(launch)]
 pub fn knn_kernel<F: Float + CubePrimitive>(
     pairwise_distances: &Tensor<F>,  // Pairwise distance matrix (n, n)
@@ -25,8 +32,9 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
     // Initialize arrays with values that will be replaced by actual data
     for i in 0..k {
         // Initialize distances to infinity and indices to an invalid value
-        local_distances[i] = F::new(f32::INFINITY); // Use F::infinity() to represent infinity
-        local_indices[i] = F::from_int(k as i64); // Set to an invalid index (out of range)
+        local_distances[i] = F::new(INFINITY); // f32::INFINITY Use F::infinity() to represent infinity
+
+        // local_indices[i] = F::cast_from(u32_to_float(k)); // Set to an invalid index (out of range)
     }
 
     // Iterate through all the pairwise distances for the current row
@@ -52,7 +60,7 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
 
                 // Insert the new distance at the correct position
                 local_distances[i] = dist;
-                local_indices[i] = F::from_int(col as i64); // Store the corresponding index
+                // local_indices[i] = F::cast_from(u32_to_float(col)); // Store the corresponding index
             }
         }
     }
@@ -87,8 +95,9 @@ pub fn knn_backward_kernel<F: Float + CubePrimitive>(
 
     // Initialize arrays with values that will be replaced by actual data
     for i in 0..k {
-        local_distances[i] = F::new(f32::INFINITY); // Use F::infinity() to represent infinity
-        local_indices[i] = F::from_int(k as i64); // Set to an invalid index (out of range)
+        local_distances[i] = F::new(INFINITY); // Use F::infinity() to represent infinity
+
+        // local_indices[i] = F::from_int(k as i64); // Set to an invalid index (out of range)
     }
 
     // Retrieve k nearest neighbors' indices and distances for the current row
@@ -114,7 +123,7 @@ pub fn knn_backward_kernel<F: Float + CubePrimitive>(
 
                 // Insert the new distance at the correct position
                 local_distances[i] = dist;
-                local_indices[i] = F::from_int(col as i64); // Store the corresponding index
+                // local_indices[i] = F::from_int(col as i64); // Store the corresponding index
             }
         }
     }
@@ -125,7 +134,7 @@ pub fn knn_backward_kernel<F: Float + CubePrimitive>(
         let grad_value = grad_output[row * k + i]; // Get the gradient from the output tensor
 
         // TODO: once we move indices to IntTensor, refactor the types
-        let neighbor_index: u32 = u32::cast_from(neighbor_index);
+        // let neighbor_index: u32 = u32::cast_from(neighbor_index);
 
         // If grad_value is non-zero, propagate the gradient to the pairwise distance
         if grad_value != F::new(0.0) {
@@ -140,8 +149,11 @@ pub fn knn_backward_kernel<F: Float + CubePrimitive>(
             let grad_pairwise = grad_value / dist;
 
             // Propagate the gradient back to the pairwise distance matrix
-            grad_pairwise_distances[row * n + neighbor_index] += grad_pairwise;
-            grad_pairwise_distances[neighbor_index * n + row] += grad_pairwise; // Symmetry
+            grad_pairwise_distances[row * n] += grad_pairwise;
+            grad_pairwise_distances[n + row] += grad_pairwise; // Symmetry
+
+            // grad_pairwise_distances[row * n + neighbor_index] += grad_pairwise;
+            // grad_pairwise_distances[neighbor_index * n + row] += grad_pairwise; // Symmetry
         }
     }
 }

@@ -66,17 +66,19 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     let cubes_needed_in_y = (k as f32 / cube_dim.y as f32).ceil() as u32;
     let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
+    let vectorisation = 1;
+
     // Launch the k-NN kernel
     knn_kernel::launch::<F, R>(
         &client,
         cube_count,
         cube_dim,
-        pairwise_distances.as_tensor_arg(2), // Pairwise distance matrix
-        ScalarArg::new(k),                   // Number of neighbors
-        local_distances.as_tensor_arg(1),
-        local_indices.as_tensor_arg(1),
-        indices.as_tensor_arg(1),   // Indices tensor
-        distances.as_tensor_arg(1), // Distances tensor
+        pairwise_distances.as_tensor_arg(vectorisation), // Pairwise distance matrix
+        ScalarArg::new(k),                               // Number of neighbors
+        local_distances.as_tensor_arg(vectorisation),
+        local_indices.as_tensor_arg(vectorisation),
+        indices.as_tensor_arg(vectorisation),   // Indices tensor
+        distances.as_tensor_arg(vectorisation), // Distances tensor
     );
 
     (indices, distances)
