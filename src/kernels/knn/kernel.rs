@@ -24,10 +24,9 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
 
     // Initialize arrays with values that will be replaced by actual data
     for i in 0..k {
-        // local_distances[i] = F::INFINITY; // <-- this breaks for some reason
-        local_distances[i] = F::new(f32::INFINITY);
-        local_indices[i] = F::from_int(k as i64);
-        // Set to an invalid index (as F)
+        // Initialize distances to infinity and indices to an invalid value
+        local_distances[i] = F::new(f32::INFINITY); // Use F::infinity() to represent infinity
+        local_indices[i] = F::from_int(k as i64); // Set to an invalid index (out of range)
     }
 
     // Iterate through all the pairwise distances for the current row
@@ -38,15 +37,11 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
 
             // Find where to insert this distance in the sorted array of top-k distances
             if dist < local_distances[k - 1] {
-                // Shift larger distances to make space for the new distance
-                // let mut inserted = false;
-
-                // Manually iterate backwards through the array using u32 indices
                 let mut i = k - 1; // Start from the last index
 
+                // Shift larger distances one step to the right to make space for the new distance
                 while i > 0 {
                     if dist < local_distances[i] {
-                        // Shift the larger distances one step to the right
                         local_distances[i] = local_distances[i - 1];
                         local_indices[i] = local_indices[i - 1];
                     } else {
@@ -57,7 +52,7 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
 
                 // Insert the new distance at the correct position
                 local_distances[i] = dist;
-                local_indices[i] = F::from_int(col as i64);
+                local_indices[i] = F::from_int(col as i64); // Store the corresponding index
             }
         }
     }
