@@ -1,4 +1,5 @@
 use burn::{backend::*, module::AutodiffModule as _, prelude::*};
+use crossbeam_channel::{unbounded, Receiver};
 use fast_umap::{backend::AutodiffBackend, chart};
 #[allow(unused)]
 use fast_umap::{
@@ -40,6 +41,7 @@ fn execute<B: AutodiffBackend>(
     train_data: Vec<f64>,
     labels: Vec<String>,
     config: TrainingConfig,
+    exit_rx: Receiver<()>,
 ) -> f64 {
     // Configure the UMAP model with the specified input size, hidden layer size, and output size
     let model_config = UMAPModelConfigBuilder::default()
@@ -61,6 +63,7 @@ fn execute<B: AutodiffBackend>(
         train_data.clone(), // The training data
         &config,            // The training configuration
         device.clone(),
+        exit_rx,
     );
 
     // Validate the trained model after training
@@ -95,6 +98,7 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
     penalties: Vec<f64>,
     hidden_size_options: Vec<Vec<usize>>,
     epochs_options: Vec<usize>, // Added epochs as an array of values
+    exit_rx: Receiver<()>,
 ) -> (String, f64) {
     let mut best_loss = f64::MAX;
     let mut best_config = String::new();
@@ -139,6 +143,7 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
                             train_data.clone(),
                             labels.clone(),
                             current_config,
+                            exit_rx.clone(),
                         );
 
                         // Update the best configuration if the current loss is smaller
@@ -158,6 +163,11 @@ fn find_best_hyperparameters<B: AutodiffBackend>(
 // Example usage in main:
 
 fn main() {
+    let (exit_tx, exit_rx) = unbounded();
+
+    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
+
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
     type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
 
@@ -249,6 +259,7 @@ fn main() {
         penalties,
         hidden_size_options,
         epochs_options,
+        exit_rx,
     );
 
     // Print the best configuration and its corresponding loss

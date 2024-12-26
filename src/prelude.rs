@@ -4,6 +4,7 @@ use crate::{chart, train, utils, UMAP};
 // Re-export common utilities for easier use
 pub use chart::{chart_tensor, chart_vector};
 
+use crossbeam_channel::unbounded;
 use num::Float;
 pub use train::Metric;
 pub use train::{TrainingConfig, TrainingConfigBuilder};
@@ -29,9 +30,14 @@ pub fn umap<B: AutodiffBackend, F: Float>(data: Vec<Vec<F>>) -> UMAP<B>
 where
     F: num::FromPrimitive + burn::tensor::Element,
 {
+    let (exit_tx, exit_rx) = unbounded();
+
+    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
+
     let output_size = 2;
     let device = Default::default();
-    let model = UMAP::<B>::fit(data, device, output_size);
+    let model = UMAP::<B>::fit(data, device, output_size, exit_rx);
     model
 }
 
@@ -56,7 +62,12 @@ pub fn umap_size<B: AutodiffBackend, F: Float>(data: Vec<Vec<F>>, output_size: u
 where
     F: num::FromPrimitive + burn::tensor::Element,
 {
+    let (exit_tx, exit_rx) = unbounded();
+
+    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
+
     let device = Default::default();
-    let model = UMAP::<B>::fit(data, device, output_size);
+    let model = UMAP::<B>::fit(data, device, output_size, exit_rx);
     model
 }

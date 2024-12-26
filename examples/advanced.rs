@@ -1,8 +1,14 @@
 use burn::{module::*, prelude::*};
+use crossbeam_channel::unbounded;
 use cubecl::wgpu::WgpuRuntime;
 use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
 
 fn main() {
+    let (exit_tx, exit_rx) = unbounded();
+
+    ctrlc::set_handler(move || exit_tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
+
     type F = f32;
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
     type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, F, i32>;
@@ -77,6 +83,7 @@ fn main() {
         train_data.clone(), // The training data
         &config,            // The training configuration
         device.clone(),
+        exit_rx,
     );
 
     // Validate the trained model after training

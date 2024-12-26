@@ -13,6 +13,7 @@ edition = "2021"
 [dependencies]
 burn = { version = "~0.15", features = ["train", "wgpu", "autodiff", "autotune"] }
 burn-jit = { version = "0.15.0", features = ["burn-autodiff"] }
+crossbeam-channel = "0.5.14"
 ctrlc = "3.4.5"
 cubecl = { version = "0.3.0", features = ["wgpu", "cubecl-wgpu"] }
 hsl = "0.1.1"
