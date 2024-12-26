@@ -27,8 +27,6 @@ use num::{Float, FromPrimitive};
 use std::time::Duration;
 use std::{thread, time::Instant};
 
-const VERBOSE: bool = false;
-
 /// Train the UMAP model over multiple epochs.
 ///
 /// This function trains the UMAP model by iterating over the dataset for the specified
@@ -289,25 +287,19 @@ where
                 // this is still slow
 
                 let embeddings_for_entire_dataset = model.forward(tensor_data);
-                if VERBOSE {
-                    let output_path = output_path.clone();
+                let output_path = output_path.clone();
 
-                    thread::spawn(move || {
-                        let chart_config = ChartConfigBuilder::default()
-                            .caption(format!("{name}_{epoch}").as_str())
-                            .path(format!("{name}_{epoch}.png").as_str())
-                            .build();
+                thread::spawn(move || {
+                    let chart_config = ChartConfigBuilder::default()
+                        .caption(format!("{name}_{epoch}").as_str())
+                        .path(format!("{name}_{epoch}.png").as_str())
+                        .build();
 
-                        // Visualize the 2D embedding (local representation) using a chart
-                        chart::chart_tensor(
-                            embeddings_for_entire_dataset,
-                            None,
-                            Some(chart_config),
-                        );
-                        // Print only last losses
-                        plot_loss(losses.clone()[STEP..].to_vec(), &output_path).unwrap();
-                    });
-                }
+                    // Visualize the 2D embedding (local representation) using a chart
+                    chart::chart_tensor(embeddings_for_entire_dataset, None, Some(chart_config));
+                    // Print only last losses
+                    plot_loss(losses.clone()[STEP..].to_vec(), &output_path).unwrap();
+                });
             }
         }
 
