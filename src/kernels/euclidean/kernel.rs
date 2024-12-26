@@ -133,17 +133,4 @@ pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
             grad_output[index_col] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
         }
     }
-
-    // let max_grad = F::new(1e3); // Set a reasonable maximum gradient value
-
-    // // clamp gradients
-    // if row != col {
-    //     for i in 0..d {
-    //         let index_row = row * d + i; // Linear index for row, dimension i
-    //         let index_col = col * d + i; // Linear index for col, dimension i
-
-    //         grad_output[index_row] = F::min(grad_output[index_row], max_grad);
-    //         grad_output[index_col] = F::min(grad_output[index_col], max_grad);
-    //     }
-    // }
 }
