@@ -1,17 +1,15 @@
 use core::f32;
-
 use cubecl::{cube, prelude::*};
 
 #[cube(launch)]
 pub fn knn_kernel<F: Float + CubePrimitive>(
-    x: &Tensor<F>, // Input tensor of shape (n, d) representing n vectors of dimension d
     pairwise_distances: &Tensor<F>, // Pairwise distance matrix (n, n)
-    k: u32,        // Number of nearest neighbors to find
+    k: u32,                         // Number of nearest neighbors to find
     indices: &mut Tensor<F>, // Output tensor of shape (n, k) storing the indices of k nearest neighbors
     distances: &mut Tensor<F>, // Output tensor of shape (n, k) storing the distances of k nearest neighbors
 ) {
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
-    let n = x.shape(0); // Number of vectors
+    let n = pairwise_distances.shape(0); // Number of vectors
 
     // Edge case: skip if the row is out of bounds
     if row >= n {

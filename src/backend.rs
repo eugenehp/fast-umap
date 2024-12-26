@@ -9,7 +9,6 @@ pub trait Backend: burn::tensor::backend::Backend {
         grad_x: FloatTensor<Self>,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self>;
-
     fn knn(x: FloatTensor<Self>, k: u32) -> (FloatTensor<Self>, FloatTensor<Self>);
 }
 
