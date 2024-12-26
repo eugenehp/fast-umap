@@ -11,10 +11,6 @@ pub fn euclidean_pairwise_distance_kernel<F: Float>(
     let n = x.shape(0); // Number of vectors (rows) in the output tensor
     let d = x.shape(1); // Dimension of each vector (features) in the input tensor
 
-    // if row >= n || col >= n {
-    //     return; // Skip threads that are out of bounds
-    // }
-
     if row >= n || col >= n || row > col {
         return; // Skip threads that are out of bounds or handle only the upper triangular matrix
     }

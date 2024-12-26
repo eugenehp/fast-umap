@@ -1,1 +1,2 @@
 mod euclidean;
+mod knn;
