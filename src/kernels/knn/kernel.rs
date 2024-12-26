@@ -3,8 +3,10 @@ use cubecl::{cube, prelude::*};
 
 #[cube(launch)]
 pub fn knn_kernel<F: Float + CubePrimitive>(
-    pairwise_distances: &Tensor<F>, // Pairwise distance matrix (n, n)
-    k: u32,                         // Number of nearest neighbors to find
+    pairwise_distances: &Tensor<F>,  // Pairwise distance matrix (n, n)
+    k: u32,                          // Number of nearest neighbors to find
+    local_distances: &mut Tensor<F>, // for local distances storage, size of k
+    local_indices: &mut Tensor<F>,   // for local indices storage, size of k
     indices: &mut Tensor<F>, // Output tensor of shape (n, k) storing the indices of k nearest neighbors
     distances: &mut Tensor<F>, // Output tensor of shape (n, k) storing the distances of k nearest neighbors
 ) {
@@ -17,8 +19,8 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
     }
 
     // Pre-allocate arrays to store the k smallest distances and corresponding indices (as F)
-    let mut local_distances = Array::<F>::new(k); // Array for storing k smallest distances
-    let mut local_indices = Array::<F>::new(k); // Array for storing k smallest indices
+    // let mut local_distances = Array::<F>::new(k); // Array for storing k smallest distances
+    // let mut local_indices = Array::<F>::new(k); // Array for storing k smallest indices
 
     // Initialize arrays with values that will be replaced by actual data
     for i in 0..k {
@@ -64,9 +66,11 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
 
 #[cube(launch)]
 pub fn knn_backward_kernel<F: Float + CubePrimitive>(
-    pairwise_distances: &Tensor<F>, // Pairwise distance matrix (n, n)
-    k: u32,                         // Number of nearest neighbors to find
-    grad_output: &Tensor<F>,        // Gradient of the loss w.r.t the output (distances and indices)
+    pairwise_distances: &Tensor<F>,  // Pairwise distance matrix (n, n)
+    k: u32,                          // Number of nearest neighbors to find
+    local_distances: &mut Tensor<F>, // for local distances storage, size of k
+    local_indices: &mut Tensor<F>,   // for local indices storage, size of k
+    grad_output: &Tensor<F>, // Gradient of the loss w.r.t the output (distances and indices)
     grad_pairwise_distances: &mut Tensor<F>, // Gradient of the loss w.r.t the input (pairwise distances)
 ) {
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
@@ -78,8 +82,8 @@ pub fn knn_backward_kernel<F: Float + CubePrimitive>(
     }
 
     // Pre-allocate arrays to store the k smallest distances and corresponding indices
-    let mut local_distances = Array::<F>::new(k); // Array for storing k smallest distances
-    let mut local_indices = Array::<F>::new(k); // Array for storing k smallest indices
+    // let mut local_distances = Array::<F>::new(k); // Array for storing k smallest distances
+    // let mut local_indices = Array::<F>::new(k); // Array for storing k smallest indices
 
     // Initialize arrays with values that will be replaced by actual data
     for i in 0..k {
