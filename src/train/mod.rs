@@ -20,6 +20,7 @@ use burn::{
 };
 pub use config::*;
 
+use crossbeam_channel::Receiver;
 use get_distance_by_metric::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive};
@@ -50,6 +51,7 @@ pub fn train<B: AutodiffBackend, F: Float>(
     mut data: Vec<F>,        // Training data.
     config: &TrainingConfig, // Configuration parameters for training.
     device: Device<B>,
+    exit_rx: Receiver<()>,
 ) -> (UMAPModel<B>, Vec<F>, F)
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
@@ -146,9 +148,9 @@ where
         // println!("batch {}", format_duration(start_time.elapsed()));
         for (batch_idx, _) in batches.iter().enumerate() {
             // TODO: uncomment this and allow ctrlc feature
-            // if let Ok(_) = exit_rx.try_recv() {
-            //     break 'main;
-            // }
+            if let Ok(_) = exit_rx.try_recv() {
+                break 'main;
+            }
 
             // Slice the corresponding part of the global_distances_all tensor for this batch
             let start_idx = batch_idx * batch_size * num_features; // Calculate the starting index

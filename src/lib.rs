@@ -1,6 +1,7 @@
 use backend::AutodiffBackend;
 use burn::module::AutodiffModule;
 
+use crossbeam_channel::Receiver;
 use model::{UMAPModel, UMAPModelConfigBuilder};
 use num::Float;
 use train::*;
@@ -41,7 +42,12 @@ impl<B: AutodiffBackend> UMAP<B> {
     /// This method initializes the model configuration, sets up the training parameters (like batch size, learning rate, etc.),
     /// and runs the training process using the provided data. It returns an instance of the `UMAP` struct containing
     /// the trained model and the device.
-    pub fn fit<F: Float>(data: Vec<Vec<F>>, device: Device<B>, output_size: usize) -> Self
+    pub fn fit<F: Float>(
+        data: Vec<Vec<F>>,
+        device: Device<B>,
+        output_size: usize,
+        exit_rx: Receiver<()>,
+    ) -> Self
     where
         F: num::FromPrimitive + burn::tensor::Element,
     {
@@ -93,6 +99,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             train_data.clone(),
             &config,
             device.clone(),
+            exit_rx,
         );
 
         // Validate the trained model
