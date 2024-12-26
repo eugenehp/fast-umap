@@ -21,19 +21,22 @@ fn main() {
     let device = Default::default();
 
     // Set training hyperparameters
-    let batch_size = 1; // Number of samples per batch during training
+    let batch_size = 1000; // Number of samples per batch during training
     let num_samples = 1000; // Total number of samples in the dataset
-    let num_features = 90; // Number of features (dimensions) for each sample
+    let num_features = 100; // Number of features (dimensions) for each sample
     let k_neighbors = 10; // Number of nearest neighbors for the UMAP algorithm
     let output_size = 2; // Number of output dimensions (e.g., 2D for embeddings)
     let hidden_sizes = vec![100, 100, 100]; // Size of the hidden layer in the neural network
     let learning_rate = 0.001; // Learning rate for optimization
     let beta1 = 0.9; // Beta1 parameter for the Adam optimizer
     let beta2 = 0.999; // Beta2 parameter for the Adam optimizer
-    let epochs = 400; // Number of training epochs
+
+    // let epochs = 400; // Number of training epochs
+    let epochs = 100; // Number of training epochs
     let seed = 9999; // Random seed to ensure reproducibility
     let verbose = true; // Whether to enable the progress bar during training
-    let patience = 10; // Number of epochs without improvement before early stopping
+
+    // let patience = 10; // Number of epochs without improvement before early stopping
     let min_desired_loss = 0.001; // Minimum loss threshold for early stopping
     let timeout = 60;
 
@@ -66,7 +69,7 @@ fn main() {
         .with_beta1(beta1) // Set the beta1 parameter for the Adam optimizer
         .with_beta2(beta2) // Set the beta2 parameter for the Adam optimizer
         .with_verbose(verbose) // Enable or disable the progress bar
-        .with_patience(patience) // Set the patience for early stopping
+        // .with_patience(patience) // Set the patience for early stopping
         .with_metric(metric.into()) // Set the metric for nearest neighbors (e.g., Euclidean)
         .with_k_neighbors(k_neighbors) // Set the number of neighbors to consider for UMAP
         .with_min_desired_loss(min_desired_loss) // Set the minimum desired loss for early stopping

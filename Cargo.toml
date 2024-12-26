@@ -29,3 +29,7 @@ serde = "1.0.216"
 
 [dev-dependencies]
 mnist = { version = "0.6.1", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
+
+[features]
+default = ["verbose"]
+verbose = []

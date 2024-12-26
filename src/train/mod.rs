@@ -66,6 +66,15 @@ where
 
     let batch_size = config.batch_size;
 
+    #[cfg(feature = "verbose")]
+    {
+        println!("config - {config:#?}");
+    }
+
+    if batch_size == 1 {
+        panic!("You can not have a batch size of 1, because UMAP doesn't have other samples to compare to!")
+    }
+
     // Normalize the input data (Z-score normalization).
     normalize_data(&mut data, num_samples, num_features);
 
@@ -82,6 +91,8 @@ where
         }
         batches.push(batch);
     }
+
+    println!("batches - {:?}", batches.len());
 
     // Step 2: Precompute the tensor representations and global distances for each batch.
     let mut tensor_batches: Vec<Tensor<B, 2>> = Vec::new();
@@ -147,7 +158,6 @@ where
     'main: loop {
         // println!("batch {}", format_duration(start_time.elapsed()));
         for (batch_idx, _) in batches.iter().enumerate() {
-            // TODO: uncomment this and allow ctrlc feature
             if let Ok(_) = exit_rx.try_recv() {
                 break 'main;
             }
@@ -185,22 +195,28 @@ where
 
             let loss = mse_loss.forward(
                 global_distances.clone(),
-                local_distances,
+                local_distances.clone(),
                 burn::nn::loss::Reduction::Mean,
             );
 
             let current_loss = F::from(loss.clone().into_scalar().to_f64()).unwrap();
-            // Compute gradients and update the model parameters using the optimizer.
 
-            if !current_loss.is_nan() {
-                losses.push(current_loss);
-            } else {
-                println!("Loss is nan");
+            losses.push(current_loss);
+
+            #[cfg(feature = "verbose")]
+            {
+                // println!("global_distances {:?}", global_distances.to_data());
+                // println!("local_distances {:?}", local_distances.to_data());
+                // println!("loss {:?}", loss.to_data());
+                if current_loss.is_nan() {
+                    panic!("current loss is NaN")
+                }
             }
 
             // TODO: if loss is NaN, do something else. FIXME
             let grads = loss.backward();
 
+            // Compute gradients and update the model parameters using the optimizer.
             let batch_grads = GradientsParams::from_grads(grads, &model);
 
             // Accumulate gradients.
@@ -263,28 +279,37 @@ where
 
         let output_path = format!("losses_{name}.png");
 
-        const STEP: usize = 100;
-        if epoch > 0 && epoch % STEP == 0 {
-            let losses = losses.clone();
-            let model = &model.valid();
-            let tensor_data =
-                convert_vector_to_tensor(data.clone(), num_samples, num_features, &device);
-            // this is still slow
+        #[cfg(feature = "verbose")]
+        {
+            const STEP: usize = 100;
+            let name = name.to_string();
+            if epoch > 0 && epoch % STEP == 0 {
+                let losses = losses.clone();
+                let model = &model.valid();
+                let tensor_data =
+                    convert_vector_to_tensor(data.clone(), num_samples, num_features, &device);
+                // this is still slow
 
-            let embeddings_for_entire_dataset = model.forward(tensor_data);
-            if VERBOSE {
-                let output_path = output_path.clone();
-                thread::spawn(move || {
-                    let chart_config = ChartConfigBuilder::default()
-                        .caption("MNIST")
-                        .path(format!("mnist_{epoch}.png").as_str())
-                        .build();
+                let embeddings_for_entire_dataset = model.forward(tensor_data);
+                if VERBOSE {
+                    let output_path = output_path.clone();
 
-                    // Visualize the 2D embedding (local representation) using a chart
-                    chart::chart_tensor(embeddings_for_entire_dataset, None, Some(chart_config));
-                    // Print only last losses
-                    plot_loss(losses.clone()[STEP..].to_vec(), &output_path).unwrap();
-                });
+                    thread::spawn(move || {
+                        let chart_config = ChartConfigBuilder::default()
+                            .caption(format!("{name}_{epoch}").as_str())
+                            .path(format!("{name}_{epoch}.png").as_str())
+                            .build();
+
+                        // Visualize the 2D embedding (local representation) using a chart
+                        chart::chart_tensor(
+                            embeddings_for_entire_dataset,
+                            None,
+                            Some(chart_config),
+                        );
+                        // Print only last losses
+                        plot_loss(losses.clone()[STEP..].to_vec(), &output_path).unwrap();
+                    });
+                }
             }
         }
 
@@ -311,17 +336,16 @@ where
     }
 
     // If verbose mode is enabled, plot the loss curve after training.
-    // if config.verbose {
-    //     plot_loss(losses.clone(), "losses.png").unwrap();
-    // }
+    #[cfg(feature = "verbose")]
+    {
+        let name = format!("losses_{name}.png");
+        plot_loss(losses.clone(), name.as_str()).unwrap();
+    }
 
     // Finish the progress bar if it was used.
     if let Some(pb) = pb {
         pb.finish();
     }
-
-    // Return last trained model.
-    // (model, losses)
 
     // let record = BinFileRecorder::<FullPrecisionSettings>::default();
     model = model
