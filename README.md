@@ -19,7 +19,7 @@ See [documentation](https://docs.rs/crate/fast-umap/latest) for more.
 ## Roadmap
 
 - [x] Add MNIST dataset example. add intermediary plots.
-- [ ] move charting into a feature.
+- [x] move charting into a feature.
 - [x] add labels in the plots.
 - [x] Implement batches, **accumulated gradient**
 - [ ] precompute inital local fitting with the PCA
