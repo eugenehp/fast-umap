@@ -39,6 +39,27 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         distances_buffer,
     );
 
+    let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
+
+    // Create the buffer and grad_pairwise_distances tensor
+    let local_buffer = pairwise_distances
+        .client
+        .empty(local_shape.num_elements() * std::mem::size_of::<F>());
+
+    let local_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+        pairwise_distances.client.clone(),
+        pairwise_distances.device.clone(),
+        pairwise_distances.shape.clone(),
+        local_buffer.clone(),
+    );
+
+    let local_indices: JitTensor<R, F> = JitTensor::new_contiguous(
+        pairwise_distances.client.clone(),
+        pairwise_distances.device.clone(),
+        pairwise_distances.shape.clone(),
+        local_buffer,
+    );
+
     // Launch the k-NN kernel
     let cube_dim = DEFAULT_CUBE_DIM;
     let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
@@ -52,8 +73,10 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         cube_dim,
         pairwise_distances.as_tensor_arg(2), // Pairwise distance matrix
         ScalarArg::new(k),                   // Number of neighbors
-        indices.as_tensor_arg(1),            // Indices tensor
-        distances.as_tensor_arg(1),          // Distances tensor
+        local_distances.as_tensor_arg(1),
+        local_indices.as_tensor_arg(1),
+        indices.as_tensor_arg(1),   // Indices tensor
+        distances.as_tensor_arg(1), // Distances tensor
     );
 
     (indices, distances)
@@ -81,6 +104,27 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         buffer,
     );
 
+    let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
+
+    // Create the buffer and grad_pairwise_distances tensor
+    let local_buffer = pairwise_distances
+        .client
+        .empty(local_shape.num_elements() * std::mem::size_of::<F>());
+
+    let local_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+        pairwise_distances.client.clone(),
+        pairwise_distances.device.clone(),
+        pairwise_distances.shape.clone(),
+        local_buffer.clone(),
+    );
+
+    let local_indices: JitTensor<R, F> = JitTensor::new_contiguous(
+        pairwise_distances.client.clone(),
+        pairwise_distances.device.clone(),
+        pairwise_distances.shape.clone(),
+        local_buffer,
+    );
+
     // Calculate the number of blocks needed for the kernel launch
     let cube_dim = DEFAULT_CUBE_DIM;
     let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
@@ -96,6 +140,8 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         cube_dim,
         pairwise_distances.as_tensor_arg(vectorization),
         ScalarArg::new(k), // Pass the value of k as an argument
+        local_distances.as_tensor_arg(vectorization),
+        local_indices.as_tensor_arg(vectorization),
         grad_output.as_tensor_arg(vectorization),
         grad_pairwise_distances.as_tensor_arg(vectorization),
     );
