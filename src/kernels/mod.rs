@@ -32,6 +32,14 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
     ) -> (FloatTensor<Self>, FloatTensor<Self>) {
         knn::forward::forward::<R, F, I>(pairwise_distances, k)
     }
+
+    fn knn_backward(
+        pairwise_distances: FloatTensor<Self>, // Pairwise distance matrix (n, n)
+        k: u32,                                // Number of nearest neighbors
+        grad_output: FloatTensor<Self>,        // Gradient of the loss w.r.t the output
+    ) -> FloatTensor<Self> {
+        knn::forward::backward::<R, F, I>(pairwise_distances, k, grad_output)
+    }
 }
 
 // Forward
@@ -48,14 +56,26 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     }
 
     fn euclidean_pairwise_distance_backward(
-        grad_x: FloatTensor<Self>,
-        output: FloatTensor<Self>,
+        _grad_x: FloatTensor<Self>,
+        _output: FloatTensor<Self>,
     ) -> FloatTensor<Self> {
-        unimplemented!("We trigger this method in JitBackend above. Since I didn't find a nicer way to call kernel from the euclidean_pairwise_distance in Autodiff above.");
+        unimplemented!("We trigger this method in `JitBackend` above. Since I didn't find a nicer way to call kernel from the `euclidean_pairwise_distance` in `Autodiff` above.");
     }
 
-    fn knn(x: FloatTensor<Self>, k: u32) -> (FloatTensor<Self>, FloatTensor<Self>) {
+    fn knn(
+        pairwise_distances: FloatTensor<Self>,
+        k: u32,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
         // todo!("We need to implement backward kernel for the KNN")
-        (x.clone(), x)
+        // (pairwise_distances.clone(), pairwise_distances)
+        knn::backward::backward::<B, C>(pairwise_distances, k)
+    }
+
+    fn knn_backward(
+        _pairwise_distances: FloatTensor<Self>, // Pairwise distance matrix (n, n)
+        _k: u32,                                // Number of nearest neighbors
+        _grad_output: FloatTensor<Self>,        // Gradient of the loss w.r.t the output
+    ) -> FloatTensor<Self> {
+        unimplemented!("We trigger this method in `JitBackend` above. Since I didn't find a nicer way to call kernel from the `knn` in `Autodiff` above.");
     }
 }

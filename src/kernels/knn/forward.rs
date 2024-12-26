@@ -58,3 +58,48 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
 
     (indices, distances)
 }
+
+pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
+    pairwise_distances: FloatTensor<JitBackend<R, F, I>>, // Pairwise distance matrix (n, n)
+    k: u32,                                               // Number of nearest neighbors
+    grad_output: FloatTensor<JitBackend<R, F, I>>,        // Gradient of the loss w.r.t the output
+) -> FloatTensor<JitBackend<R, F, I>> {
+    // Convert the output tensor to a contiguous format for efficient access
+    let pairwise_distances = into_contiguous(pairwise_distances);
+    let n = pairwise_distances.shape.dims[0]; // Number of vectors
+    let grad_output_shape = Shape::from(vec![n, k as usize]); // Gradient output shape for k neighbors
+
+    // Create the buffer and grad_pairwise_distances tensor
+    let buffer = pairwise_distances
+        .client
+        .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
+
+    let grad_pairwise_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+        pairwise_distances.client.clone(),
+        pairwise_distances.device.clone(),
+        pairwise_distances.shape.clone(),
+        buffer,
+    );
+
+    // Calculate the number of blocks needed for the kernel launch
+    let cube_dim = DEFAULT_CUBE_DIM;
+    let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
+    let cubes_needed_in_y = (n as f32 / cube_dim.y as f32).ceil() as u32;
+    let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
+
+    let vectorization = 1; // Use 1 for no vectorization
+
+    // Launch the KNN backward kernel
+    knn_backward_kernel::launch::<F, R>(
+        &pairwise_distances.client,
+        cube_count,
+        cube_dim,
+        pairwise_distances.as_tensor_arg(vectorization),
+        ScalarArg::new(k), // Pass the value of k as an argument
+        grad_output.as_tensor_arg(vectorization),
+        grad_pairwise_distances.as_tensor_arg(vectorization),
+    );
+
+    // Return the gradient of the pairwise distances
+    grad_pairwise_distances
+}

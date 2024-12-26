@@ -14,6 +14,12 @@ pub trait Backend: burn::tensor::backend::Backend {
     /// Returns indices, distances
     fn knn(pairwise_distances: FloatTensor<Self>, k: u32)
         -> (FloatTensor<Self>, FloatTensor<Self>);
+
+    fn knn_backward(
+        pairwise_distances: FloatTensor<Self>, // Pairwise distance matrix (n, n)
+        k: u32,                                // Number of nearest neighbors
+        grad_output: FloatTensor<Self>,        // Gradient of the loss w.r.t the output
+    ) -> FloatTensor<Self>;
 }
 
 /// We create our own AutodiffBackend trait that extends the Burn autodiff backend trait.
