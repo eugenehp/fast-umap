@@ -92,8 +92,6 @@ where
         batches.push(batch);
     }
 
-    println!("batches - {:?}", batches.len());
-
     // Step 2: Precompute the tensor representations and global distances for each batch.
     let mut tensor_batches: Vec<Tensor<B, 2>> = Vec::new();
     let mut global_distances_batches: Vec<Tensor<B, 2>> = Vec::new();
