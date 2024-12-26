@@ -1,98 +1,146 @@
-// use std::fmt::Debug;
+use std::fmt::Debug;
 
-// use burn::{
-//     backend::{
-//         autodiff::{
-//             checkpoint::{base::Checkpointer, strategy::CheckpointStrategy},
-//             grads::Gradients,
-//             ops::{Backward, Ops, OpsKind},
-//             NodeID,
-//         },
-//         Autodiff,
-//     },
-//     tensor::ops::FloatTensor,
-// };
+use burn::{
+    backend::{
+        autodiff::{
+            checkpoint::{base::Checkpointer, strategy::CheckpointStrategy},
+            grads::Gradients,
+            ops::{Backward, Ops, OpsKind},
+            NodeID,
+        },
+        Autodiff,
+    },
+    tensor::ops::FloatTensor,
+};
 
-// use crate::{backend::Backend, print_if, print_primitive_tensor};
+use crate::{backend::Backend, print_if, print_primitive_tensor};
 
-// const VERBOSE: bool = false;
+const VERBOSE: bool = false;
 
-// impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
-//     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
-//         // println!("euclidean_pairwise_distance");
-//         // Create zero-sized struct for backward computation
-//         #[derive(Debug)]
-//         struct EuclideanPairwiseDistanceBackward;
+pub fn backward<B: Backend, C: CheckpointStrategy>(
+    pairwise_distances: FloatTensor<Autodiff<B, C>>,
+    k: u32, // Number of nearest neighbors
+) -> (FloatTensor<Autodiff<B, C>>, FloatTensor<Autodiff<B, C>>) {
+    // println!("knn_backward");
+    // Create zero-sized struct for backward computation
+    #[derive(Debug)]
+    struct KnnBackward;
 
-//         // Implement the backward trait for the given backend B
-//         impl<B: Backend> Backward<B, 1> for EuclideanPairwiseDistanceBackward {
-//             type State = NodeID; // , FloatTensor<B>
+    // Implement the backward trait for the given backend B
+    impl<B: Backend> Backward<B, 1> for KnnBackward {
+        type State = (NodeID, u32); // FloatTensor<B>,
 
-//             fn backward(
-//                 self,
-//                 ops: Ops<Self::State, 1>,
-//                 grads: &mut Gradients,
-//                 checkpointer: &mut Checkpointer,
-//             ) {
-//                 let node_x = ops.state; // Retrieve x and output from the state
+        fn backward(
+            self,
+            ops: Ops<Self::State, 1>,
+            grads: &mut Gradients,
+            checkpointer: &mut Checkpointer,
+        ) {
+            let (node_pairwise_distances, k) = ops.state; // Retrieve pairwise_distances and output from the state
 
-//                 // Fetch the gradient for the current node.
-//                 let grad_x = grads.consume::<B>(&ops.node);
-//                 let output: FloatTensor<B> = checkpointer.retrieve_node_output(node_x);
+            // Fetch the gradient for the current node.
+            let grad_output = grads.consume::<B>(&ops.node);
+            let pairwise_distances: FloatTensor<B> =
+                checkpointer.retrieve_node_output(node_pairwise_distances);
 
-//                 if VERBOSE {
-//                     println!("grad_x {grad_x:?}");
-//                     print_primitive_tensor::<B>(&grad_x, 10, 10);
-//                     println!("output {output:?}");
-//                     print_primitive_tensor::<B>(&output, 10, 10);
-//                 }
+            if VERBOSE {
+                println!("grad_output {grad_output:?}");
+                print_primitive_tensor::<B>(&grad_output, 10, 10);
+                println!("pairwise_distances {pairwise_distances:?}");
+                print_primitive_tensor::<B>(&pairwise_distances, 10, 10);
+            }
 
-//                 let grad_output = B::euclidean_pairwise_distance_backward(grad_x, output);
+            // Perform the backward pass for the KNN operation
+            let grad_pairwise_distances = B::knn_backward(pairwise_distances, k, grad_output);
 
-//                 if VERBOSE {
-//                     println!("===grad_output=== {grad_output:?}");
-//                     print_primitive_tensor::<B>(&grad_output, 0, 0);
-//                 }
+            if VERBOSE {
+                println!("===grad_pairwise_distances=== {grad_pairwise_distances:?}");
+                print_primitive_tensor::<B>(&grad_pairwise_distances, 0, 0);
+            }
 
-//                 // let grad_output = B::float_matmul(grad_x, output);
-//                 // println!("===grad_output=== {:?}", grad_output);
-//                 // print_primitive_tensor::<B>(&grad_output, 10, 10);
-//                 grads.register::<B>(node_x, grad_output);
-//             }
-//         }
+            // Register the gradient for the pairwise_distances tensor
+            grads.register::<B>(node_pairwise_distances, grad_pairwise_distances);
+        }
+    }
 
-//         // Prepare the stateful operation
-//         match EuclideanPairwiseDistanceBackward
-//             .prepare::<C>([x.node.clone()])
-//             .compute_bound()
-//             .stateful()
-//         {
-//             OpsKind::Tracked(mut prep) => {
-//                 // When at least one node is tracked, register the backward function
-//                 let x_state = prep.checkpoint(&x); // Checkpoint x for future retrieval during the backward pass
+    // Prepare the stateful operation
+    let indicies = match KnnBackward
+        .prepare::<C>([pairwise_distances.node.clone()])
+        .compute_bound()
+        .stateful()
+    {
+        OpsKind::Tracked(mut prep) => {
+            // When at least one node is tracked, register the backward function
+            let pairwise_distances_state = prep.checkpoint(&pairwise_distances); // Checkpoint pairwise_distances for future retrieval during the backward pass
 
-//                 let output = B::euclidean_pairwise_distance(x.clone().primitive); // Forward pass calculation
-//                 print_if!(VERBOSE, "Forward pass output (Tracked): {:?}", output); // Debug: Print output shape
+            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
+            let (indicies, distances) = output;
+            print_if!(VERBOSE, "Forward pass indicies (Tracked): {:?}", indicies); // Debug: Print indicies shape
+            print_if!(VERBOSE, "Forward pass distances (Tracked): {:?}", distances); // Debug: Print distances shape
 
-//                 let state = x_state;
+            let state = (pairwise_distances_state, k);
 
-//                 // The state now includes the checkpointed x and the output
-//                 prep.finish(state, output) // Finish with the computed output
-//             }
-//             OpsKind::UnTracked(prep) => {
-//                 // If no node is tracked, just do the forward calculation
-//                 let output = B::euclidean_pairwise_distance(x.primitive);
-//                 print_if!(VERBOSE, "Forward pass output (UnTracked): {:?}", output); // Debug: Print output shape
-//                 prep.finish(output) // No need for state here
-//             }
-//         }
-//     }
+            // The state now includes the checkpointed pairwise_distances and the output
+            let indicies = prep.finish(state, indicies); // Finish with the computed output
 
-//     fn euclidean_pairwise_distance_backward(
-//         _grad_x: FloatTensor<Self>,
-//         _output: FloatTensor<Self>,
-//     ) -> FloatTensor<Self> {
-//         println!("backward - euclidean_pairwise_distance_backward");
-//         todo!()
-//     }
-// }
+            indicies
+        }
+        OpsKind::UnTracked(prep) => {
+            // If no node is tracked, just do the forward calculation
+            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
+            let (indicies, distances) = output;
+
+            print_if!(VERBOSE, "Forward pass indicies (UnTracked): {:?}", indicies); // Debug: Print indicies shape
+            print_if!(
+                VERBOSE,
+                "Forward pass distances (UnTracked): {:?}",
+                distances
+            ); // Debug: Print distances shape
+
+            let indicies = prep.finish(indicies);
+
+            indicies
+        }
+    };
+
+    let distances = match KnnBackward
+        .prepare::<C>([pairwise_distances.node.clone()])
+        .compute_bound()
+        .stateful()
+    {
+        OpsKind::Tracked(mut prep) => {
+            // When at least one node is tracked, register the backward function
+            let pairwise_distances_state = prep.checkpoint(&pairwise_distances); // Checkpoint pairwise_distances for future retrieval during the backward pass
+
+            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
+            let (indicies, distances) = output;
+            print_if!(VERBOSE, "Forward pass indicies (Tracked): {:?}", indicies); // Debug: Print indicies shape
+            print_if!(VERBOSE, "Forward pass distances (Tracked): {:?}", distances); // Debug: Print distances shape
+
+            let state = (pairwise_distances_state, k);
+
+            // The state now includes the checkpointed pairwise_distances and the output
+            let distances = prep.finish(state, distances); // Finish with the computed output
+
+            distances
+        }
+        OpsKind::UnTracked(prep) => {
+            // If no node is tracked, just do the forward calculation
+            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
+            let (indicies, distances) = output;
+
+            print_if!(VERBOSE, "Forward pass indicies (UnTracked): {:?}", indicies); // Debug: Print indicies shape
+            print_if!(
+                VERBOSE,
+                "Forward pass distances (UnTracked): {:?}",
+                distances
+            ); // Debug: Print distances shape
+
+            let distances = prep.finish(distances);
+
+            distances
+        }
+    };
+
+    (indicies, distances)
+}

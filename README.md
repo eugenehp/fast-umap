@@ -106,9 +106,6 @@ let model_config = UMAPModelConfigBuilder::default()
     .unwrap();
 ```
 
-Certainly! Here's an improved version of your documentation with additional details for clarity and completeness:
-
----
 
 ## Training the UMAP Model
 
