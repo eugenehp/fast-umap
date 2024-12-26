@@ -1,4 +1,4 @@
-use burn::tensor::{Tensor, TensorPrimitive};
+use burn::tensor::{Float, Tensor, TensorPrimitive};
 
 use crate::backend::Backend;
 
@@ -49,7 +49,14 @@ pub fn get_distance_by_metric<B: Backend>(
         // Metric::Euclidean => {
         _ => {
             let x = data.clone().into_primitive().tensor();
-            let distances = B::euclidean_pairwise_distance(x);
+            let pairwise_distances = B::euclidean_pairwise_distance(x);
+
+            let (indices, distances) =
+                B::knn(pairwise_distances.clone(), config.k_neighbors as u32);
+
+            // TODO: don't clone later, to optimize the speed
+            let pairwise_distances: Tensor<B, 2, Float> =
+                Tensor::from_primitive(TensorPrimitive::Float(pairwise_distances));
             let distances = Tensor::from_primitive(TensorPrimitive::Float(distances));
 
             distances

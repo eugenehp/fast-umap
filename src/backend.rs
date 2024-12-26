@@ -9,7 +9,11 @@ pub trait Backend: burn::tensor::backend::Backend {
         grad_x: FloatTensor<Self>,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self>;
-    fn knn(x: FloatTensor<Self>, k: u32) -> (FloatTensor<Self>, FloatTensor<Self>);
+
+    // TODO: return IntTensor for indices
+    /// Returns indices, distances
+    fn knn(pairwise_distances: FloatTensor<Self>, k: u32)
+        -> (FloatTensor<Self>, FloatTensor<Self>);
 }
 
 /// We create our own AutodiffBackend trait that extends the Burn autodiff backend trait.

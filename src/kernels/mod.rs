@@ -26,10 +26,21 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         euclidean::forward::backward::<R, F, I>(grad_x, output)
     }
 
-    fn knn(x: FloatTensor<Self>, k: u32) -> (FloatTensor<Self>, FloatTensor<Self>) {
-        todo!()
+    fn knn(
+        pairwise_distances: FloatTensor<Self>,
+        k: u32,
+    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+        knn::forward::forward::<R, F, I>(pairwise_distances, k)
     }
 }
+
+// Forward
+// JitBackend -> euclidean_pairwise_distance
+
+// Backward
+// Autodiff -> euclidean_pairwise_distance -> JitBackend -> euclidean_pairwise_distance_backward
+
+// TODO: FIXME
 
 impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
@@ -40,10 +51,11 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
         grad_x: FloatTensor<Self>,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self> {
-        todo!()
+        unimplemented!("We trigger this method in JitBackend above. Since I didn't find a nicer way to call kernel from the euclidean_pairwise_distance in Autodiff above.");
     }
 
     fn knn(x: FloatTensor<Self>, k: u32) -> (FloatTensor<Self>, FloatTensor<Self>) {
-        unimplemented!();
+        // todo!("We need to implement backward kernel for the KNN")
+        (x.clone(), x)
     }
 }
