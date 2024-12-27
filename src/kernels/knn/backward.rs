@@ -11,9 +11,8 @@ use burn::{
         Autodiff,
     },
     tensor::{
-        backend::AutodiffBackend,
-        ops::{FloatTensor, IntTensor, IntTensorOps},
-        BasicAutodiffOps, TensorKind,
+        ops::{FloatTensor, IntTensor},
+        Float,
     },
 };
 
@@ -154,7 +153,7 @@ pub fn backward<B: Backend, C: CheckpointStrategy>(
     let inner_tensor = indicies.into_primitive();
 
     // Convert the inner tensor to the autodiff backend
-    let indicies: IntTensor<Autodiff<B, C>> = IntTensor::from_inner(inner_tensor);
+    let indicies: IntTensor<Autodiff<B, C>> = IntTensor::<Autodiff<B, C>>::from(inner_tensor);
 
     (indicies, distances)
 }
