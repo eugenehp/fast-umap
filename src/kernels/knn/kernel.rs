@@ -6,15 +6,23 @@ pub fn u32_to_float(x: u32) -> f32 {
     f32::cast_from(x)
 }
 
+#[cube]
+fn float_to_int_kernel<F: Float, I: Int>(input: &Tensor<F>, output: &mut Tensor<I>) {
+    let size = input.len();
+    for i in 0..size {
+        output[i] = I::cast_from(input[i]);
+    }
+}
+
 const INFINITY: f32 = 3.40282347e+38; // Maximum value for f32, used as infinity
 
 #[cube(launch)]
-pub fn knn_kernel<F: Float + CubePrimitive>(
+pub fn knn_kernel<F: Float + CubePrimitive, I: Int>(
     pairwise_distances: &Tensor<F>,  // Pairwise distance matrix (n, n)
     k: u32,                          // Number of nearest neighbors to find
     local_distances: &mut Tensor<F>, // for local distances storage, size of k
-    local_indices: &mut Tensor<F>,   // for local indices storage, size of k
-    indices: &mut Tensor<F>, // Output tensor of shape (n, k) storing the indices of k nearest neighbors
+    local_indices: &mut Tensor<I>,   // for local indices storage, size of k
+    indices: &mut Tensor<I>, // Output tensor of shape (n, k) storing the indices of k nearest neighbors
     distances: &mut Tensor<F>, // Output tensor of shape (n, k) storing the distances of k nearest neighbors
 ) {
     let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
@@ -33,37 +41,38 @@ pub fn knn_kernel<F: Float + CubePrimitive>(
     for i in 0..k {
         // Initialize distances to infinity and indices to an invalid value
         local_distances[i] = F::new(INFINITY); // f32::INFINITY Use F::infinity() to represent infinity
+        local_indices[i] = I::cast_from(k); // Set to an invalid index (out of range)
 
         // local_indices[i] = F::cast_from(u32_to_float(k)); // Set to an invalid index (out of range)
     }
 
     // Iterate through all the pairwise distances for the current row
-    for col in 0..n {
-        if row != col {
-            // Skip self-comparison
-            let dist = pairwise_distances[row * n + col];
+    // for col in 0..n {
+    //     if row != col {
+    //         // Skip self-comparison
+    //         let dist = pairwise_distances[row * n + col];
 
-            // Find where to insert this distance in the sorted array of top-k distances
-            if dist < local_distances[k - 1] {
-                let mut i = k - 1; // Start from the last index
+    //         // Find where to insert this distance in the sorted array of top-k distances
+    //         if dist < local_distances[k - 1] {
+    //             let mut i = k - 1; // Start from the last index
 
-                // Shift larger distances one step to the right to make space for the new distance
-                while i > 0 {
-                    if dist < local_distances[i] {
-                        local_distances[i] = local_distances[i - 1];
-                        local_indices[i] = local_indices[i - 1];
-                    } else {
-                        break;
-                    }
-                    i -= 1; // Move to the previous index
-                }
+    //             // Shift larger distances one step to the right to make space for the new distance
+    //             while i > 0 {
+    //                 if dist < local_distances[i] {
+    //                     local_distances[i] = local_distances[i - 1];
+    //                     local_indices[i] = local_indices[i - 1];
+    //                 } else {
+    //                     break;
+    //                 }
+    //                 i -= 1; // Move to the previous index
+    //             }
 
-                // Insert the new distance at the correct position
-                local_distances[i] = dist;
-                // local_indices[i] = F::cast_from(u32_to_float(col)); // Store the corresponding index
-            }
-        }
-    }
+    //             // Insert the new distance at the correct position
+    //             local_distances[i] = dist;
+    //             // local_indices[i] = F::cast_from(u32_to_float(col)); // Store the corresponding index
+    //         }
+    //     }
+    // }
 
     // Copy the results from local arrays into the output tensors
     for i in 0..k {

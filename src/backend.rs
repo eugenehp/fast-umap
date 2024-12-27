@@ -1,4 +1,7 @@
-use burn::{backend::Autodiff, tensor::ops::FloatTensor};
+use burn::{
+    backend::Autodiff,
+    tensor::ops::{FloatTensor, IntTensor},
+};
 use burn_jit::JitBackend;
 use cubecl::wgpu::WgpuRuntime;
 
@@ -12,8 +15,7 @@ pub trait Backend: burn::tensor::backend::Backend {
 
     // TODO: return IntTensor for indices
     /// Returns indices, distances
-    fn knn(pairwise_distances: FloatTensor<Self>, k: u32)
-        -> (FloatTensor<Self>, FloatTensor<Self>);
+    fn knn(pairwise_distances: FloatTensor<Self>, k: u32) -> (IntTensor<Self>, FloatTensor<Self>);
 
     fn knn_backward(
         pairwise_distances: FloatTensor<Self>, // Pairwise distance matrix (n, n)
