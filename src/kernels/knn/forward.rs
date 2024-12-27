@@ -9,10 +9,7 @@ use cubecl::prelude::*;
 pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     pairwise_distances: FloatTensor<JitBackend<R, F, I>>,
     k: u32,
-) -> (
-    FloatTensor<JitBackend<R, F, I>>,
-    FloatTensor<JitBackend<R, F, I>>,
-) {
+) -> (JitTensor<R, I>, JitTensor<R, F>) {
     let pairwise_distances = into_contiguous(pairwise_distances.clone());
     let client = pairwise_distances.client.clone();
     let device = pairwise_distances.device.clone();
@@ -26,13 +23,13 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     let indices_buffer = client.empty(indices_shape.num_elements() * std::mem::size_of::<F>());
     let distances_buffer = client.empty(distances_shape.num_elements() * std::mem::size_of::<F>());
 
-    let indices = JitTensor::new_contiguous(
+    let indices: JitTensor<R, I> = JitTensor::new_contiguous(
         client.clone(),
         device.clone(),
         indices_shape,
         indices_buffer,
     );
-    let distances = JitTensor::new_contiguous(
+    let distances: JitTensor<R, F> = JitTensor::new_contiguous(
         client.clone(),
         device.clone(),
         distances_shape,
@@ -53,7 +50,7 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         local_buffer.clone(),
     );
 
-    let local_indices: JitTensor<R, F> = JitTensor::new_contiguous(
+    let local_indices: JitTensor<R, I> = JitTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
@@ -69,7 +66,7 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     let vectorisation = 1;
 
     // Launch the k-NN kernel
-    knn_kernel::launch::<F, R>(
+    knn_kernel::launch::<F, I, R>(
         &client,
         cube_count,
         cube_dim,

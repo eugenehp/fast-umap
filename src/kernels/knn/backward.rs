@@ -10,17 +10,21 @@ use burn::{
         },
         Autodiff,
     },
-    tensor::ops::FloatTensor,
+    tensor::{
+        backend::AutodiffBackend,
+        ops::{FloatTensor, IntTensor, IntTensorOps},
+        BasicAutodiffOps, TensorKind,
+    },
 };
 
-use crate::{backend::Backend, print_if, print_primitive_tensor};
+use crate::{backend::*, print_if, print_primitive_tensor};
 
 const VERBOSE: bool = false;
 
 pub fn backward<B: Backend, C: CheckpointStrategy>(
     pairwise_distances: FloatTensor<Autodiff<B, C>>,
     k: u32, // Number of nearest neighbors
-) -> (FloatTensor<Autodiff<B, C>>, FloatTensor<Autodiff<B, C>>) {
+) -> (IntTensor<Autodiff<B, C>>, FloatTensor<Autodiff<B, C>>) {
     // println!("knn_backward");
     // Create zero-sized struct for backward computation
     #[derive(Debug)]
@@ -73,12 +77,14 @@ pub fn backward<B: Backend, C: CheckpointStrategy>(
             // When at least one node is tracked, register the backward function
             let pairwise_distances_state = prep.checkpoint(&pairwise_distances); // Checkpoint pairwise_distances for future retrieval during the backward pass
 
-            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
-            let (indicies, distances) = output;
+            let (indicies, distances) = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
             print_if!(VERBOSE, "Forward pass indicies (Tracked): {:?}", indicies); // Debug: Print indicies shape
             print_if!(VERBOSE, "Forward pass distances (Tracked): {:?}", distances); // Debug: Print distances shape
 
             let state = (pairwise_distances_state, k);
+
+            // TODO: this is a strange way to convert it
+            let indicies = B::int_into_float(indicies);
 
             // The state now includes the checkpointed pairwise_distances and the output
             let indicies = prep.finish(state, indicies); // Finish with the computed output
@@ -97,6 +103,9 @@ pub fn backward<B: Backend, C: CheckpointStrategy>(
                 distances
             ); // Debug: Print distances shape
 
+            // TODO: this is a strange way to convert it
+            let indicies = B::int_into_float(indicies);
+
             let indicies = prep.finish(indicies);
 
             indicies
@@ -112,8 +121,7 @@ pub fn backward<B: Backend, C: CheckpointStrategy>(
             // When at least one node is tracked, register the backward function
             let pairwise_distances_state = prep.checkpoint(&pairwise_distances); // Checkpoint pairwise_distances for future retrieval during the backward pass
 
-            let output = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
-            let (indicies, distances) = output;
+            let (indicies, distances) = B::knn(pairwise_distances.clone().primitive, k); // Forward pass calculation
             print_if!(VERBOSE, "Forward pass indicies (Tracked): {:?}", indicies); // Debug: Print indicies shape
             print_if!(VERBOSE, "Forward pass distances (Tracked): {:?}", distances); // Debug: Print distances shape
 
@@ -141,6 +149,12 @@ pub fn backward<B: Backend, C: CheckpointStrategy>(
             distances
         }
     };
+
+    // Extract the inner tensor
+    let inner_tensor = indicies.into_primitive();
+
+    // Convert the inner tensor to the autodiff backend
+    let indicies: IntTensor<Autodiff<B, C>> = IntTensor::from_inner(inner_tensor);
 
     (indicies, distances)
 }

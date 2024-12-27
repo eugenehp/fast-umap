@@ -1,6 +1,6 @@
 use burn::{
     backend::{autodiff::checkpoint::strategy::CheckpointStrategy, Autodiff},
-    tensor::ops::FloatTensor,
+    tensor::ops::{FloatTensor, IntTensor},
 };
 use burn_jit::{FloatElement, IntElement, JitBackend, JitRuntime};
 use cubecl::CubeDim;
@@ -26,10 +26,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         euclidean::forward::backward::<R, F, I>(grad_x, output)
     }
 
-    fn knn(
-        pairwise_distances: FloatTensor<Self>,
-        k: u32,
-    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+    fn knn(pairwise_distances: FloatTensor<Self>, k: u32) -> (IntTensor<Self>, FloatTensor<Self>) {
         knn::forward::forward::<R, F, I>(pairwise_distances, k)
     }
 
@@ -62,10 +59,7 @@ impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
         unimplemented!("We trigger this method in `JitBackend` above. Since I didn't find a nicer way to call kernel from the `euclidean_pairwise_distance` in `Autodiff` above.");
     }
 
-    fn knn(
-        pairwise_distances: FloatTensor<Self>,
-        k: u32,
-    ) -> (FloatTensor<Self>, FloatTensor<Self>) {
+    fn knn(pairwise_distances: FloatTensor<Self>, k: u32) -> (IntTensor<Self>, FloatTensor<Self>) {
         // todo!("We need to implement backward kernel for the KNN")
         // (pairwise_distances.clone(), pairwise_distances)
         knn::backward::backward::<B, C>(pairwise_distances, k)
