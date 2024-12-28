@@ -97,3 +97,60 @@ pub(crate) fn knn_pairwise_euclidean_launch<R: JitRuntime, F: FloatElement, I: I
 
     (indices, distances)
 }
+
+#[cube(launch)]
+fn knn_backward_kernel<F: Float, I: Int>(
+    input: &Tensor<F>,
+    grad_output: &Tensor<F>,
+    indices: &Tensor<I>,
+    distances: &Tensor<F>,
+    grad_input: &mut Tensor<F>,
+) {
+    if ABSOLUTE_POS >= input.len() {
+        return;
+    }
+
+    let n = input.shape(0);
+    let d = input.shape(1);
+    let i = ABSOLUTE_POS / input.stride(0);
+
+    for j in 0..n {
+        let idx = indices[i * n + j];
+        if idx != I::cast_from(i32::MAX) {
+            let dist = distances[i * n + j];
+            for l in 0..d {
+                let input_idx = idx * I::cast_from(input.stride(0))
+                    + I::cast_from(l) * I::cast_from(input.stride(1));
+                let input_idx = u32::cast_from(input_idx);
+
+                let diff = input[i * input.stride(0) + l * input.stride(1)] - input[input_idx];
+                grad_input[i * input.stride(0) + l * input.stride(1)] +=
+                    grad_output[i * input.stride(0)] * diff / dist;
+            }
+        }
+    }
+}
+
+pub(crate) fn knn_backward_launch<R: JitRuntime, F: FloatElement, I: IntElement>(
+    input: JitTensor<R, F>,
+    grad_output: JitTensor<R, F>,
+    indices: JitTensor<R, I>,
+    distances: JitTensor<R, F>,
+    grad_input: JitTensor<R, F>,
+) -> JitTensor<R, F> {
+    let cube_dim = CubeDim::default();
+    let cube_count = calculate_cube_count_elemwise(input.shape.num_elements(), cube_dim);
+
+    knn_backward_kernel::launch::<F, I, R>(
+        &input.client,
+        cube_count,
+        cube_dim,
+        input.as_tensor_arg(1),
+        grad_output.as_tensor_arg(1),
+        indices.as_tensor_arg(1),
+        distances.as_tensor_arg(1),
+        grad_input.as_tensor_arg(1),
+    );
+
+    grad_input
+}
