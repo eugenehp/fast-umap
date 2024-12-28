@@ -1,5 +1,6 @@
 use core::f32;
 
+use burn::tensor::Shape;
 use burn_jit::{tensor::JitTensor, FloatElement, IntElement, JitRuntime};
 use cubecl::{calculate_cube_count_elemwise, prelude::*};
 
@@ -76,23 +77,48 @@ fn knn_pairwise_euclidean_kernel<F: Float, I: Int>(
 
 pub(crate) fn knn_pairwise_euclidean_launch<R: JitRuntime, F: FloatElement, I: IntElement>(
     input: JitTensor<R, F>,
-    k: I,
-    min_dist: F,
-    indices: JitTensor<R, I>,
-    distances: JitTensor<R, F>,
+    k: u32,
+    min_dist: f32,
 ) -> (JitTensor<R, I>, JitTensor<R, F>) {
+    let client = input.client.clone();
+    let device = input.device.clone();
+    let dims = input.shape.dims.clone();
+    let n = dims[0];
+
+    // Allocate output tensors for indices and distances
+    let indices_shape = Shape::from(vec![n, k as usize]);
+    let distances_shape = Shape::from(vec![n, k as usize]);
+
+    let indices_buffer = client.empty(indices_shape.num_elements() * std::mem::size_of::<F>());
+    let distances_buffer = client.empty(distances_shape.num_elements() * std::mem::size_of::<F>());
+
+    let indices: JitTensor<R, I> = JitTensor::new_contiguous(
+        client.clone(),
+        device.clone(),
+        indices_shape,
+        indices_buffer,
+    );
+    let distances: JitTensor<R, F> = JitTensor::new_contiguous(
+        client.clone(),
+        device.clone(),
+        distances_shape,
+        distances_buffer,
+    );
+
     let cube_dim = CubeDim::default();
     let cube_count = calculate_cube_count_elemwise(input.shape.num_elements(), cube_dim);
+
+    let vectorisation = 1;
 
     knn_pairwise_euclidean_kernel::launch::<F, I, R>(
         &input.client,
         cube_count,
         cube_dim,
-        input.as_tensor_arg(1),
-        ScalarArg::new(k),
-        ScalarArg::new(min_dist),
-        indices.as_tensor_arg(1),
-        distances.as_tensor_arg(1),
+        input.as_tensor_arg(vectorisation),
+        ScalarArg::new(I::cast_from(k)),
+        ScalarArg::new(F::cast_from(min_dist)),
+        indices.as_tensor_arg(vectorisation),
+        distances.as_tensor_arg(vectorisation),
     );
 
     (indices, distances)
@@ -137,7 +163,7 @@ pub(crate) fn knn_backward_launch<R: JitRuntime, F: FloatElement, I: IntElement>
     indices: JitTensor<R, I>,
     distances: JitTensor<R, F>,
     grad_input: JitTensor<R, F>,
-) -> JitTensor<R, F> {
+) -> (JitTensor<R, I>, JitTensor<R, F>) {
     let cube_dim = CubeDim::default();
     let cube_count = calculate_cube_count_elemwise(input.shape.num_elements(), cube_dim);
 
@@ -152,5 +178,5 @@ pub(crate) fn knn_backward_launch<R: JitRuntime, F: FloatElement, I: IntElement>
         grad_input.as_tensor_arg(1),
     );
 
-    grad_input
+    (indices, grad_input)
 }
