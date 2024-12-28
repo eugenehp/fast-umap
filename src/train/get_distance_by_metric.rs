@@ -48,18 +48,19 @@ pub fn get_distance_by_metric<B: Backend>(
         // Metric::Euclidean => euclidean(data),
         // Metric::Euclidean => {
         _ => {
-            let x = data.clone().into_primitive().tensor();
-            let pairwise_distances = B::euclidean_pairwise_distance(x);
+            // let x = data.clone().into_primitive().tensor();
+            // let pairwise_distances = B::euclidean_pairwise_distance(x);
 
-            let (indices, distances) =
-                B::knn(pairwise_distances.clone(), config.k_neighbors as u32);
+            // let (indices, distances) =
+            //     B::knn(pairwise_distances.clone(), config.k_neighbors as u32);
 
-            // TODO: don't clone later, to optimize the speed
-            let pairwise_distances: Tensor<B, 2, Float> =
-                Tensor::from_primitive(TensorPrimitive::Float(pairwise_distances));
-            let distances = Tensor::from_primitive(TensorPrimitive::Float(distances));
+            // // TODO: don't clone later, to optimize the speed
+            // let pairwise_distances: Tensor<B, 2, Float> =
+            //     Tensor::from_primitive(TensorPrimitive::Float(pairwise_distances));
+            // let distances = Tensor::from_primitive(TensorPrimitive::Float(distances));
 
-            distances
+            // distances
+            data
         } // Metric::EuclideanKNN => euclidean_knn(data, config.k_neighbors),
           // Metric::Manhattan => manhattan(data),
           // Metric::Cosine => cosine(data),
