@@ -1,5 +1,7 @@
 # fast-umap
 
+⚠️Not ready for production⚠️
+
 UMAP (Uniform Manifold Approximation and Projection) in Rust
 
 This repository contains a Rust implementation of **UMAP** (Uniform Manifold Approximation and Projection), a dimensionality reduction algorithm that preserves both the local and global structure of data. UMAP is widely used for visualizing high-dimensional data in 2D or 3D space.
