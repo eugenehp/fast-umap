@@ -13,17 +13,17 @@ edition = "2021"
 [dependencies]
 burn = { version = "~0.17", features = ["train", "wgpu", "autodiff", "autotune"] }
 burn-jit = { version = "0.16.1", features = ["burn-autodiff"] }
-crossbeam-channel = "0.5.14"
-ctrlc = "3.4.5"
+crossbeam-channel = "0.5.15"
+ctrlc = "3.4.7"
 cubecl = { version = "0.3.0", features = ["wgpu", "cubecl-wgpu"] }
 hsl = "0.1.1"
-indicatif = "0.17.9"
+indicatif = "0.17.11"
 ndarray = "0.16.1"
 num = "0.4.3"
 num-traits = "0.2.19"
 plotters = "0.3.7"
 prettytable = "0.10.0"
-rand = "0.8.5"
+rand = "0.9.1"
 rayon = "1.10.0"
 serde = "1.0.216"
 
