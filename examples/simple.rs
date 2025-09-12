@@ -10,7 +10,7 @@ fn main() {
     let num_features = 3;
 
     // Create a random number generator for generating random values
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Generate a dataset of random values with `num_samples` rows and `num_features` columns
     let data: Vec<Vec<f64>> = (0..num_samples * num_features)
@@ -20,7 +20,7 @@ fn main() {
         .map(|chunk| chunk.to_vec()) // Convert each chunk into a Vec<f64>
         .collect(); // Collect the rows into a vector of vectors
 
-    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
+    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
     // Fit the UMAP model to the data and reduce the data to a lower-dimensional space (default: 2D)

@@ -1,4 +1,5 @@
 use burn::{module::*, prelude::*};
+use burn_cubecl::{BoolElement, CubeRuntime};
 use crossbeam_channel::unbounded;
 use cubecl::wgpu::WgpuRuntime;
 use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
@@ -11,7 +12,7 @@ fn main() {
 
     type F = f32;
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
-    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, F, i32>;
+    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, F, i32, u32>;
 
     // Define the AutodiffBackend based on the custom MyBackend type
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;

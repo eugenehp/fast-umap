@@ -2,8 +2,9 @@ use burn::{
     backend::Autodiff,
     tensor::ops::{FloatTensor, IntTensor},
 };
-use burn_jit::JitBackend;
-use cubecl::wgpu::WgpuRuntime;
+// use burn_jit::JitBackend;
+use burn_cubecl::{BoolElement, CubeBackend, CubeRuntime, FloatElement, IntElement};
+// use cubecl::wgpu::WgpuRuntime;
 
 /// We create our own Backend trait that extends the Burn backend trait.
 pub trait Backend: burn::tensor::backend::Backend {
@@ -28,4 +29,9 @@ pub trait Backend: burn::tensor::backend::Backend {
 pub trait AutodiffBackend: Backend + burn::tensor::backend::AutodiffBackend {}
 
 // this line along with the `backward` module is what's needed to enable support for a particular device below
-impl AutodiffBackend for Autodiff<JitBackend<WgpuRuntime, f32, i32>> {}
+// impl AutodiffBackend for Autodiff<JitBackend<WgpuRuntime, f32, i32>> {}
+
+impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> AutodiffBackend
+    for Autodiff<CubeBackend<R, F, I, BT>>
+{
+}

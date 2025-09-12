@@ -1,14 +1,15 @@
 use super::kernel::*;
 use crate::kernels::DEFAULT_CUBE_DIM;
 use burn::tensor::{ops::FloatTensor, Shape};
-use burn_jit::{
-    kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,
+use burn_cubecl::{
+    kernel::into_contiguous, tensor::CubeTensor, BoolElement, CubeBackend, CubeRuntime,
+    FloatElement, IntElement,
 };
 use cubecl::prelude::*;
 
-pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
-    x: FloatTensor<JitBackend<R, F, I>>,
-) -> FloatTensor<JitBackend<R, F, I>> {
+pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
+    x: FloatTensor<CubeBackend<R, F, I, BT>>,
+) -> FloatTensor<CubeBackend<R, F, I, BT>> {
     let xx = into_contiguous(x.clone());
     let client = xx.client;
     let device = xx.device;
@@ -18,7 +19,13 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     // Allocate output tensor of shape (N, N) to hold pairwise distances
     let output_shape = Shape::from(vec![n, n]);
     let buffer = client.empty(output_shape.num_elements() * std::mem::size_of::<F>());
-    let output = JitTensor::new_contiguous(client.clone(), device.clone(), output_shape, buffer);
+    let output = CubeTensor::new_contiguous(
+        client.clone(),
+        device.clone(),
+        output_shape,
+        buffer,
+        burn::tensor::DType::F64,
+    );
 
     // Launch the Euclidean pairwise distance kernel
     let cube_dim = DEFAULT_CUBE_DIM;
@@ -31,8 +38,8 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         &client,
         cube_count,
         cube_dim,
-        x.as_tensor_arg(1),
-        output.as_tensor_arg(1),
+        x.as_tensor_arg::<F>(1),
+        output.as_tensor_arg::<F>(1),
     );
 
     #[cfg(feature = "verbose")]
@@ -44,10 +51,10 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     output
 }
 
-pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
-    grad_x: FloatTensor<JitBackend<R, F, I>>,
-    output: FloatTensor<JitBackend<R, F, I>>,
-) -> FloatTensor<JitBackend<R, F, I>> {
+pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
+    grad_x: FloatTensor<CubeBackend<R, F, I, BT>>,
+    output: FloatTensor<CubeBackend<R, F, I, BT>>,
+) -> FloatTensor<CubeBackend<R, F, I, BT>> {
     // println!("backend - euclidean_pairwise_distance_backward");
     let output = into_contiguous(output);
     let n = output.shape.dims[0];
@@ -57,11 +64,12 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
     let buffer = output
         .client
         .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
-    let grad_output: JitTensor<R, F> = JitTensor::new_contiguous(
+    let grad_output: CubeTensor<R> = CubeTensor::new_contiguous(
         output.client.clone(),
         output.device.clone(),
         grad_output_shape,
         buffer,
+        burn::tensor::DType::F64,
     );
 
     // Launch the Euclidean pairwise distance kernel
@@ -77,9 +85,9 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         &output.client,
         cube_count,
         cube_dim,
-        output.as_tensor_arg(vectorisation),
-        grad_output.as_tensor_arg(vectorisation),
-        grad_x.as_tensor_arg(vectorisation),
+        output.as_tensor_arg::<F>(vectorisation),
+        grad_output.as_tensor_arg::<F>(vectorisation),
+        grad_x.as_tensor_arg::<F>(vectorisation),
     );
 
     grad_output
