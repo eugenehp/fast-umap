@@ -2,10 +2,11 @@ use burn::{
     backend::{autodiff::checkpoint::strategy::CheckpointStrategy, Autodiff},
     tensor::ops::{FloatTensor, IntTensor},
 };
-use burn_jit::{FloatElement, IntElement, JitBackend, JitRuntime};
+// use burn_jit::{FloatElement, IntElement, JitBackend, JitRuntime};
 use cubecl::CubeDim;
 
 use crate::backend::Backend;
+use burn_cubecl::{BoolElement, CubeBackend, CubeRuntime, FloatElement, IntElement};
 
 mod euclidean;
 mod knn;
@@ -13,9 +14,12 @@ mod knn;
 /// Example cube size
 pub const DEFAULT_CUBE_DIM: CubeDim = CubeDim { x: 32, y: 32, z: 1 };
 
-impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F, I> {
+// impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F, I> {
+impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> Backend
+    for CubeBackend<R, F, I, BT>
+{
     fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
-        euclidean::forward::forward::<R, F, I>(x)
+        euclidean::forward::forward::<R, F, I, BT>(x)
     }
 
     fn euclidean_pairwise_distance_backward(
@@ -23,11 +27,11 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         output: FloatTensor<Self>,
     ) -> FloatTensor<Self> {
         // TODO: this is confusing naming, FIXME
-        euclidean::forward::backward::<R, F, I>(grad_x, output)
+        euclidean::forward::backward::<R, F, I, BT>(grad_x, output)
     }
 
     fn knn(pairwise_distances: FloatTensor<Self>, k: u32) -> (IntTensor<Self>, FloatTensor<Self>) {
-        knn::forward::forward::<R, F, I>(pairwise_distances, k)
+        knn::forward::forward::<R, F, I, BT>(pairwise_distances, k)
     }
 
     fn knn_backward(
@@ -35,7 +39,7 @@ impl<R: JitRuntime, F: FloatElement, I: IntElement> Backend for JitBackend<R, F,
         k: u32,                                // Number of nearest neighbors
         grad_output: FloatTensor<Self>,        // Gradient of the loss w.r.t the output
     ) -> FloatTensor<Self> {
-        knn::forward::backward::<R, F, I>(pairwise_distances, k, grad_output)
+        knn::forward::backward::<R, F, I, BT>(pairwise_distances, k, grad_output)
     }
 }
 

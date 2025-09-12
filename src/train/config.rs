@@ -76,7 +76,7 @@ pub struct TrainingConfig {
     pub beta2: f64,
 
     /// The L2 regularization (weight decay) penalty to apply during training.
-    pub penalty: f64,
+    pub penalty: f32,
 
     /// Whether to show detailed progress information during training (e.g., loss values, progress bars).
     pub verbose: bool,
@@ -121,7 +121,7 @@ pub struct TrainingConfigBuilder {
     learning_rate: Option<f64>,
     beta1: Option<f64>,
     beta2: Option<f64>,
-    penalty: Option<f64>,
+    penalty: Option<f32>,
     verbose: Option<bool>,
     patience: Option<i32>,
     loss_reduction: Option<LossReduction>,
@@ -176,7 +176,7 @@ impl TrainingConfigBuilder {
 
     /// Set the L2 regularization (weight decay) penalty for the optimizer.
     /// This helps prevent overfitting by penalizing large weights.
-    pub fn with_penalty(mut self, penalty: f64) -> Self {
+    pub fn with_penalty(mut self, penalty: f32) -> Self {
         self.penalty = Some(penalty);
         self
     }

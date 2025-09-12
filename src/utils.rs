@@ -6,7 +6,7 @@ use burn::{
 };
 use num::{Float, FromPrimitive};
 // use prettytable::{row, Table};
-use rand::{distributions::uniform::SampleUniform, Rng};
+use rand::{distr::uniform::SampleUniform, Rng};
 use rayon::prelude::*;
 
 /// Generates random test data with the given number of samples and features.
@@ -23,7 +23,7 @@ pub fn generate_test_data<F: Float + FromPrimitive + SampleUniform>(
     num_samples: usize,  // Number of samples
     num_features: usize, // Number of features (columns) per sample
 ) -> Vec<F> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Define the range for random numbers (e.g., [0.0, 1.0))
     let zero = F::from_f64(0.0).unwrap(); // 0.0 as a `F` type
@@ -31,7 +31,7 @@ pub fn generate_test_data<F: Float + FromPrimitive + SampleUniform>(
 
     // Generate random data for the tensor (size = num_samples * num_features)
     let data: Vec<F> = (0..num_samples * num_features)
-        .map(|_| rng.gen_range(zero..one)) // Generate random number from the range [0.0, 1.0)
+        .map(|_| rng.random_range(zero..one)) // Generate random number from the range [0.0, 1.0)
         .collect();
 
     data

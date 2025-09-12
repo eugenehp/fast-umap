@@ -169,7 +169,7 @@ fn main() {
         .expect("Error setting Ctrl-C handler");
 
     // Define a custom backend type using Wgpu with 32-bit floating point precision and 32-bit integer type
-    type MyBackend = burn::backend::wgpu::JitBackend<WgpuRuntime, f32, i32>;
+    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
 
     // Define the AutodiffBackend based on the custom MyBackend type
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;

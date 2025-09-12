@@ -1,15 +1,16 @@
 use super::kernel::*;
 use crate::kernels::DEFAULT_CUBE_DIM;
 use burn::tensor::{ops::FloatTensor, Shape};
-use burn_jit::{
-    kernel::into_contiguous, tensor::JitTensor, FloatElement, IntElement, JitBackend, JitRuntime,
+use burn_cubecl::{
+    kernel::into_contiguous, tensor::CubeTensor, BoolElement, CubeBackend, CubeRuntime,
+    FloatElement, IntElement,
 };
 use cubecl::prelude::*;
 
-pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
-    pairwise_distances: FloatTensor<JitBackend<R, F, I>>,
+pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
+    pairwise_distances: FloatTensor<CubeBackend<R, F, I, BT>>,
     k: u32,
-) -> (JitTensor<R, I>, JitTensor<R, F>) {
+) -> (CubeTensor<R>, CubeTensor<R>) {
     let pairwise_distances = into_contiguous(pairwise_distances.clone());
     let client = pairwise_distances.client.clone();
     let device = pairwise_distances.device.clone();
@@ -23,17 +24,19 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
     let indices_buffer = client.empty(indices_shape.num_elements() * std::mem::size_of::<F>());
     let distances_buffer = client.empty(distances_shape.num_elements() * std::mem::size_of::<F>());
 
-    let indices: JitTensor<R, I> = JitTensor::new_contiguous(
+    let indices: CubeTensor<R> = CubeTensor::new_contiguous(
         client.clone(),
         device.clone(),
         indices_shape,
         indices_buffer,
+        burn::tensor::DType::I64,
     );
-    let distances: JitTensor<R, F> = JitTensor::new_contiguous(
+    let distances: CubeTensor<R> = CubeTensor::new_contiguous(
         client.clone(),
         device.clone(),
         distances_shape,
         distances_buffer,
+        burn::tensor::DType::F64,
     );
 
     let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
@@ -43,18 +46,20 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         .client
         .empty(local_shape.num_elements() * std::mem::size_of::<F>());
 
-    let local_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+    let local_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer.clone(),
+        burn::tensor::DType::F64,
     );
 
-    let local_indices: JitTensor<R, I> = JitTensor::new_contiguous(
+    let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer,
+        burn::tensor::DType::I64,
     );
 
     // Launch the k-NN kernel
@@ -70,22 +75,22 @@ pub fn forward<R: JitRuntime, F: FloatElement, I: IntElement>(
         &client,
         cube_count,
         cube_dim,
-        pairwise_distances.as_tensor_arg(vectorisation), // Pairwise distance matrix
-        ScalarArg::new(k),                               // Number of neighbors
-        local_distances.as_tensor_arg(vectorisation),
-        local_indices.as_tensor_arg(vectorisation),
-        indices.as_tensor_arg(vectorisation),   // Indices tensor
-        distances.as_tensor_arg(vectorisation), // Distances tensor
+        pairwise_distances.as_tensor_arg::<F>(vectorisation), // Pairwise distance matrix
+        ScalarArg::new(k),                                    // Number of neighbors
+        local_distances.as_tensor_arg::<F>(vectorisation),
+        local_indices.as_tensor_arg::<I>(vectorisation),
+        indices.as_tensor_arg::<I>(vectorisation), // Indices tensor
+        distances.as_tensor_arg::<F>(vectorisation), // Distances tensor
     );
 
     (indices, distances)
 }
 
-pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
-    pairwise_distances: FloatTensor<JitBackend<R, F, I>>, // Pairwise distance matrix (n, n)
-    k: u32,                                               // Number of nearest neighbors
-    grad_output: FloatTensor<JitBackend<R, F, I>>,        // Gradient of the loss w.r.t the output
-) -> FloatTensor<JitBackend<R, F, I>> {
+pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
+    pairwise_distances: FloatTensor<CubeBackend<R, F, I, BT>>, // Pairwise distance matrix (n, n)
+    k: u32,                                                    // Number of nearest neighbors
+    grad_output: FloatTensor<CubeBackend<R, F, I, BT>>, // Gradient of the loss w.r.t the output
+) -> FloatTensor<CubeBackend<R, F, I, BT>> {
     // Convert the output tensor to a contiguous format for efficient access
     let pairwise_distances = into_contiguous(pairwise_distances);
     let n = pairwise_distances.shape.dims[0]; // Number of vectors
@@ -96,11 +101,12 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         .client
         .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
 
-    let grad_pairwise_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+    let grad_pairwise_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         buffer,
+        burn::tensor::DType::F64,
     );
 
     let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
@@ -110,18 +116,20 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         .client
         .empty(local_shape.num_elements() * std::mem::size_of::<F>());
 
-    let local_distances: JitTensor<R, F> = JitTensor::new_contiguous(
+    let local_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer.clone(),
+        burn::tensor::DType::F64,
     );
 
-    let local_indices: JitTensor<R, F> = JitTensor::new_contiguous(
+    let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer,
+        burn::tensor::DType::F64,
     );
 
     // Calculate the number of blocks needed for the kernel launch
@@ -137,12 +145,12 @@ pub fn backward<R: JitRuntime, F: FloatElement, I: IntElement>(
         &pairwise_distances.client,
         cube_count,
         cube_dim,
-        pairwise_distances.as_tensor_arg(vectorization),
+        pairwise_distances.as_tensor_arg::<F>(vectorization),
         ScalarArg::new(k), // Pass the value of k as an argument
-        local_distances.as_tensor_arg(vectorization),
-        local_indices.as_tensor_arg(vectorization),
-        grad_output.as_tensor_arg(vectorization),
-        grad_pairwise_distances.as_tensor_arg(vectorization),
+        local_distances.as_tensor_arg::<F>(vectorization),
+        local_indices.as_tensor_arg::<I>(vectorization),
+        grad_output.as_tensor_arg::<F>(vectorization),
+        grad_pairwise_distances.as_tensor_arg::<F>(vectorization),
     );
 
     // Return the gradient of the pairwise distances
