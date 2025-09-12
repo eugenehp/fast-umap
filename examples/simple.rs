@@ -14,7 +14,7 @@ fn main() {
 
     // Generate a dataset of random values with `num_samples` rows and `num_features` columns
     let data: Vec<Vec<f64>> = (0..num_samples * num_features)
-        .map(|_| rng.gen::<f64>()) // Random number generation for each feature
+        .map(|_| rng.random::<f64>()) // Random number generation for each feature
         .collect::<Vec<f64>>() // Collect all random values into a vector
         .chunks_exact(num_features) // Chunk the vector into rows of length `num_features`
         .map(|chunk| chunk.to_vec()) // Convert each chunk into a Vec<f64>

@@ -1,5 +1,4 @@
 use burn::{module::*, prelude::*};
-use burn_cubecl::{BoolElement, CubeRuntime};
 use crossbeam_channel::unbounded;
 use cubecl::wgpu::WgpuRuntime;
 use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
