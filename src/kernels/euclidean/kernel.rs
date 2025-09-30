@@ -109,7 +109,7 @@ pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
     let dist = output[row * n + col];
 
     // Handle small distances (to avoid division by zero)
-    let epsilon = F::cast_from(1e-8); // Define a small epsilon value
+    let epsilon = F::new(1e-8); // Define a small epsilon value
     let dist = F::max(dist, epsilon); // Ensure dist is never less than epsilon
 
     // Skip if the distance is 0 (identical vectors)

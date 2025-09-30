@@ -24,7 +24,7 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         device.clone(),
         output_shape,
         buffer,
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     // Launch the Euclidean pairwise distance kernel
@@ -69,7 +69,7 @@ pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>
         output.device.clone(),
         grad_output_shape,
         buffer,
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     // Launch the Euclidean pairwise distance kernel
