@@ -1,7 +1,10 @@
 use crate::backend::AutodiffBackend;
-use crate::{chart, train, utils, UMAP};
+use crate::{train, utils, UMAP};
 
 // Re-export common utilities for easier use
+#[cfg(feature = "plots")]
+pub use crate::chart;
+#[cfg(feature = "plots")]
 pub use chart::{chart_tensor, chart_vector};
 
 use crossbeam_channel::unbounded;

@@ -10,6 +10,7 @@ use utils::*;
 use burn::tensor::{Device, Tensor};
 
 pub mod backend;
+#[cfg(feature = "plots")]
 pub mod chart;
 pub mod distances;
 pub mod kernels;
