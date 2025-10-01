@@ -36,7 +36,7 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         device.clone(),
         distances_shape,
         distances_buffer,
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
@@ -51,7 +51,7 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer.clone(),
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
@@ -106,7 +106,7 @@ pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         buffer,
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
@@ -121,7 +121,7 @@ pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer.clone(),
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
@@ -129,7 +129,7 @@ pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
         local_buffer,
-        burn::tensor::DType::F64,
+        F::dtype(),
     );
 
     // Calculate the number of blocks needed for the kernel launch
