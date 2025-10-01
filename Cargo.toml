@@ -22,15 +22,18 @@ indicatif = "0.18"
 ndarray = "0.16.1"
 num = "0.4.3"
 num-traits = "0.2.19"
-plotters = "0.3.7"
+plotters = { version = "0.3.7", optional = true }
 prettytable = "0.10.0"
 rand = "0.9.2"
 rayon = "1.10.0"
 serde = "1.0.216"
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
 
 [dev-dependencies]
 mnist = { version = "0.6.1", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
 
 [features]
-default = ["verbose"]
-verbose = []
+default = []
+verbose = ["tracing", "tracing-subscriber"]
+plots = ["plotters"]

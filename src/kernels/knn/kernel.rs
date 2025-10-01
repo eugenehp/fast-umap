@@ -46,32 +46,32 @@ pub fn knn_kernel<F: Float + CubePrimitive, I: Int>(
         }
 
         // Iterate through all the pairwise distances for the current row
-        // for col in 0..n {
-        //     if row != col {
-        //         // Skip self-comparison
-        //         let dist = pairwise_distances[row * n + col];
+        for col in 0..n {
+            if row != col {
+                // Skip self-comparison
+                let dist = pairwise_distances[row * n + col];
 
-        //         // Find where to insert this distance in the sorted array of top-k distances
-        //         if dist < local_distances[k - 1] {
-        //             let mut i = k - 1; // Start from the last index
+                // Find where to insert this distance in the sorted array of top-k distances
+                if dist < local_distances[k - 1] {
+                    let mut i = k - 1; // Start from the last index
 
-        //             // Shift larger distances one step to the right to make space for the new distance
-        //             while i > 0 {
-        //                 if dist < local_distances[i] {
-        //                     local_distances[i] = local_distances[i - 1];
-        //                     local_indices[i] = local_indices[i - 1];
-        //                 } else {
-        //                     break;
-        //                 }
-        //                 i -= 1; // Move to the previous index
-        //             }
+                    // Shift larger distances one step to the right to make space for the new distance
+                    while i > 0 {
+                        if dist < local_distances[i] {
+                            local_distances[i] = local_distances[i - 1];
+                            local_indices[i] = local_indices[i - 1];
+                        } else {
+                            break;
+                        }
+                        i -= 1; // Move to the previous index
+                    }
 
-        //             // Insert the new distance at the correct position
-        //             local_distances[i] = dist;
-        //             // local_indices[i] = F::cast_from(u32_to_float(col)); // Store the corresponding index
-        //         }
-        //     }
-        // }
+                    // Insert the new distance at the correct position
+                    local_distances[i] = dist;
+                    local_indices[i] = I::cast_from(col); // Store the corresponding index
+                }
+            }
+        }
 
         // Copy the results from local arrays into the output tensors
         for i in 0..k {

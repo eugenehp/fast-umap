@@ -1,16 +1,18 @@
 mod config;
 mod get_distance_by_metric;
 
+#[cfg(feature = "verbose")]
+use tracing::{debug, info, span, Level};
+
+#[cfg(feature = "plots")]
+use crate::chart::{self, plot_loss, ChartConfigBuilder};
+
 use crate::{
-    backend::AutodiffBackend,
-    chart::{self, plot_loss, ChartConfigBuilder},
-    format_duration,
-    model::UMAPModel,
-    normalize_data,
+    backend::AutodiffBackend, format_duration, model::UMAPModel, normalize_data,
     utils::convert_vector_to_tensor,
 };
 use burn::{
-    module::{AutodiffModule, Module},
+    module::Module,
     nn::loss::MseLoss,
     optim::{
         decay::WeightDecayConfig, AdamConfig, GradientsAccumulator, GradientsParams, Optimizer,
@@ -24,8 +26,10 @@ use crossbeam_channel::Receiver;
 use get_distance_by_metric::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive};
+#[cfg(feature = "plots")]
+use std::thread;
 use std::time::Duration;
-use std::{thread, time::Instant};
+use std::time::Instant;
 
 /// Train the UMAP model over multiple epochs.
 ///
@@ -39,14 +43,14 @@ use std::{thread, time::Instant};
 /// * `num_samples`: The number of samples in the training data.
 /// * `num_features`: The number of features per sample (columns in the data).
 /// * `data`: The training data as a flat `Vec<f64>`, where each sample is represented as a
-///   sequence of `num_features` values.
+///   sequence of `num_features` values. In row-major order.
 /// * `config`: The `TrainingConfig` containing training hyperparameters and options.
 pub fn train<B: AutodiffBackend, F: Float>(
     name: &str,
     mut model: UMAPModel<B>,
     num_samples: usize,      // Number of samples in the dataset.
     num_features: usize,     // Number of features (columns) in each sample.
-    mut data: Vec<F>,        // Training data.
+    mut data: Vec<F>,        // Training data in row-major order.
     config: &TrainingConfig, // Configuration parameters for training.
     device: Device<B>,
     exit_rx: Receiver<()>,
@@ -54,6 +58,15 @@ pub fn train<B: AutodiffBackend, F: Float>(
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
 {
+    #[cfg(feature = "verbose")]
+    {
+        // Initialize tracing subscriber only once
+        use tracing_subscriber;
+        let _ = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::DEBUG)
+            .try_init();
+    }
+
     if config.metric == Metric::EuclideanKNN && config.k_neighbors > num_samples {
         panic!("When using Euclidean KNN distance, k_neighbors should be smaller than number of samples!")
     }
@@ -97,22 +110,35 @@ where
     // store the size of the Tensor after the distance has been calculated
     let mut global_distance_size: Shape = Shape::from([0, 0]);
 
-    for batch_data in &batches {
+    #[cfg(feature = "verbose")]
+    info!("Preprocessing {} batches", batches.len());
+
+    for (_batch_idx, batch_data) in batches.iter().enumerate() {
+        #[cfg(feature = "verbose")]
+        let _span = span!(Level::DEBUG, "preprocess_batch", batch = _batch_idx).entered();
+
         // Convert each batch to tensor format.
         let tensor_batch =
             convert_vector_to_tensor(batch_data.clone(), batch_size, num_features, &device);
 
         tensor_batches.push(tensor_batch);
 
-        // Compute the global distances for each batch (using the entire dataset).
+        // Compute the global distances for each batch (in high-dimensional space).
         let global_tensor_data =
-            convert_vector_to_tensor(data.clone(), batch_size, num_features, &device);
+            convert_vector_to_tensor(batch_data.clone(), batch_size, num_features, &device);
+
+        #[cfg(feature = "verbose")]
+        debug!("Computing global distances for batch {}", _batch_idx);
+
         let global_distances =
             get_distance_by_metric(global_tensor_data.clone(), config, Some("global".into()));
 
         global_distance_size = global_distances.shape();
         global_distances_batches.push(global_distances);
     }
+
+    #[cfg(feature = "verbose")]
+    info!("Preprocessing complete, starting training loop");
 
     let global_distances_all = Tensor::<B, 2>::cat(global_distances_batches, 0); // Concatenate along the 0-axis
     let tensor_batches_all = Tensor::<B, 2>::cat(tensor_batches, 0); // Concatenate along the 0-axis
@@ -152,8 +178,12 @@ where
     let mse_loss = MseLoss::new();
 
     'main: loop {
-        // println!("batch {}", format_duration(start_time.elapsed()));
+        #[cfg(feature = "verbose")]
+        let _epoch_span = span!(Level::INFO, "epoch", epoch = epoch).entered();
+
         for (batch_idx, _) in batches.iter().enumerate() {
+            #[cfg(feature = "verbose")]
+            let _batch_span = span!(Level::DEBUG, "train_batch", batch = batch_idx).entered();
             if let Ok(_) = exit_rx.try_recv() {
                 break 'main;
             }
@@ -197,17 +227,18 @@ where
 
             let current_loss = F::from(loss.clone().into_scalar().to_f64()).unwrap();
 
-            losses.push(current_loss);
-
             #[cfg(feature = "verbose")]
             {
-                // println!("global_distances {:?}", global_distances.to_data());
-                // println!("local_distances {:?}", local_distances.to_data());
-                // println!("loss {:?}", loss.to_data());
+                debug!("Batch {} loss: {}", batch_idx, current_loss);
                 if current_loss.is_nan() {
                     panic!("current loss is NaN")
                 }
+                if current_loss.is_infinite() {
+                    debug!("Warning: infinite loss detected");
+                }
             }
+
+            losses.push(current_loss);
 
             // TODO: if loss is NaN, do something else. FIXME
             let grads = loss.backward();
@@ -220,6 +251,9 @@ where
         }
 
         let current_loss = losses.last().unwrap().clone();
+
+        #[cfg(feature = "verbose")]
+        info!("Epoch {} completed, loss: {}", epoch, current_loss);
 
         let grads = accumulator.grads(); // Pop the accumulated gradients.
 
@@ -273,11 +307,14 @@ where
             }
         }
 
+        #[cfg(feature = "plots")]
         let output_path = format!("losses_{name}.png");
 
-        #[cfg(feature = "verbose")]
+        #[cfg(feature = "plots")]
         {
+            use burn::module::AutodiffModule;
             const STEP: usize = 100;
+
             let name = name.to_string();
             if epoch > 0 && epoch % STEP == 0 {
                 let losses = losses.clone();
@@ -314,7 +351,8 @@ where
             break; // Stop training if the specified number of epochs is reached.
         }
 
-        // If verbose mode is enabled, plot the loss curve after training.
+        // If plots feature is enabled, plot the loss curve after training.
+        #[cfg(feature = "plots")]
         if config.verbose {
             plot_loss(losses.clone(), &output_path).unwrap();
         }
@@ -325,8 +363,8 @@ where
         }
     }
 
-    // If verbose mode is enabled, plot the loss curve after training.
-    #[cfg(feature = "verbose")]
+    // If plots feature is enabled, plot the loss curve after training.
+    #[cfg(feature = "plots")]
     {
         let name = format!("losses_{name}.png");
         plot_loss(losses.clone(), name.as_str()).unwrap();

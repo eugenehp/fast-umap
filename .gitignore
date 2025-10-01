@@ -1,3 +1,7 @@
+mnist_*.png
+mnist.bin
+minst.png
+losses_mnist.png
 /target
 .DS_Store
 data/*
