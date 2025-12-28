@@ -345,7 +345,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Copyright
 
-2024-2025, Eugene Hauptmann
+2024-2026, Eugene Hauptmann
 
 ## Thank you
 
