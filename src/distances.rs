@@ -88,6 +88,24 @@ pub fn euclidean_knn<B: Backend>(x: Tensor<B, 2>, k: usize) -> Tensor<B, 1> {
     sum_of_top_k_distances
 }
 
+/// Compute the L1 (Manhattan) norm of each row in a 2-D tensor.
+///
+/// For each sample row `x[i]`, returns `∑_j |x[i, j]|`.
+///
+/// # Arguments
+///
+/// * `tensor` — A 2-D tensor of shape `[n_samples, n_features]`.
+///
+/// # Returns
+///
+/// A 1-D tensor of shape `[n_samples]` where element `i` is the sum of
+/// absolute feature values for sample `i`.
+///
+/// # Note
+///
+/// This computes the L1 norm of each row, *not* pairwise Manhattan distances
+/// between rows.  It is used as a distance-from-origin proxy when the
+/// `Manhattan` metric is selected.
 pub fn manhattan<B: Backend>(tensor: Tensor<B, 2>) -> Tensor<B, 1> {
     let n_samples = tensor.dims()[0];
     // Sum the absolute difference along the rows (axis 1)

@@ -1,3 +1,52 @@
+//! # fast-umap
+//!
+//! GPU-accelerated UMAP (Uniform Manifold Approximation and Projection) in Rust,
+//! built on top of the [burn](https://github.com/tracel-ai/burn) deep-learning
+//! framework and [CubeCL](https://github.com/tracel-ai/cubecl) GPU kernels.
+//!
+//! ## Quick start
+//!
+//! ```rust,no_run
+//! use fast_umap::prelude::*;
+//!
+//! // 100 samples × 10 features
+//! let data: Vec<Vec<f64>> = generate_test_data(100, 10)
+//!     .chunks(10)
+//!     .map(|c| c.iter().map(|&x: &f32| x as f64).collect())
+//!     .collect();
+//!
+//! // Project to 2-D and save plot.png
+//! // let embedding = umap(data.clone()).transform(data);
+//! // chart_vector(embedding, None, None);
+//! ```
+//!
+//! ## Architecture
+//!
+//! The dimensionality reduction is performed by a small feed-forward neural
+//! network (`UMAPModel`) trained with the UMAP cross-entropy loss:
+//!
+//! ```text
+//! attraction  =  mean_{k-NN pairs}   [ −log q_ij ]
+//! repulsion   =  mean_{non-NN pairs} [ −log (1 − q_ij) ]
+//! loss        =  attraction  +  repulsion_strength × repulsion
+//! ```
+//!
+//! where `q_ij = 1 / (1 + d_ij²)` is the Student-t kernel applied to the
+//! 2-D embedding distances.
+//!
+//! ## Modules
+//!
+//! | Module | Description |
+//! |--------|-------------|
+//! [`model`] | `UMAPModel` neural network and config builder |
+//! [`train`] | Training loop, `TrainingConfig`, loss computation |
+//! [`chart`] | 2-D scatter plots and loss curves (plotters) |
+//! [`utils`] | Data generation, tensor conversion, normalisation |
+//! [`kernels`] | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
+//! [`backend`] | Backend trait extension for custom kernel dispatch |
+//! [`distances`] | CPU-side distance functions (Euclidean, cosine, Minkowski…) |
+//! [`prelude`] | Re-exports of the most commonly used items |
+
 use backend::AutodiffBackend;
 use burn::module::AutodiffModule;
 
@@ -53,9 +102,11 @@ impl<B: AutodiffBackend> UMAP<B> {
     {
         let default_name = "model";
         // Set training parameters
-        let batch_size = 1;
         let num_samples = data.len();
         let num_features = data[0].len();
+        // Process all samples in one batch per epoch (suitable for the convenience umap() API).
+        // Using batch_size=1 would panic in train(); using num_samples guarantees one full batch.
+        let batch_size = num_samples;
         // let output_size = 2; // UMAP typically reduces the data to 2 dimensions
         let hidden_sizes = vec![100]; // Size of the hidden layers in the model
         let learning_rate = 0.001; // Learning rate for optimization
@@ -64,7 +115,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         let epochs = 100; // Number of epochs for training
         let seed = 9999; // Random seed for reproducibility
 
-        B::seed(seed); // Set the seed for the backend
+        B::seed(&device, seed); // Set the seed for the backend
 
         // Flatten the input data into a single vector of f64 values
         let train_data: Vec<F> = data.into_iter().flatten().map(|f| f).collect();
@@ -100,6 +151,7 @@ impl<B: AutodiffBackend> UMAP<B> {
             &config,
             device.clone(),
             exit_rx,
+            None, // no labels available in the UMAP::fit path
         );
 
         // Validate the trained model

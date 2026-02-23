@@ -7,6 +7,23 @@ use burn_cubecl::{
 };
 use cubecl::prelude::*;
 
+/// Forward pass: select the `k` nearest neighbours for every row.
+///
+/// Allocates `[n, k]` output buffers for indices and distances, plus `[n, k]`
+/// scratch buffers used inside the kernel for the per-row insertion sort.
+/// Launches [`knn_kernel`] with one GPU thread per row of the `[n, n]`
+/// `pairwise_distances` matrix.
+///
+/// # Arguments
+///
+/// * `pairwise_distances` — Symmetric `[n, n]` float distance matrix.
+/// * `k`                  — Number of nearest neighbours to select per row.
+///
+/// # Returns
+///
+/// A tuple `(indices, distances)`:
+/// * `indices`   — `[n, k]` integer tensor of neighbour column indices.
+/// * `distances` — `[n, k]` float tensor of corresponding distances.
 pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
     pairwise_distances: FloatTensor<CubeBackend<R, F, I, BT>>,
     k: u32,
@@ -39,33 +56,36 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         F::dtype(),
     );
 
-    let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
+    // Each of the n threads needs its own scratch space of k slots — so shape is [n, k].
+    let local_shape = Shape::from(vec![n, k as usize]);
 
-    // Create the buffer and grad_pairwise_distances tensor
-    let local_buffer = pairwise_distances
+    let local_dist_buffer = pairwise_distances
         .client
         .empty(local_shape.num_elements() * std::mem::size_of::<F>());
+    let local_idx_buffer = pairwise_distances
+        .client
+        .empty(local_shape.num_elements() * std::mem::size_of::<i64>());
 
     let local_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
-        pairwise_distances.shape.clone(),
-        local_buffer.clone(),
+        local_shape.clone(),
+        local_dist_buffer,
         F::dtype(),
     );
 
     let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
-        pairwise_distances.shape.clone(),
-        local_buffer,
+        local_shape,
+        local_idx_buffer,
         burn::tensor::DType::I64,
     );
 
-    // Launch the k-NN kernel
+    // One thread per row; y-dimension is unused (set to 1).
     let cube_dim = DEFAULT_CUBE_DIM;
     let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
-    let cubes_needed_in_y = (k as f32 / cube_dim.y as f32).ceil() as u32;
+    let cubes_needed_in_y = 1_u32;
     let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
     let vectorisation = 1;
@@ -75,67 +95,88 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         &client,
         cube_count,
         cube_dim,
-        pairwise_distances.as_tensor_arg::<F>(vectorisation), // Pairwise distance matrix
-        ScalarArg::new(k),                                    // Number of neighbors
-        local_distances.as_tensor_arg::<F>(vectorisation),
-        local_indices.as_tensor_arg::<I>(vectorisation),
-        indices.as_tensor_arg::<I>(vectorisation), // Indices tensor
-        distances.as_tensor_arg::<F>(vectorisation), // Distances tensor
-    );
+        pairwise_distances.as_tensor_arg(vectorisation), // Pairwise distance matrix
+        ScalarArg::new(k),                               // Number of neighbors
+        local_distances.as_tensor_arg(vectorisation),
+        local_indices.as_tensor_arg(vectorisation),
+        indices.as_tensor_arg(vectorisation), // Indices tensor
+        distances.as_tensor_arg(vectorisation), // Distances tensor
+    )
+    .expect("knn_kernel launch failed");
 
     (indices, distances)
 }
 
+/// Backward pass: propagate gradients through the k-NN selection.
+///
+/// Re-runs the forward insertion sort (via [`knn_backward_kernel`]) to
+/// recover which neighbours were selected, then propagates `grad_output`
+/// (shape `[n, k]`) back to `grad_pairwise_distances` (shape `[n, n]`).
+///
+/// The output gradient buffer is zero-initialised because the kernel uses
+/// `+=` to accumulate contributions.
+///
+/// # Arguments
+///
+/// * `pairwise_distances` — Symmetric `[n, n]` distance matrix from the forward pass.
+/// * `k`                  — Number of nearest neighbours.
+/// * `grad_output`        — Upstream gradient `∂loss/∂knn_distances`, shape `[n, k]`.
+///
+/// # Returns
+///
+/// `∂loss/∂pairwise_distances`, shape `[n, n]`.
 pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
-    pairwise_distances: FloatTensor<CubeBackend<R, F, I, BT>>, // Pairwise distance matrix (n, n)
-    k: u32,                                                    // Number of nearest neighbors
-    grad_output: FloatTensor<CubeBackend<R, F, I, BT>>, // Gradient of the loss w.r.t the output
+    pairwise_distances: FloatTensor<CubeBackend<R, F, I, BT>>,
+    k: u32,
+    grad_output: FloatTensor<CubeBackend<R, F, I, BT>>,
 ) -> FloatTensor<CubeBackend<R, F, I, BT>> {
     // Convert the output tensor to a contiguous format for efficient access
     let pairwise_distances = into_contiguous(pairwise_distances);
     let n = pairwise_distances.shape.dims[0]; // Number of vectors
     let grad_output_shape = Shape::from(vec![n, k as usize]); // Gradient output shape for k neighbors
 
-    // Create the buffer and grad_pairwise_distances tensor
-    let buffer = pairwise_distances
-        .client
-        .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
+    // grad_pairwise_distances uses += in the kernel, so must be zero-initialised.
+    let zero_bytes = vec![0u8; grad_output_shape.num_elements() * std::mem::size_of::<F>()];
+    let grad_buffer = pairwise_distances.client.create_from_slice(&zero_bytes);
 
     let grad_pairwise_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
         pairwise_distances.shape.clone(),
-        buffer,
+        grad_buffer,
         F::dtype(),
     );
 
-    let local_shape = Shape::from(vec![k as usize]); // Local shape for k neighbors
+    // Per-row scratch space of k slots — shape [n, k].
+    let local_shape = Shape::from(vec![n, k as usize]);
 
-    // Create the buffer and grad_pairwise_distances tensor
-    let local_buffer = pairwise_distances
+    let local_dist_buffer = pairwise_distances
+        .client
+        .empty(local_shape.num_elements() * std::mem::size_of::<F>());
+    let local_idx_buffer = pairwise_distances
         .client
         .empty(local_shape.num_elements() * std::mem::size_of::<F>());
 
     let local_distances: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
-        pairwise_distances.shape.clone(),
-        local_buffer.clone(),
+        local_shape.clone(),
+        local_dist_buffer,
         F::dtype(),
     );
 
     let local_indices: CubeTensor<R> = CubeTensor::new_contiguous(
         pairwise_distances.client.clone(),
         pairwise_distances.device.clone(),
-        pairwise_distances.shape.clone(),
-        local_buffer,
+        local_shape,
+        local_idx_buffer,
         F::dtype(),
     );
 
-    // Calculate the number of blocks needed for the kernel launch
+    // One thread per row.
     let cube_dim = DEFAULT_CUBE_DIM;
     let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
-    let cubes_needed_in_y = (n as f32 / cube_dim.y as f32).ceil() as u32;
+    let cubes_needed_in_y = 1_u32;
     let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
 
     let vectorization = 1; // Use 1 for no vectorization
@@ -145,13 +186,14 @@ pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>
         &pairwise_distances.client,
         cube_count,
         cube_dim,
-        pairwise_distances.as_tensor_arg::<F>(vectorization),
+        pairwise_distances.as_tensor_arg(vectorization),
         ScalarArg::new(k), // Pass the value of k as an argument
-        local_distances.as_tensor_arg::<F>(vectorization),
-        local_indices.as_tensor_arg::<I>(vectorization),
-        grad_output.as_tensor_arg::<F>(vectorization),
-        grad_pairwise_distances.as_tensor_arg::<F>(vectorization),
-    );
+        local_distances.as_tensor_arg(vectorization),
+        local_indices.as_tensor_arg(vectorization),
+        grad_output.as_tensor_arg(vectorization),
+        grad_pairwise_distances.as_tensor_arg(vectorization),
+    )
+    .expect("knn_backward_kernel launch failed");
 
     // Return the gradient of the pairwise distances
     grad_pairwise_distances

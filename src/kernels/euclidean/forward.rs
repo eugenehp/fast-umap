@@ -7,6 +7,21 @@ use burn_cubecl::{
 };
 use cubecl::prelude::*;
 
+/// Forward pass: compute the `[n, n]` Euclidean pairwise distance matrix.
+///
+/// Allocates an `[n, n]` output buffer on the GPU and launches
+/// [`euclidean_pairwise_distance_kernel`] with a 2-D grid of
+/// `⌈n/32⌉ × ⌈n/32⌉` work-groups, one thread per `(row, col)` pair.
+/// The kernel writes both `output[row, col]` and the symmetric entry
+/// `output[col, row]` from the upper-triangle threads.
+///
+/// # Arguments
+///
+/// * `x` — Input tensor of shape `[n, d]` on the target CubeBackend device.
+///
+/// # Returns
+///
+/// A contiguous `[n, n]` float tensor of pairwise Euclidean distances.
 pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
     x: FloatTensor<CubeBackend<R, F, I, BT>>,
 ) -> FloatTensor<CubeBackend<R, F, I, BT>> {
@@ -38,9 +53,10 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
         &client,
         cube_count,
         cube_dim,
-        x.as_tensor_arg::<F>(1),
-        output.as_tensor_arg::<F>(1),
-    );
+        x.as_tensor_arg(1),
+        output.as_tensor_arg(1),
+    )
+    .expect("euclidean_pairwise_distance_kernel launch failed");
 
     #[cfg(feature = "verbose")]
     {
@@ -51,44 +67,56 @@ pub fn forward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
     output
 }
 
+/// Backward pass for euclidean pairwise distances.
+///
+/// Dispatches one GPU thread per (row, feature) output element of grad_x.
+/// Each thread iterates over all columns — O(n) work — to accumulate the
+/// gradient contributions from both `pairwise[row, col]` and the symmetric
+/// entry `pairwise[col, row]`, using the precomputed distance to avoid
+/// recomputing O(d) inner products per pair.
+///
+/// The kernel uses `=` (write-once), so no zero-initialisation is needed.
 pub fn backward<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement>(
-    grad_x: FloatTensor<CubeBackend<R, F, I, BT>>,
-    output: FloatTensor<CubeBackend<R, F, I, BT>>,
+    grad_pairwise: FloatTensor<CubeBackend<R, F, I, BT>>, // ∂loss/∂pairwise_distances [n,n]
+    x: FloatTensor<CubeBackend<R, F, I, BT>>,             // original input x            [n,d]
+    pairwise: FloatTensor<CubeBackend<R, F, I, BT>>,      // precomputed distances       [n,n]
 ) -> FloatTensor<CubeBackend<R, F, I, BT>> {
-    // println!("backend - euclidean_pairwise_distance_backward");
-    let output = into_contiguous(output);
-    let n = output.shape.dims[0];
-    let d = output.shape.dims[1];
+    let x = into_contiguous(x);
+    let pairwise = into_contiguous(pairwise);
+    let grad_pairwise = into_contiguous(grad_pairwise);
+    let n = x.shape.dims[0];
+    let d = x.shape.dims[1];
 
-    let grad_output_shape = Shape::from(vec![n, d]);
-    let buffer = output
+    // Output: ∂loss/∂x, shape [n, d].  Kernel writes with `=`, no init needed.
+    let grad_x_shape = Shape::from(vec![n, d]);
+    let buffer = x
         .client
-        .empty(grad_output_shape.num_elements() * std::mem::size_of::<F>());
-    let grad_output: CubeTensor<R> = CubeTensor::new_contiguous(
-        output.client.clone(),
-        output.device.clone(),
-        grad_output_shape,
+        .empty(grad_x_shape.num_elements() * std::mem::size_of::<F>());
+    let grad_x: CubeTensor<R> = CubeTensor::new_contiguous(
+        x.client.clone(),
+        x.device.clone(),
+        grad_x_shape,
         buffer,
         F::dtype(),
     );
 
-    // Launch the Euclidean pairwise distance kernel
+    // Dispatch one thread per (sample, feature) = n×d grid.
+    // ABSOLUTE_POS_X → sample row, ABSOLUTE_POS_Y → feature column.
     let cube_dim = DEFAULT_CUBE_DIM;
-    let cubes_needed_in_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
-    let cubes_needed_in_y = (d as f32 / cube_dim.y as f32).ceil() as u32;
-    let cube_count = CubeCount::Static(cubes_needed_in_x, cubes_needed_in_y, 1);
+    let cubes_x = (n as f32 / cube_dim.x as f32).ceil() as u32;
+    let cubes_y = (d as f32 / cube_dim.y as f32).ceil() as u32;
+    let cube_count = CubeCount::Static(cubes_x, cubes_y, 1);
 
-    let vectorisation = 1;
-
-    // Launch the kernel
     euclidean_pairwise_distance_backward_kernel::launch::<F, R>(
-        &output.client,
+        &x.client,
         cube_count,
         cube_dim,
-        output.as_tensor_arg::<F>(vectorisation),
-        grad_output.as_tensor_arg::<F>(vectorisation),
-        grad_x.as_tensor_arg::<F>(vectorisation),
-    );
+        x.as_tensor_arg(1),
+        pairwise.as_tensor_arg(1),
+        grad_pairwise.as_tensor_arg(1),
+        grad_x.as_tensor_arg(1),
+    )
+    .expect("euclidean_pairwise_distance_backward_kernel launch failed");
 
-    grad_output
+    grad_x
 }

@@ -6,17 +6,30 @@ categories = ["science", "mathematics", "visualization"]
 authors = ["Eugene Hauptmann"]
 repository = "https://github.com/eugenehp/fast-map"
 homepage = "https://github.com/eugenehp/fast-map"
+documentation = "https://docs.rs/fast-umap/latest/fast_umap/"
 license = "MIT"
-version = "0.0.2"
+version = "1.0.0"
 edition = "2021"
 
+# docs.rs build configuration.
+# `all-features = true`  — build docs with every feature enabled so nothing
+#                          is hidden behind a flag.
+# `rustdoc-args`         — pass --cfg docsrs so that doc-only items gated with
+#                          #[cfg(docsrs)] (e.g. nightly doc_cfg annotations)
+#                          are included in the rendered output.
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+exclude = ["figures/*"]
+
 [dependencies]
-burn = { version = "0.18", features = ["train", "wgpu", "autodiff", "autotune"] }
-burn-cubecl = { version = "0.18.0", features = ["burn-autodiff"] }
+burn = { version = "0.20.1", features = ["train", "wgpu", "autodiff", "autotune", "ndarray"] }
+burn-cubecl = { version = "0.20.1" }
 # burn-jit = { version = "0.16.1", features = ["burn-autodiff"] }
 crossbeam-channel = "0.5.15"
 ctrlc = "3.4.7"
-cubecl = { version = "0.6.0", features = ["wgpu"] }
+cubecl = { version = "0.9.0", features = ["wgpu"] }
 hsl = "0.1.1"
 indicatif = "0.18"
 ndarray = "0.16.1"
@@ -29,7 +42,13 @@ rayon = "1.10.0"
 serde = "1.0.216"
 
 [dev-dependencies]
+burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 mnist = { version = "0.6.1", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
+
+[[bench]]
+name = "umap_bench"
+harness = false
 
 [features]
 default = ["verbose"]

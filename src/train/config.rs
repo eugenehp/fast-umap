@@ -1,25 +1,39 @@
 use std::fmt;
 
+/// How the per-sample losses are combined into a single scalar for
+/// backpropagation.
+///
+/// * [`Mean`](LossReduction::Mean) - divide by the number of elements
+///   (scale-invariant, recommended for most use cases).
+/// * [`Sum`](LossReduction::Sum) - sum without normalisation (sensitive to
+///   batch size; may require a lower learning rate).
 #[derive(Debug, Clone)]
 pub enum LossReduction {
+    /// Average the loss over all contributing pairs.
     Mean,
+    /// Sum the loss over all contributing pairs without normalisation.
     Sum,
 }
 
+/// Distance metric used to build the high-dimensional k-NN graph during the
+/// precomputation phase.
+///
+/// The choice of metric determines how "closeness" is measured in the original
+/// feature space.  [`Euclidean`](Metric::Euclidean) (L2) is the default and
+/// works well for most continuous data.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Metric {
+    /// Standard L2 (Euclidean) distance — default.
     Euclidean,
+    /// Euclidean distance computed via the GPU k-NN kernel path.
     EuclideanKNN,
-    // EuclideanWeighted,
+    /// L1 (Manhattan / taxicab) distance.
     Manhattan,
+    /// Cosine dissimilarity `1 − cos(θ)`.
     Cosine,
-    // Correlation,
-    // Hamming,
-    // Jaccard,
+    /// Generalised Minkowski distance of order `p`
+    /// (`p = 1` → Manhattan, `p = 2` → Euclidean).
     Minkowski,
-    // Chebyshev,
-    // Mahalnobis,
-    // Spearman, // Spearman’s Rank Correlation Distance
 }
 
 // Implement From<&str> for Metric
@@ -101,6 +115,11 @@ pub struct TrainingConfig {
     pub normalized: bool,
 
     pub minkowski_p: f64,
+
+    /// Weight applied to the repulsion term of the UMAP cross-entropy loss.
+    /// 1.0 (default) balances attraction and repulsion equally.
+    /// Increase to push non-neighbour points further apart.
+    pub repulsion_strength: f32,
 }
 
 impl TrainingConfig {
@@ -130,6 +149,7 @@ pub struct TrainingConfigBuilder {
     timeout: Option<u64>,
     normalized: Option<bool>,
     minkowski_p: Option<f64>,
+    repulsion_strength: Option<f32>,
 }
 
 impl TrainingConfigBuilder {
@@ -225,6 +245,9 @@ impl TrainingConfigBuilder {
         self
     }
 
+    /// Set whether the distance outputs are normalised before being used in
+    /// the loss.  Normalisation keeps values in a numerically stable range,
+    /// especially when using non-Euclidean metrics.  Defaults to `true`.
     pub fn with_normalized(mut self, normalized: bool) -> Self {
         self.normalized = Some(normalized);
         self
@@ -234,6 +257,13 @@ impl TrainingConfigBuilder {
     /// it computes Manhattan distance, and for `p = 2`, it computes Euclidean distance.
     pub fn with_minkowski_p(mut self, minkowski_p: f64) -> Self {
         self.minkowski_p = Some(minkowski_p);
+        self
+    }
+
+    /// Set the repulsion strength for the UMAP cross-entropy loss.
+    /// Default is 1.0.  Raise this to push non-neighbour classes further apart.
+    pub fn with_repulsion_strength(mut self, repulsion_strength: f32) -> Self {
+        self.repulsion_strength = Some(repulsion_strength);
         self
     }
 
@@ -258,6 +288,7 @@ impl TrainingConfigBuilder {
             timeout: self.timeout,                       // Optional, no default
             normalized: self.normalized.unwrap_or(true), // normalize output of distance by default
             minkowski_p: self.minkowski_p.unwrap_or(1.0), // default to 1.0 so it computes Manhattan distance
+            repulsion_strength: self.repulsion_strength.unwrap_or(1.0),
         })
     }
 }
