@@ -64,6 +64,7 @@ fn execute<B: AutodiffBackend>(
         &config,            // The training configuration
         device.clone(),
         exit_rx,
+        None,               // no labels for benchmark runs
     );
 
     // Validate the trained model after training
@@ -77,7 +78,7 @@ fn execute<B: AutodiffBackend>(
 
     let chart_config = ChartConfigBuilder::default()
         .caption(name.as_str())
-        .path(format!("{name}.png").as_str())
+        .path(format!("figures/{name}.png").as_str())
         .build();
 
     // Visualize the 2D embedding (local representation) using a chart
@@ -193,7 +194,7 @@ fn main() {
     let normalized = true;
 
     // Seed the random number generator to ensure reproducibility
-    MyBackend::seed(seed);
+    MyBackend::seed(&device, seed);
 
     let Mnist {
         trn_img, trn_lbl, ..

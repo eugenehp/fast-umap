@@ -11,7 +11,7 @@ use std::collections::HashSet;
 const CAPTION: &str = "fast-umap";
 
 /// The default path where the plot will be saved
-const PATH: &str = "plot.png";
+const PATH: &str = "figures/plot.png";
 
 /// Configuration structure for the chart, including caption, path, width, and height
 #[derive(Debug, Clone)]
@@ -130,6 +130,13 @@ pub fn plot_loss<F: num::Float>(
 where
     F:,
 {
+    // Ensure parent directory exists.
+    if let Some(parent) = std::path::Path::new(output_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)?;
+        }
+    }
+
     // Calculate the min and max loss values
     let min_loss = losses.iter().cloned().fold(F::infinity(), F::min);
     let max_loss = losses.iter().cloned().fold(F::neg_infinity(), F::max);
@@ -187,6 +194,13 @@ pub fn chart_vector(
 ) {
     let config = config.unwrap_or(ChartConfig::default());
 
+    // Ensure the parent directory exists (handles "figures/plot.png" etc.)
+    if let Some(parent) = std::path::Path::new(&config.path).parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent).expect("Could not create chart output directory");
+        }
+    }
+
     // Create the drawing area
     let root = BitMapBackend::new(&config.path, (config.width, config.height)).into_drawing_area();
     root.fill(&WHITE).unwrap();
@@ -217,22 +231,25 @@ pub fn chart_vector(
         .max_by(|a, b| a.partial_cmp(b).unwrap())
         .unwrap() as Float;
 
-    // Assign colors to unique labels if provided
+    // Assign colors to unique labels if provided.
+    // Labels are sorted (numerically if parseable, lexicographically otherwise)
+    // before hues are assigned, so the same label always maps to the same color
+    // across all plots in a run.
     let mut label_colors: Vec<(String, RGBColor)> = Vec::new();
     if let Some(labels) = labels.clone() {
-        let unique_labels: Vec<String> = labels
+        let mut unique_labels: Vec<String> = labels
             .into_iter()
             .collect::<HashSet<String>>()
             .into_iter()
             .collect();
+        // Stable, deterministic sort: numeric first, lexicographic fallback.
+        unique_labels.sort_by(|a, b| match (a.parse::<f64>(), b.parse::<f64>()) {
+            (Ok(af), Ok(bf)) => af.partial_cmp(&bf).unwrap_or_else(|| a.cmp(b)),
+            _ => a.cmp(b),
+        });
         for (i, label) in unique_labels.iter().enumerate() {
-            let hue = i as f64 * 360.0 / unique_labels.len() as f64; // Even distribution of hues
-            let color = HSL {
-                h: hue,
-                s: 0.7,
-                l: 0.6,
-            }
-            .to_rgb();
+            let hue = i as f64 * 360.0 / unique_labels.len() as f64;
+            let color = HSL { h: hue, s: 0.7, l: 0.5 }.to_rgb();
             label_colors.push((label.clone(), RGBColor(color.0, color.1, color.2)));
         }
     }

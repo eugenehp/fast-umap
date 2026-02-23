@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="754.0" font-family="monospace,Arial,sans-serif">
+<rect width="960" height="754.0" fill="#FAFAFA"/>
+<text x="480.0" y="22" text-anchor="middle" font-size="14" font-weight="bold" fill="#222">Apple M3 Max vs Apple M3 Max — CPU/GPU Comparison</text>
+<rect x="380.0" y="30" width="12" height="10" fill="#4C78A8" rx="2"/>
+<text x="395.0" y="39" font-size="9" fill="#333">CPU (NdArray)</text>
+<rect x="485.0" y="30" width="12" height="10" fill="#F58518" rx="2"/>
+<text x="500.0" y="39" font-size="9" fill="#333">GPU (WGPU/Metal)</text>
+<rect x="4" y="52.0" width="952.0" height="266.0" rx="6" fill="white" stroke="#DDD" stroke-width="1"/>
+<text x="480.0" y="80.0" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">model_forward</text>
+<line x1="227.8" y1="118.0" x2="227.8" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="227.8" y="290.0" text-anchor="middle" font-size="8" fill="#999">20.00 µs</text>
+<line x1="380.7" y1="118.0" x2="380.7" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="380.7" y="290.0" text-anchor="middle" font-size="8" fill="#999">50.00 µs</text>
+<line x1="496.3" y1="118.0" x2="496.3" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="496.3" y="290.0" text-anchor="middle" font-size="8" fill="#999">100.00 µs</text>
+<line x1="612.0" y1="118.0" x2="612.0" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="612.0" y="290.0" text-anchor="middle" font-size="8" fill="#999">200.00 µs</text>
+<line x1="764.8" y1="118.0" x2="764.8" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="764.8" y="290.0" text-anchor="middle" font-size="8" fill="#999">500.00 µs</text>
+<line x1="880.5" y1="118.0" x2="880.5" y2="278.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="880.5" y="290.0" text-anchor="middle" font-size="8" fill="#999">1.00 ms</text>
+<rect x="185.0" y="118.0" width="141.0" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="330.0" y="127.0" font-size="7.5" fill="#555">36.03 µs</text>
+<rect x="185.0" y="131.0" width="600.2" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="789.2" y="140.0" font-size="7.5" fill="#555">564.85 µs</text>
+<text x="892.0" y="133.5" font-size="8.5" font-weight="bold" fill="#888">0.06×</text>
+<text x="181.0" y="133.5" text-anchor="end" font-size="8.5" fill="#333">16s×10f [32]→2</text>
+<rect x="185.0" y="152.0" width="133.2" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="322.2" y="161.0" font-size="7.5" fill="#555">34.38 µs</text>
+<rect x="185.0" y="165.0" width="568.0" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="757.0" y="174.0" font-size="7.5" fill="#555">465.69 µs</text>
+<text x="892.0" y="167.5" font-size="8.5" font-weight="bold" fill="#888">0.07×</text>
+<text x="181.0" y="167.5" text-anchor="end" font-size="8.5" fill="#333">64s×50f [64]→2</text>
+<rect x="185.0" y="186.0" width="219.0" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="408.0" y="195.0" font-size="7.5" fill="#555">57.50 µs</text>
+<rect x="185.0" y="199.0" width="571.1" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="760.1" y="208.0" font-size="7.5" fill="#555">474.35 µs</text>
+<text x="892.0" y="201.5" font-size="8.5" font-weight="bold" fill="#888">0.12×</text>
+<text x="181.0" y="201.5" text-anchor="end" font-size="8.5" fill="#333">128s×50f [128]→2</text>
+<rect x="185.0" y="220.0" width="262.6" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="451.6" y="229.0" font-size="7.5" fill="#555">74.67 µs</text>
+<rect x="185.0" y="233.0" width="620.3" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="809.3" y="242.0" font-size="7.5" fill="#555">637.41 µs</text>
+<text x="892.0" y="235.5" font-size="8.5" font-weight="bold" fill="#888">0.12×</text>
+<text x="181.0" y="235.5" text-anchor="end" font-size="8.5" fill="#333">64s×100f [128,64]→3</text>
+<rect x="185.0" y="254.0" width="463.0" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="652.0" y="263.0" font-size="7.5" fill="#555">248.14 µs</text>
+<rect x="185.0" y="267.0" width="629.9" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="818.9" y="276.0" font-size="7.5" fill="#555">674.90 µs</text>
+<text x="892.0" y="269.5" font-size="8.5" font-weight="bold" fill="#888">0.37×</text>
+<text x="181.0" y="269.5" text-anchor="end" font-size="8.5" fill="#333">256s×100f [256,128]→2</text>
+<line x1="185.0" y1="278.0" x2="888.0" y2="278.0" stroke="#BBB" stroke-width="1"/>
+<rect x="4" y="328.0" width="952.0" height="198.0" rx="6" fill="white" stroke="#DDD" stroke-width="1"/>
+<text x="480.0" y="356.0" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">normalize_tensor</text>
+<line x1="228.8" y1="394.0" x2="228.8" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="228.8" y="498.0" text-anchor="middle" font-size="8" fill="#999">2.00 µs</text>
+<line x1="324.5" y1="394.0" x2="324.5" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="324.5" y="498.0" text-anchor="middle" font-size="8" fill="#999">5.00 µs</text>
+<line x1="396.9" y1="394.0" x2="396.9" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="396.9" y="498.0" text-anchor="middle" font-size="8" fill="#999">10.00 µs</text>
+<line x1="469.3" y1="394.0" x2="469.3" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="469.3" y="498.0" text-anchor="middle" font-size="8" fill="#999">20.00 µs</text>
+<line x1="565.0" y1="394.0" x2="565.0" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="565.0" y="498.0" text-anchor="middle" font-size="8" fill="#999">50.00 µs</text>
+<line x1="637.3" y1="394.0" x2="637.3" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="637.3" y="498.0" text-anchor="middle" font-size="8" fill="#999">100.00 µs</text>
+<line x1="709.7" y1="394.0" x2="709.7" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="709.7" y="498.0" text-anchor="middle" font-size="8" fill="#999">200.00 µs</text>
+<line x1="805.4" y1="394.0" x2="805.4" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="805.4" y="498.0" text-anchor="middle" font-size="8" fill="#999">500.00 µs</text>
+<line x1="877.8" y1="394.0" x2="877.8" y2="486.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="877.8" y="498.0" text-anchor="middle" font-size="8" fill="#999">1.00 ms</text>
+<rect x="185.0" y="394.0" width="83.4" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="272.4" y="403.0" font-size="7.5" fill="#555">2.92 µs</text>
+<rect x="185.0" y="407.0" width="649.4" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="838.4" y="416.0" font-size="7.5" fill="#555">659.77 µs</text>
+<text x="892.0" y="409.5" font-size="8.5" font-weight="bold" fill="#888">0.00×</text>
+<text x="181.0" y="409.5" text-anchor="end" font-size="8.5" fill="#333">n=512</text>
+<rect x="185.0" y="428.0" width="208.7" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="397.7" y="437.0" font-size="7.5" fill="#555">9.70 µs</text>
+<rect x="185.0" y="441.0" width="647.9" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="836.9" y="450.0" font-size="7.5" fill="#555">650.43 µs</text>
+<text x="892.0" y="443.5" font-size="8.5" font-weight="bold" fill="#888">0.01×</text>
+<text x="181.0" y="443.5" text-anchor="end" font-size="8.5" fill="#333">n=4096</text>
+<rect x="185.0" y="462.0" width="415.5" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="604.5" y="471.0" font-size="7.5" fill="#555">70.30 µs</text>
+<rect x="185.0" y="475.0" width="657.2" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="846.2" y="484.0" font-size="7.5" fill="#555">711.39 µs</text>
+<text x="892.0" y="477.5" font-size="8.5" font-weight="bold" fill="#888">0.10×</text>
+<text x="181.0" y="477.5" text-anchor="end" font-size="8.5" fill="#333">n=32768</text>
+<line x1="185.0" y1="486.0" x2="888.0" y2="486.0" stroke="#BBB" stroke-width="1"/>
+<rect x="4" y="536.0" width="952.0" height="198.0" rx="6" fill="white" stroke="#DDD" stroke-width="1"/>
+<text x="480.0" y="564.0" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">layer_normalize</text>
+<line x1="214.2" y1="602.0" x2="214.2" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="214.2" y="706.0" text-anchor="middle" font-size="8" fill="#999">10.00 µs</text>
+<line x1="313.4" y1="602.0" x2="313.4" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="313.4" y="706.0" text-anchor="middle" font-size="8" fill="#999">20.00 µs</text>
+<line x1="444.6" y1="602.0" x2="444.6" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="444.6" y="706.0" text-anchor="middle" font-size="8" fill="#999">50.00 µs</text>
+<line x1="543.8" y1="602.0" x2="543.8" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="543.8" y="706.0" text-anchor="middle" font-size="8" fill="#999">100.00 µs</text>
+<line x1="643.0" y1="602.0" x2="643.0" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="643.0" y="706.0" text-anchor="middle" font-size="8" fill="#999">200.00 µs</text>
+<line x1="774.1" y1="602.0" x2="774.1" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="774.1" y="706.0" text-anchor="middle" font-size="8" fill="#999">500.00 µs</text>
+<line x1="873.3" y1="602.0" x2="873.3" y2="694.0" stroke="#EBEBEB" stroke-width="1"/>
+<text x="873.3" y="706.0" text-anchor="middle" font-size="8" fill="#999">1.00 ms</text>
+<rect x="185.0" y="602.0" width="114.3" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="303.3" y="611.0" font-size="7.5" fill="#555">18.11 µs</text>
+<rect x="185.0" y="615.0" width="563.7" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="752.7" y="624.0" font-size="7.5" fill="#555">418.61 µs</text>
+<text x="892.0" y="617.5" font-size="8.5" font-weight="bold" fill="#888">0.04×</text>
+<text x="181.0" y="617.5" text-anchor="end" font-size="8.5" fill="#333">128×64</text>
+<rect x="185.0" y="636.0" width="381.3" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="570.3" y="645.0" font-size="7.5" fill="#555">117.04 µs</text>
+<rect x="185.0" y="649.0" width="590.1" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="779.1" y="658.0" font-size="7.5" fill="#555">503.48 µs</text>
+<text x="892.0" y="651.5" font-size="8.5" font-weight="bold" fill="#888">0.23×</text>
+<text x="181.0" y="651.5" text-anchor="end" font-size="8.5" fill="#333">512×128</text>
+<rect x="185.0" y="670.0" width="562.9" height="11.0" rx="2" fill="#4C78A8" opacity="0.85"/>
+<text x="751.9" y="679.0" font-size="7.5" fill="#555">416.44 µs</text>
+<rect x="185.0" y="683.0" width="640.3" height="11.0" rx="2" fill="#F58518" opacity="0.85"/>
+<text x="829.3" y="692.0" font-size="7.5" fill="#555">715.07 µs</text>
+<text x="892.0" y="685.5" font-size="8.5" font-weight="bold" fill="#888">0.58×</text>
+<text x="181.0" y="685.5" text-anchor="end" font-size="8.5" fill="#333">1000×256</text>
+<line x1="185.0" y1="694.0" x2="888.0" y2="694.0" stroke="#BBB" stroke-width="1"/>
+</svg>

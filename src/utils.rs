@@ -285,14 +285,19 @@ pub fn normalize_tensor<B: Backend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
     // this is to prevent deleting by zero
     let offset_val = Tensor::<B, 1>::from_data(TensorData::new(vec![1e-6], [1]), &device);
 
-    let are_equal = max_val
-        .clone()
-        .equal(min_val.clone())
+    // Read the scalar diff as f32.
+    // We intentionally avoid .equal() + .to_vec::<bool>() because the WGPU
+    // backend stores boolean tensors as u32 internally, and .to_vec::<bool>()
+    // fails with TypeMismatch on that backend.
+    let diff: f32 = (max_val.clone() - min_val.clone())
+        .abs()
         .to_data()
-        .to_vec::<bool>()
-        .unwrap();
-
-    let are_equal = are_equal.first().unwrap();
+        .to_vec::<f32>()
+        .unwrap()
+        .first()
+        .copied()
+        .unwrap_or(0.0);
+    let are_equal = diff < 1e-6_f32;
 
     // Avoid division by zero by ensuring max_val != min_val
     let normalized = if !are_equal {
@@ -305,12 +310,34 @@ pub fn normalize_tensor<B: Backend>(tensor: Tensor<B, 1>) -> Tensor<B, 1> {
     normalized
 }
 
+/// Print a raw [`FloatTensor`] primitive to stdout in a grid layout.
+///
+/// Wraps the primitive in a typed [`Tensor`] and delegates to [`print_tensor`].
+///
+/// # Arguments
+///
+/// * `tensor` — The raw float-tensor primitive to display.
+/// * `rows`   — Maximum number of rows to print (clamped to at least `MIN_SIZE`).
+/// * `cols`   — Maximum number of columns to print (clamped to at least `MIN_SIZE`).
 pub fn print_primitive_tensor<B: Backend>(tensor: &FloatTensor<B>, rows: usize, cols: usize) {
     let tensor: Tensor<B, 2> = Tensor::from_primitive(TensorPrimitive::Float(tensor.clone()));
     print_tensor(&tensor, rows, cols)
 }
 
+/// Minimum number of rows / columns shown by [`print_tensor`] when `rows` or
+/// `cols` is smaller than this value.
 const MIN_SIZE: usize = 10;
+
+/// Print the first `rows × cols` elements of a 2-D tensor to stdout.
+///
+/// Each element is formatted in scientific notation with three decimal places
+/// (`{:10.3e}`).  Values beyond `rows` or `cols` are silently omitted.
+///
+/// # Arguments
+///
+/// * `tensor` — The 2-D tensor to display.
+/// * `rows`   — Maximum number of rows to print (floored to `MIN_SIZE`).
+/// * `cols`   — Maximum number of columns to print (floored to `MIN_SIZE`).
 pub fn print_tensor<B: Backend>(tensor: &Tensor<B, 2>, rows: usize, cols: usize) {
     let shape = tensor.shape().dims;
     let n = shape[0]; // Number of rows

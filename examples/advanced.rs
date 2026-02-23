@@ -44,7 +44,7 @@ fn main() {
     let metric = Metric::Euclidean; // Alternative metric for neighbors search
 
     // Seed the random number generator to ensure reproducibility
-    MyAutodiffBackend::seed(seed);
+    MyAutodiffBackend::seed(&device, seed);
 
     // Generate random test data for training
     let train_data: Vec<F> = generate_test_data(num_samples, num_features);
@@ -87,6 +87,7 @@ fn main() {
         &config,            // The training configuration
         device.clone(),
         exit_rx,
+        None,               // no labels for this example
     );
 
     // Validate the trained model after training

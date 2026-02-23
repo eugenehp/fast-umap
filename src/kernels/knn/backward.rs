@@ -1,3 +1,10 @@
+//! Autodiff registration for the k-NN operation.
+//!
+//! [`backward`] wires up the Burn autodiff graph so that `loss.backward()`
+//! correctly propagates gradients through the k-NN selection back to the
+//! pairwise distance matrix — and from there, through the Euclidean distance
+//! kernel, all the way to the neural-network embedding weights.
+
 use std::fmt::Debug;
 
 use burn::{
@@ -6,7 +13,7 @@ use burn::{
             checkpoint::{base::Checkpointer, strategy::CheckpointStrategy},
             grads::Gradients,
             ops::{Backward, Ops, OpsKind},
-            NodeID,
+            NodeId,
         },
         Autodiff,
     },
@@ -17,19 +24,47 @@ use crate::{backend::*, print_if, print_primitive_tensor};
 
 const VERBOSE: bool = false;
 
+/// Register the k-NN operation in the Burn autodiff graph.
+///
+/// On the **tracked** path (at least one input requires a gradient) this
+/// function:
+/// 1. Checkpoints `pairwise_distances` for retrieval during the backward pass.
+/// 2. Runs the forward k-NN on the inner backend.
+/// 3. Registers [`KnnBackward`] as the backward hook via [`Ops::finish`].
+///
+/// On the **untracked** path it simply runs the forward pass and wraps the
+/// result in an [`Autodiff`] tensor.
+///
+/// # Arguments
+///
+/// * `pairwise_distances` — `[n, n]` autodiff-wrapped distance matrix.
+/// * `k`                  — Number of nearest neighbours.
+///
+/// # Returns
+///
+/// `(indices, distances)` — both wrapped in the [`Autodiff`] backend so that
+/// gradients flow through them during `loss.backward()`.
 pub fn backward<B: Backend, C: CheckpointStrategy>(
     pairwise_distances: FloatTensor<Autodiff<B, C>>,
-    k: u32, // Number of nearest neighbors
+    k: u32,
 ) -> (IntTensor<Autodiff<B, C>>, FloatTensor<Autodiff<B, C>>) {
     // println!("knn_backward");
-    // Create zero-sized struct for backward computation
+    /// Zero-sized marker struct that implements Burn's [`Backward`] trait for
+    /// the k-NN selection operation.
     #[derive(Debug)]
     struct KnnBackward;
 
-    // Implement the backward trait for the given backend B
     impl<B: Backend> Backward<B, 1> for KnnBackward {
-        type State = (NodeID, u32); // FloatTensor<B>,
+        /// Backward state: the `NodeId` of `pairwise_distances` (for gradient
+        /// registration) and the scalar `k` needed to re-run the forward sort.
+        type State = (NodeId, u32);
 
+        /// Called by Burn's autodiff engine during `loss.backward()`.
+        ///
+        /// Retrieves `pairwise_distances` from the checkpoint, consumes the
+        /// upstream gradient `∂loss/∂knn_distances`, dispatches the backward
+        /// GPU kernel via `B::knn_backward`, and registers the resulting
+        /// `∂loss/∂pairwise_distances` gradient for further propagation.
         fn backward(
             self,
             ops: Ops<Self::State, 1>,

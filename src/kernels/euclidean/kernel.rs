@@ -1,147 +1,82 @@
 use cubecl::{cube, prelude::*};
 
+/// Forward kernel — one thread per (row, col) upper-triangle pair.
+///
+/// Computes `||x[row] - x[col]||_2` and stores it (symmetrically) in `output`.
 #[cube(launch)]
 pub fn euclidean_pairwise_distance_kernel<F: Float>(
-    x: &Tensor<F>, // Input tensor of shape (n, d) representing n vectors of dimension d
-    output: &mut Tensor<F>, // Output tensor of shape (n, n) to store pairwise distances
+    x: &Tensor<F>,          // [n, d]
+    output: &mut Tensor<F>, // [n, n]
 ) {
-    let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
-    let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
+    let row = ABSOLUTE_POS_X as usize;
+    let col = ABSOLUTE_POS_Y as usize;
 
-    let n = x.shape(0); // Number of vectors (rows) in the output tensor
-    let d = x.shape(1); // Dimension of each vector (features) in the input tensor
-
-    let mut exit_early = false;
+    let n = x.shape(0);
+    let d = x.shape(1);
 
     if row >= n || col >= n || row > col {
-        // Skip threads that are out of bounds or handle only the upper triangular matrix
-        exit_early = true;
-    }
-
-    // Edge case 1: Handle empty input tensor (n == 0 or d == 0)
-    if n == 0 || d == 0 {
-        // No computation needed for empty tensor
-        exit_early = true;
-    }
-
-    // Edge case 2: Handle single vector case (n == 1)
-    if n == 1 {
-        output[0] = F::new(0.0); // Distance between the only vector and itself is 0
-        exit_early = true;
-    }
-
-    // Edge case 3: Handle zero-dimensional vectors (d == 0)
-    if d == 0 && !exit_early {
-        // If vectors have 0 dimensions, the distance between any two vectors is trivially 0
-        for i in 0..n {
-            for j in i..n {
-                output[i * n + j] = F::new(0.0);
-                output[j * n + i] = F::new(0.0); // Symmetry: dist(i, j) = dist(j, i)
-            }
-        }
-        exit_early = true;
-    }
-
-    if !exit_early {
-        let mut sum = F::new(0.0); // Sum of squared differences
-
-        // Compute the squared differences between vectors row and col
+        // no-op — lower triangle and out-of-range threads
+    } else if row == col {
+        output[row * n + col] = F::new(0.0);
+    } else {
+        let mut sum = F::new(0.0);
         for i in 0..d {
-            let index_row = row * d + i; // Linear index for row, dimension i
-            let index_col = col * d + i; // Linear index for col, dimension i
-
-            let diff = x[index_row] - x[index_col];
+            let diff = x[row * d + i] - x[col * d + i];
             sum += diff * diff;
         }
-
-        // Calculate Euclidean distance (square root of sum of squared differences)
         let dist = F::sqrt(sum);
-
-        // Linear index for the output tensor
-        let output_index = row * n + col;
-
-        // Store the pairwise Euclidean distance in the output tensor
-        output[output_index] = dist;
-
-        // Symmetry: dist(i, j) = dist(j, i)
-        if row != col {
-            // Avoid redundant assignments when row == col
-            let output_index_sym = col * n + row;
-            output[output_index_sym] = dist;
-        }
+        output[row * n + col] = dist;
+        output[col * n + row] = dist; // symmetry
     }
 }
 
+/// Backward kernel — one thread per (row, feat) element of grad_x.
+///
+/// `ABSOLUTE_POS_X` = sample row index  (0 .. n)
+/// `ABSOLUTE_POS_Y` = feature index     (0 .. d)
+///
+/// Each thread accumulates contributions from every other sample `col` using
+/// the *precomputed* pairwise distance (no inner d-loop needed), then writes
+/// the result with `=` (no accumulation → no cross-thread races).
+///
+/// Total work: n·d threads × n iterations each = O(n²d) — same as forward.
 #[cube(launch)]
 pub fn euclidean_pairwise_distance_backward_kernel<F: Float>(
-    output: &Tensor<F>,          // Output tensor (n, d), pairwise distances
-    grad_output: &mut Tensor<F>, // Gradient of the loss with respect to output tensor (n, d)
-    grad_x: &Tensor<F>,          // Gradient of the loss with respect to input tensor (n, n)
+    x: &Tensor<F>,           // [n, d]  original input
+    pairwise: &Tensor<F>,    // [n, n]  precomputed distances (from forward state)
+    grad_pairwise: &Tensor<F>, // [n, n]  ∂loss/∂pairwise_distances
+    grad_x: &mut Tensor<F>,  // [n, d]  ∂loss/∂x  — written by this kernel
 ) {
-    let row = ABSOLUTE_POS_X; // Row index for the pairwise computation
-    let col = ABSOLUTE_POS_Y; // Column index for the pairwise computation
+    let row = ABSOLUTE_POS_X as usize; // sample index
+    let feat = ABSOLUTE_POS_Y as usize; // feature index
 
-    // Get the number of vectors (n) and the dimension (d) of each vector
-    let n = output.shape(0); // Number of vectors (rows) in the input tensor
-    let d = output.shape(1); // Dimension of each vector (features) in the input tensor
+    let n = pairwise.shape(0);
+    let d = x.shape(1);
+    let epsilon = F::new(1e-8);
 
-    let mut exit_early = false;
+    if row >= n || feat >= d {
+        // out-of-range thread
+    } else {
+        let x_row_feat = x[row * d + feat];
+        let mut grad_sum = F::new(0.0);
 
-    // Edge case 1: Handle empty input tensor (n == 0 or d == 0)
-    if n == 0 || d == 0 {
-        // No computation needed for empty tensor
-        exit_early = true;
-    }
+        for col in 0..n {
+            if col != row {
+                let dist = F::max(pairwise[row * n + col], epsilon);
 
-    // Edge case 2: Handle zero-dimensional vectors (d == 0)
-    if d == 0 {
-        // grad_output should already be zeroed out
-        exit_early = true;
-    }
+                // Gradient from pairwise[row, col]:
+                //   ∂||x_row - x_col|| / ∂x[row, feat] = (x[row,feat] - x[col,feat]) / dist
+                // Gradient from pairwise[col, row]  (symmetric entry, same distance):
+                //   same formula — both symmetric entries carry the same gradient factor
+                let g_rc = grad_pairwise[row * n + col];
+                let g_cr = grad_pairwise[col * n + row];
 
-    // Edge case: Ensure row and col are within bounds
-    if row >= n || col >= n || row > col {
-        // Skip threads that are out of bounds
-        exit_early = true;
-    }
-
-    // Get the pairwise distance between vectors row and col
-    let dist = output[row * n + col];
-
-    // Handle small distances (to avoid division by zero)
-    let epsilon = F::new(1e-8); // Define a small epsilon value
-    let dist = F::max(dist, epsilon); // Ensure dist is never less than epsilon
-
-    // Skip if the distance is 0 (identical vectors)
-    if dist < epsilon && !exit_early {
-        for i in 0..d {
-            let index_row = row * d + i; // Linear index for row, dimension i
-            let index_col = col * d + i; // Linear index for col, dimension i
-            grad_output[index_row] = F::new(0.0);
-            grad_output[index_col] = F::new(0.0);
-        }
-
-        // No gradient to propagate for identical vectors
-        exit_early = true;
-    }
-
-    if !exit_early {
-        if row != col {
-            // Compute the gradient of the pairwise distance w.r.t the input vectors
-            for i in 0..d {
-                let index_row = row * d + i; // Linear index for row, dimension i
-                let index_col = col * d + i; // Linear index for col, dimension i
-
-                let diff = output[index_row] - output[index_col]; // Difference between the vectors
-
-                // Gradient of the distance w.r.t x_{i,k}
-                let grad_dist_i = grad_x[row * n + col] * (diff / dist); // Scale the gradient
-
-                // Propagate the gradient to the input tensor
-                // grad_output is the gradient of the loss with respect to input tensor
-                grad_output[index_row] += grad_dist_i; // Gradient w.r.t row vector (x_i)
-                grad_output[index_col] -= grad_dist_i; // Gradient w.r.t col vector (x_j)
+                let diff = x_row_feat - x[col * d + feat];
+                grad_sum += (g_rc + g_cr) * diff / dist;
             }
         }
+
+        // Each (row, feat) pair is owned by exactly one thread — safe plain write.
+        grad_x[row * d + feat] = grad_sum;
     }
 }
