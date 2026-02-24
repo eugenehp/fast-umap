@@ -36,9 +36,6 @@ use rand::Rng;
 use std::time::Duration;
 use std::{thread, time::Instant};
 
-/// Default number of negative samples per positive edge.
-const DEFAULT_NEG_RATE: usize = 5;
-
 /// Number of pre-generated edge sample batches kept on GPU.
 /// More batches = more stochastic variety across epochs.
 const EDGE_BATCH_COUNT: usize = 16;
@@ -77,19 +74,31 @@ where
 
     let k = config.k_neighbors;
     let repulsion_strength = config.repulsion_strength;
-    let neg_rate = DEFAULT_NEG_RATE;
+    let kernel_a = config.kernel_a;
+    let kernel_b = config.kernel_b;
+    let neg_rate = config.neg_sample_rate;
+    let verbose = config.verbose;
 
     if num_samples <= k {
         panic!("num_samples ({num_samples}) must be > k_neighbors ({k}).");
+    }
+
+    // ── Log configuration ────────────────────────────────────────────────────
+    if verbose {
+        println!("[fast-umap] Configuration:");
+        println!("[fast-umap]   samples={num_samples}  features={num_features}  k_neighbors={k}");
+        println!("[fast-umap]   epochs={}  lr={:.0e}  repulsion_strength={repulsion_strength}",
+            config.epochs, config.learning_rate);
+        println!("[fast-umap]   kernel: a={kernel_a:.4}  b={kernel_b:.4}  (q = 1 / (1 + a·d^(2b)))");
     }
 
     // ── Z-score normalise input features ─────────────────────────────────────
     normalize_data(&mut data, num_samples, num_features);
 
     // ── Precompute global KNN once ───────────────────────────────────────────
-    println!(
-        "[fast-umap] Precomputing global k-NN (k={k}) for {num_samples} point(s) …"
-    );
+    if verbose {
+        println!("[fast-umap] Computing global k-NN graph (k={k}) …");
+    }
     let knn_start = Instant::now();
 
     let all_data_tensor: Tensor<B, 2> =
@@ -116,8 +125,7 @@ where
     // Determine how many positive edges to sample per epoch
     let n_pos = n_all_edges.min(MAX_POS_EDGES_PER_EPOCH);
     let subsampling = n_pos < n_all_edges;
-    let n_neg = n_pos * neg_rate / k.max(1); // scale neg samples with pos
-    let n_neg = n_neg.max(num_samples); // at least 1 neg per point
+    let n_neg = (n_pos * neg_rate).max(num_samples);
     let n_total = n_pos + n_neg;
 
     // ── Pre-generate fused edge-sample batches on GPU ────────────────────────
@@ -172,16 +180,23 @@ where
             .collect();
 
     let knn_elapsed = knn_start.elapsed();
-    if subsampling {
+    if verbose {
         println!(
-            "[fast-umap] Global k-NN done in {:.2}s ({n_all_edges} edges, sampling {n_pos}+{n_neg} per epoch). Starting sparse training …",
-            knn_elapsed.as_secs_f64()
+            "[fast-umap] k-NN done in {:.2}s — {n_all_edges} total edges{}",
+            knn_elapsed.as_secs_f64(),
+            if subsampling {
+                format!(
+                    ", subsampling {n_pos} positive + {n_neg} negative per epoch \
+                     (neg_rate={neg_rate}, {EDGE_BATCH_COUNT} pre-batched shuffles)"
+                )
+            } else {
+                format!(
+                    ", {n_pos} positive + {n_neg} negative edges per epoch \
+                     (neg_rate={neg_rate})"
+                )
+            }
         );
-    } else {
-        println!(
-            "[fast-umap] Global k-NN done in {:.2}s ({n_all_edges} edges). Starting sparse training …",
-            knn_elapsed.as_secs_f64()
-        );
+        println!("[fast-umap] Training started …");
     }
 
     // ── Optimizer ─────────────────────────────────────────────────────────────
@@ -193,7 +208,7 @@ where
 
     let start_time = Instant::now();
 
-    let pb = if config.verbose {
+    let pb = if verbose {
         let pb = ProgressBar::new(config.epochs as u64);
         pb.set_style(
             ProgressStyle::default_bar()
@@ -217,6 +232,9 @@ where
 
     'main: loop {
         if exit_rx.try_recv().is_ok() {
+            if verbose {
+                eprintln!("[fast-umap] Interrupted — restoring best model (epoch {epoch}, loss {best_loss:.6})");
+            }
             break 'main;
         }
 
@@ -239,13 +257,17 @@ where
         let dist_sq_pos = dist_sq.clone().slice([0..batch_n_pos]);
         let dist_sq_neg = dist_sq.slice([batch_n_pos..batch_n_total]);
 
-        // Attraction: -log(q) where q = 1/(1+d²)
-        let q_pos = (dist_sq_pos + 1.0f32).recip();
+        // UMAP kernel: q = 1 / (1 + a * d^(2b))
+        // When b != 1 we need d^(2b) = (d²)^b = dist_sq.powf(b).
+        // Attraction: -log(q)
+        let dist_pow_pos = dist_sq_pos.clamp_min(1e-8f32).powf_scalar(kernel_b);
+        let q_pos = (dist_pow_pos.clone() * kernel_a + 1.0f32).recip();
         let attraction = q_pos.clamp_min(1e-6f32).log().neg().mean();
 
-        // Repulsion: -log(1-q) where 1-q = d²/(1+d²)
-        let dist_sq_neg_safe = dist_sq_neg.clamp_min(1e-8f32);
-        let one_minus_q_neg = dist_sq_neg_safe.clone() / (dist_sq_neg_safe + 1.0f32);
+        // Repulsion: -log(1-q) where 1-q = a*d^(2b) / (1 + a*d^(2b))
+        let dist_pow_neg = dist_sq_neg.clamp_min(1e-8f32).powf_scalar(kernel_b);
+        let a_dpow_neg = dist_pow_neg.clone() * kernel_a;
+        let one_minus_q_neg = a_dpow_neg.clone() / (a_dpow_neg + 1.0f32);
         let repulsion = one_minus_q_neg.clamp_min(1e-6f32).log().neg().mean();
 
         // ── UMAP cross-entropy loss ──────────────────────────────────────────
@@ -266,7 +288,7 @@ where
 
         if should_read && (current_loss.is_nan() || current_loss.is_infinite()) {
             eprintln!(
-                "[fast-umap] WARNING: loss is {current_loss:.4} at epoch {epoch} — stopping early."
+                "[fast-umap] WARNING: loss became {current_loss:.4} at epoch {epoch} — stopping early."
             );
             break 'main;
         }
@@ -284,14 +306,20 @@ where
             pb.inc(1);
             if should_read {
                 pb.set_message(format!(
-                    "Elapsed: {} | Epoch: {epoch} | Loss: {current_loss:.6} | Best: {best_loss:.6}",
+                    "Elapsed: {} | Epoch: {epoch}/{} | Loss: {current_loss:.6} | Best: {best_loss:.6}",
                     format_duration(elapsed),
+                    config.epochs,
                 ));
             }
         }
 
         if let Some(timeout) = config.timeout {
             if elapsed >= Duration::from_secs(timeout) {
+                if verbose {
+                    println!(
+                        "[fast-umap] Timeout ({timeout}s) reached at epoch {epoch} — stopping."
+                    );
+                }
                 break;
             }
         }
@@ -306,12 +334,22 @@ where
 
         if let Some(patience) = config.patience {
             if epochs_without_improvement >= patience {
+                if verbose {
+                    println!(
+                        "[fast-umap] Early stopping — no improvement for {patience} epochs (best loss: {best_loss:.6})."
+                    );
+                }
                 break;
             }
         }
 
         if let Some(min_desired_loss) = config.min_desired_loss {
             if should_read && current_loss < F::from(min_desired_loss).unwrap() {
+                if verbose {
+                    println!(
+                        "[fast-umap] Desired loss {min_desired_loss:.6} reached at epoch {epoch} (loss: {current_loss:.6})."
+                    );
+                }
                 break;
             }
         }
@@ -355,7 +393,7 @@ where
             }
         }
 
-        if config.verbose && epoch % PLOT_INTERVAL == 0 {
+        if verbose && epoch % PLOT_INTERVAL == 0 {
             plot_loss(losses.clone(), &loss_plot_path).unwrap();
         }
 
@@ -368,7 +406,7 @@ where
         plot_loss(losses.clone(), &path).unwrap();
     }
 
-    if config.verbose {
+    if verbose {
         let path = format!("figures/losses_{name}.png");
         plot_loss(losses.clone(), &path).unwrap();
     }
@@ -379,6 +417,14 @@ where
 
     // ── Restore best model from in-memory record ─────────────────────────────
     model = model.load_record(best_record);
+
+    let total_elapsed = start_time.elapsed();
+    if verbose {
+        println!(
+            "[fast-umap] Training complete — {epoch} epochs in {}, best loss: {best_loss:.6}",
+            format_duration(total_elapsed),
+        );
+    }
 
     (model, losses, best_loss)
 }

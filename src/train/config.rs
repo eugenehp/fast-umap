@@ -1,6 +1,83 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+// ─── UMAP a, b curve fitting ─────────────────────────────────────────────────
+
+/// Fit the UMAP kernel parameters `a` and `b` from `min_dist` and `spread`.
+///
+/// The kernel is `phi(d) = 1 / (1 + a * d^(2b))`.
+/// We fit it to the piecewise target:
+///   - `phi(d) = 1.0`                              for `d <= min_dist`
+///   - `phi(d) = exp(-(d - min_dist) / spread)`     for `d >  min_dist`
+///
+/// Uses simple grid search + refinement (runs once at init, ~ms).
+pub fn fit_ab(min_dist: f32, spread: f32) -> (f32, f32) {
+    // Generate target data
+    let n = 300;
+    let x_max = 3.0 * spread;
+    let xs: Vec<f32> = (0..n).map(|i| (i as f32 + 0.5) / n as f32 * x_max).collect();
+    let ys: Vec<f32> = xs
+        .iter()
+        .map(|&x| {
+            if x <= min_dist {
+                1.0
+            } else {
+                (-(x - min_dist) / spread).exp()
+            }
+        })
+        .collect();
+
+    // phi(d; a, b) = 1 / (1 + a * d^(2b))
+    // Minimize sum of squared residuals
+    let residual = |a: f32, b: f32| -> f32 {
+        xs.iter()
+            .zip(ys.iter())
+            .map(|(&x, &y)| {
+                let pred = 1.0 / (1.0 + a * x.powf(2.0 * b));
+                (pred - y) * (pred - y)
+            })
+            .sum::<f32>()
+    };
+
+    // Coarse grid search
+    let mut best_a = 1.0f32;
+    let mut best_b = 1.0f32;
+    let mut best_err = f32::INFINITY;
+
+    for ai in 1..=80 {
+        let a = ai as f32 * 0.08;
+        for bi in 1..=50 {
+            let b = bi as f32 * 0.06;
+            let err = residual(a, b);
+            if err < best_err {
+                best_err = err;
+                best_a = a;
+                best_b = b;
+            }
+        }
+    }
+
+    // Fine refinement via coordinate descent
+    for _ in 0..100 {
+        let step_a = best_a * 0.02;
+        let step_b = best_b * 0.02;
+        for &da in &[-step_a, 0.0, step_a] {
+            for &db in &[-step_b, 0.0, step_b] {
+                let a = (best_a + da).max(1e-4);
+                let b = (best_b + db).max(1e-4);
+                let err = residual(a, b);
+                if err < best_err {
+                    best_err = err;
+                    best_a = a;
+                    best_b = b;
+                }
+            }
+        }
+    }
+
+    (best_a, best_b)
+}
+
 // ─── Metric ──────────────────────────────────────────────────────────────────
 
 /// Distance metric used to build the high-dimensional k-NN graph during the
@@ -209,6 +286,15 @@ pub struct OptimizationParams {
     ///
     /// Default: false
     pub verbose: bool,
+
+    /// Number of negative (repulsion) samples drawn per positive (attraction)
+    /// edge each epoch.
+    ///
+    /// Higher values produce stronger repulsion and better cluster separation
+    /// at the cost of more computation per epoch.
+    ///
+    /// Default: 5
+    pub neg_sample_rate: usize,
 }
 
 impl Default for OptimizationParams {
@@ -226,6 +312,7 @@ impl Default for OptimizationParams {
             min_desired_loss: None,
             timeout: None,
             verbose: false,
+            neg_sample_rate: 5,
         }
     }
 }
@@ -339,6 +426,14 @@ pub struct TrainingConfig {
     pub minkowski_p: f64,
     /// Weight applied to the repulsion term.
     pub repulsion_strength: f32,
+    /// UMAP kernel parameter `a`, fitted from `min_dist` and `spread`.
+    /// Controls the width of the kernel: `q = 1 / (1 + a * d^(2b))`.
+    pub kernel_a: f32,
+    /// UMAP kernel parameter `b`, fitted from `min_dist` and `spread`.
+    /// Controls the decay shape: `q = 1 / (1 + a * d^(2b))`.
+    pub kernel_b: f32,
+    /// Number of negative samples per positive edge per epoch.
+    pub neg_sample_rate: usize,
 }
 
 impl TrainingConfig {
@@ -350,6 +445,7 @@ impl TrainingConfig {
 
 impl From<&UmapConfig> for TrainingConfig {
     fn from(config: &UmapConfig) -> Self {
+        let (kernel_a, kernel_b) = fit_ab(config.manifold.min_dist, config.manifold.spread);
         TrainingConfig {
             metric: config.graph.metric.clone(),
             epochs: config.optimization.n_epochs,
@@ -367,6 +463,9 @@ impl From<&UmapConfig> for TrainingConfig {
             normalized: config.graph.normalized,
             minkowski_p: config.graph.minkowski_p,
             repulsion_strength: config.optimization.repulsion_strength,
+            kernel_a,
+            kernel_b,
+            neg_sample_rate: config.optimization.neg_sample_rate,
         }
     }
 }
@@ -402,6 +501,7 @@ impl From<&TrainingConfig> for UmapConfig {
                 min_desired_loss: config.min_desired_loss,
                 timeout: config.timeout,
                 verbose: config.verbose,
+                neg_sample_rate: config.neg_sample_rate,
             },
         }
     }
@@ -432,6 +532,7 @@ pub struct TrainingConfigBuilder {
     normalized: Option<bool>,
     minkowski_p: Option<f64>,
     repulsion_strength: Option<f32>,
+    neg_sample_rate: Option<usize>,
 }
 
 impl TrainingConfigBuilder {
@@ -515,7 +616,14 @@ impl TrainingConfigBuilder {
         self
     }
 
+    pub fn with_neg_sample_rate(mut self, neg_sample_rate: usize) -> Self {
+        self.neg_sample_rate = Some(neg_sample_rate);
+        self
+    }
+
     pub fn build(self) -> Option<TrainingConfig> {
+        let defaults = ManifoldParams::default();
+        let (kernel_a, kernel_b) = fit_ab(defaults.min_dist, defaults.spread);
         Some(TrainingConfig {
             metric: self.metric.unwrap_or(Metric::Euclidean),
             epochs: self.epochs.unwrap_or(1000),
@@ -533,6 +641,9 @@ impl TrainingConfigBuilder {
             normalized: self.normalized.unwrap_or(true),
             minkowski_p: self.minkowski_p.unwrap_or(1.0),
             repulsion_strength: self.repulsion_strength.unwrap_or(1.0),
+            kernel_a,
+            kernel_b,
+            neg_sample_rate: self.neg_sample_rate.unwrap_or(5),
         })
     }
 }

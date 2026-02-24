@@ -2411,7 +2411,7 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "fast-umap"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "burn",
  "burn-cubecl",

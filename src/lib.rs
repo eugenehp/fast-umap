@@ -4,8 +4,8 @@
 //! in Rust, built on [burn](https://github.com/tracel-ai/burn) +
 //! [CubeCL](https://github.com/tracel-ai/cubecl).
 //!
-//! **Up to 9.2× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
-//! datasets ≥ 5 000 samples, with the ability to [`transform()`](FittedUmap::transform)
+//! **Up to 4.7× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
+//! datasets ≥ 10 000 samples, with the ability to [`transform()`](FittedUmap::transform)
 //! new unseen data (something classical UMAP cannot do).
 //!
 //! ## Quick start
@@ -44,9 +44,9 @@
 //!
 //! | Dataset | fast-umap | umap-rs | Speedup |
 //! |---------|-----------|---------|---------|
-//! | 5 000 × 100 | 1.62s | 2.27s | **1.4× faster** |
-//! | 10 000 × 100 | 2.06s | 8.67s | **4.2× faster** |
-//! | 20 000 × 100 | 3.72s | 34.22s | **9.2× faster** |
+//! | 5 000 × 100 | 6.75s | 2.31s | 0.34× *(umap-rs faster)* |
+//! | 10 000 × 100 | 5.93s | 8.68s | **1.5× faster** |
+//! | 20 000 × 100 | 7.32s | 34.10s | **4.7× faster** |
 //!
 //! Benchmarked on Apple M3 Max. Reproduce with
 //! `cargo run --release --example crate_comparison`.
@@ -63,9 +63,9 @@
 //! loss        =  attraction  +  repulsion_strength × repulsion
 //! ```
 //!
-//! where `q_ij = 1 / (1 + d_ij²)` is the Student-t kernel applied to
-//! embedding distances. Per-epoch cost is O(min(n·k, 50K)) regardless of
-//! dataset size.
+//! where `q_ij = 1 / (1 + a · d_ij^(2b))` is the UMAP kernel applied to
+//! embedding distances (`a` and `b` are fitted from `min_dist` / `spread`).
+//! Per-epoch cost is O(min(n·k, 50K)) regardless of dataset size.
 //!
 //! ## Modules
 //!
@@ -259,6 +259,10 @@ impl<B: AutodiffBackend> Umap<B> {
         let model: UMAPModel<B> = UMAPModel::new(&model_config, &self.device);
 
         // Build training config from UmapConfig
+        let (kernel_a, kernel_b) = train::fit_ab(
+            self.config.manifold.min_dist,
+            self.config.manifold.spread,
+        );
         let training_config = TrainingConfig {
             metric: self.config.graph.metric.clone(),
             epochs: self.config.optimization.n_epochs,
@@ -276,6 +280,9 @@ impl<B: AutodiffBackend> Umap<B> {
             normalized: self.config.graph.normalized,
             minkowski_p: self.config.graph.minkowski_p,
             repulsion_strength: self.config.optimization.repulsion_strength,
+            kernel_a,
+            kernel_b,
+            neg_sample_rate: self.config.optimization.neg_sample_rate,
         };
 
         // Use the sparse training path (O(n·k) per epoch) by default.

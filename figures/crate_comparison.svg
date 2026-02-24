@@ -9,57 +9,57 @@
 <line x1="130.0" y1="100.0" x2="130.0" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
 <text x="130.0" y="416.0" text-anchor="middle" font-size="10" fill="#999">0.0s</text>
 <line x1="241.7" y1="100.0" x2="241.7" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
-<text x="241.7" y="416.0" text-anchor="middle" font-size="10" fill="#999">6.6s</text>
+<text x="241.7" y="416.0" text-anchor="middle" font-size="10" fill="#999">6.5s</text>
 <line x1="353.3" y1="100.0" x2="353.3" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
 <text x="353.3" y="416.0" text-anchor="middle" font-size="10" fill="#999">13.1s</text>
 <line x1="465.0" y1="100.0" x2="465.0" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
-<text x="465.0" y="416.0" text-anchor="middle" font-size="10" fill="#999">19.7s</text>
+<text x="465.0" y="416.0" text-anchor="middle" font-size="10" fill="#999">19.6s</text>
 <line x1="576.7" y1="100.0" x2="576.7" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
-<text x="576.7" y="416.0" text-anchor="middle" font-size="10" fill="#999">26.2s</text>
+<text x="576.7" y="416.0" text-anchor="middle" font-size="10" fill="#999">26.1s</text>
 <line x1="688.3" y1="100.0" x2="688.3" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
-<text x="688.3" y="416.0" text-anchor="middle" font-size="10" fill="#999">32.8s</text>
+<text x="688.3" y="416.0" text-anchor="middle" font-size="10" fill="#999">32.7s</text>
 <line x1="800.0" y1="100.0" x2="800.0" y2="400.0" stroke="#E8E8E8" stroke-width="1"/>
-<text x="800.0" y="416.0" text-anchor="middle" font-size="10" fill="#999">39.3s</text>
-<rect x="130.0" y="100.0" width="3.7" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="138.7" y="111.5" font-size="10" fill="#555">0.220s</text>
+<text x="800.0" y="416.0" text-anchor="middle" font-size="10" fill="#999">39.2s</text>
+<rect x="130.0" y="100.0" width="14.4" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="149.4" y="111.5" font-size="10" fill="#555">0.843s</text>
 <rect x="130.0" y="119.0" width="2.0" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
-<text x="137.0" y="130.5" font-size="10" fill="#555">0.064s</text>
-<text x="808.0" y="121.0" font-size="10" font-weight="bold" fill="#666">0.29× (umap-rs faster)</text>
+<text x="137.0" y="130.5" font-size="10" fill="#555">0.080s</text>
+<text x="808.0" y="121.0" font-size="10" font-weight="bold" fill="#666">0.10× (umap-rs faster)</text>
 <text x="122.0" y="121.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">500×50</text>
 <text x="122.0" y="131.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
-<rect x="130.0" y="153.0" width="13.9" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="148.9" y="164.5" font-size="10" fill="#555">0.814s</text>
+<rect x="130.0" y="153.0" width="37.4" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="172.4" y="164.5" font-size="10" fill="#555">2.188s</text>
 <rect x="130.0" y="172.0" width="2.0" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
 <text x="137.0" y="183.5" font-size="10" fill="#555">0.119s</text>
-<text x="808.0" y="174.0" font-size="10" font-weight="bold" fill="#666">0.15× (umap-rs faster)</text>
+<text x="808.0" y="174.0" font-size="10" font-weight="bold" fill="#666">0.05× (umap-rs faster)</text>
 <text x="122.0" y="174.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">1000×50</text>
 <text x="122.0" y="184.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
-<rect x="130.0" y="206.0" width="15.7" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="150.7" y="217.5" font-size="10" fill="#555">0.920s</text>
+<rect x="130.0" y="206.0" width="62.4" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="197.4" y="217.5" font-size="10" fill="#555">3.652s</text>
 <rect x="130.0" y="225.0" width="7.5" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
-<text x="142.5" y="236.5" font-size="10" fill="#555">0.438s</text>
-<text x="808.0" y="227.0" font-size="10" font-weight="bold" fill="#666">0.48× (umap-rs faster)</text>
+<text x="142.5" y="236.5" font-size="10" fill="#555">0.436s</text>
+<text x="808.0" y="227.0" font-size="10" font-weight="bold" fill="#666">0.12× (umap-rs faster)</text>
 <text x="122.0" y="227.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">2000×100</text>
 <text x="122.0" y="237.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
-<rect x="130.0" y="259.0" width="27.6" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="162.6" y="270.5" font-size="10" fill="#555">1.623s</text>
-<rect x="130.0" y="278.0" width="38.7" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
-<text x="173.7" y="289.5" font-size="10" fill="#555">2.272s</text>
-<text x="808.0" y="280.0" font-size="10" font-weight="bold" fill="#2a7ec7">1.40×</text>
+<rect x="130.0" y="259.0" width="115.3" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="250.3" y="270.5" font-size="10" fill="#555">6.745s</text>
+<rect x="130.0" y="278.0" width="39.5" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
+<text x="174.5" y="289.5" font-size="10" fill="#555">2.312s</text>
+<text x="808.0" y="280.0" font-size="10" font-weight="bold" fill="#666">0.34× (umap-rs faster)</text>
 <text x="122.0" y="280.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">5000×100</text>
 <text x="122.0" y="290.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
-<rect x="130.0" y="312.0" width="35.1" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="170.1" y="323.5" font-size="10" fill="#555">2.062s</text>
-<rect x="130.0" y="331.0" width="147.6" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
-<text x="282.6" y="342.5" font-size="10" fill="#555">8.666s</text>
-<text x="808.0" y="333.0" font-size="10" font-weight="bold" fill="#c41e3a">4.2× 🚀</text>
+<rect x="130.0" y="312.0" width="101.4" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="236.4" y="323.5" font-size="10" fill="#555">5.934s</text>
+<rect x="130.0" y="331.0" width="148.2" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
+<text x="283.2" y="342.5" font-size="10" fill="#555">8.675s</text>
+<text x="808.0" y="333.0" font-size="10" font-weight="bold" fill="#2a7ec7">1.46×</text>
 <text x="122.0" y="333.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">10000×100</text>
 <text x="122.0" y="343.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
-<rect x="130.0" y="365.0" width="63.3" height="16" rx="3" fill="#E45756" opacity="0.85"/>
-<text x="198.3" y="376.5" font-size="10" fill="#555">3.717s</text>
+<rect x="130.0" y="365.0" width="125.0" height="16" rx="3" fill="#E45756" opacity="0.85"/>
+<text x="260.0" y="376.5" font-size="10" fill="#555">7.317s</text>
 <rect x="130.0" y="384.0" width="582.6" height="16" rx="3" fill="#4C78A8" opacity="0.85"/>
-<text x="717.6" y="395.5" font-size="10" fill="#555">34.216s</text>
-<text x="808.0" y="386.0" font-size="10" font-weight="bold" fill="#c41e3a">9.2× 🚀</text>
+<text x="717.6" y="395.5" font-size="10" fill="#555">34.096s</text>
+<text x="808.0" y="386.0" font-size="10" font-weight="bold" fill="#c41e3a">4.7× 🚀</text>
 <text x="122.0" y="386.5" text-anchor="end" font-size="11" font-weight="600" fill="#333">20000×100</text>
 <text x="122.0" y="396.5" text-anchor="end" font-size="8" fill="#999">k=15</text>
 <line x1="130.0" y1="400.0" x2="800.0" y2="400.0" stroke="#BBB" stroke-width="1"/>
