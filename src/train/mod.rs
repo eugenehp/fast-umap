@@ -1,5 +1,6 @@
 mod config;
 mod get_distance_by_metric;
+mod train_sparse;
 
 use crate::{
     backend::AutodiffBackend,
@@ -16,6 +17,7 @@ use burn::{
     tensor::{cast::ToElement, Device, Int, IndexingUpdateOp, Tensor, TensorData},
 };
 pub use config::*;
+pub use train_sparse::train_sparse;
 
 use crossbeam_channel::Receiver;
 use get_distance_by_metric::*;

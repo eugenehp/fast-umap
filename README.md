@@ -1,16 +1,83 @@
 # fast-umap
 
-UMAP (Uniform Manifold Approximation and Projection) in Rust — GPU-accelerated
-via [burn](https://github.com/tracel-ai/burn) + [CubeCL](https://github.com/tracel-ai/cubecl).
+GPU-accelerated parametric UMAP (Uniform Manifold Approximation and Projection)
+in Rust, built on [burn](https://github.com/tracel-ai/burn) +
+[CubeCL](https://github.com/tracel-ai/cubecl).
 
 See [docs.rs](https://docs.rs/crate/fast-umap/latest) for the full API reference.
 
 ---
 
-## What's New (v1.0.0)
+## Highlights
+
+- **Up to 9.2× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
+  datasets ≥ 5 000 samples (see [benchmarks](#performance--fast-umap-vs-umap-rs) below)
+- **Parametric** — trains a neural network, so you can
+  [`transform()`](#transform-new-data) new unseen data instantly
+- **GPU-accelerated** — custom CubeCL kernels for pairwise distance and KNN,
+  compiled for Metal / Vulkan / DX12 via WGPU
+- **API mirrors umap-rs** — drop-in replacement with `Umap::new(config).fit(data)`
+- **Automatic differentiation** — full autograd through custom GPU kernels
+- **CPU fallback** — runs on NdArray backend (no GPU required for inference or tests)
+
+---
+
+## Performance — fast-umap vs umap-rs
+
+Benchmarked on Apple M3 Max. Both crates receive identical random data.
+fast-umap runs 50 epochs (parametric, GPU); umap-rs runs 200 epochs
+(classical SGD, CPU). Total time includes data prep + KNN + fit + extract.
+
+![Crate comparison chart](figures/crate_comparison.svg)
+
+| Dataset | fast-umap | umap-rs | Speedup |
+|---------|-----------|---------|---------|
+| 500 × 50 | 0.22s | 0.06s | 0.29× *(umap-rs faster)* |
+| 1 000 × 50 | 0.81s | 0.12s | 0.15× *(umap-rs faster)* |
+| 2 000 × 100 | 0.92s | 0.44s | 0.48× *(umap-rs faster)* |
+| **5 000 × 100** | **1.62s** | **2.27s** | **1.4× faster** 🚀 |
+| **10 000 × 100** | **2.06s** | **8.67s** | **4.2× faster** 🚀 |
+| **20 000 × 100** | **3.72s** | **34.22s** | **9.2× faster** 🚀 |
+
+> **Crossover ≈ 5 000 samples.** Below that, umap-rs wins on raw CPU
+> efficiency for small data. Above it, fast-umap pulls ahead and the gap
+> widens with dataset size — umap-rs's brute-force KNN scales O(n²) while
+> fast-umap's per-epoch cost is capped.
+
+**Why fast-umap wins at scale:**
+
+| Technique | Effect |
+|-----------|--------|
+| Sparse edge-based loss | O(n·k) per epoch instead of O(n²) |
+| Edge subsampling | Caps edges/epoch at 50K regardless of n |
+| Pre-batched negative samples on GPU | Zero per-epoch CPU→GPU transfers |
+| Fused index gather | 2 GPU `select()` calls instead of 4 |
+| Async loss readback | GPU→CPU sync every 5 epochs, not every epoch |
+| In-memory checkpointing | No disk I/O during training |
+| GPU-accelerated KNN | Full n×n pairwise distance on GPU (one-time cost) |
+
+**Reproduce:**
+
+```shell
+./bench.sh --only comparison
+```
+
+Or run all benchmarks at once (hardware + comparison + MNIST):
+
+```shell
+./bench.sh
+```
+
+---
+
+## What's New (v1.1.0)
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 | Area | Change |
 |------|--------|
+| **New API** | `Umap::new(config).fit(data)` returns `FittedUmap` with `.embedding()`, `.transform()`, `.into_embedding()` — mirrors umap-rs |
+| **Sparse training** | O(n·k) per epoch with edge subsampling + negative sampling (was O(n²)) |
 | **burn upgrade** | `0.18` → `0.20.1`; cubecl `0.6` → `0.9` |
 | **API fixes** | `Backend::seed` now takes `(&device, seed)`; `as_tensor_arg` no longer takes a generic type param; `NodeID` renamed `NodeId` |
 | **Kernel fixes** | `ABSOLUTE_POS_X/Y` cast to `usize` for shape indexing; all `for i in 0..k` loops use `k as usize` |
@@ -18,31 +85,368 @@ See [docs.rs](https://docs.rs/crate/fast-umap/latest) for the full API reference
 | **Warning fixes** | All 4 `unused Result` warnings from kernel launches resolved with `.expect()` |
 | **Tests** | 36 unit tests added (`cargo test`), all CPU-only via NdArray backend |
 | **Benchmarks** | `cargo run --release --bin bench_report` — auto-detects CPU & GPU, writes hardware-tagged `.md` + `.svg` + CPU vs GPU comparison |
+| **Crate comparison** | `cargo run --release --example crate_comparison` — fast-umap vs umap-rs benchmark |
 
 ---
 
 ## Features
 
 - **Dimensionality Reduction** — projects high-dimensional data to 2-D or 3-D for visualization
+- **Parametric model** — learned neural network can project new, unseen data via `transform()`
 - **GPU-accelerated kernels** — custom CubeCL kernels for Euclidean pairwise distance and KNN, compiled for WGPU (Metal / Vulkan / DX12)
 - **Automatic differentiation** — full autograd through the custom kernels via burn's autodiff backend
-- **Flexible architecture** — configurable hidden layers, output dims, distance metric, batch size, learning rate, early stopping, timeout
+- **Sparse training** — edge subsampling + negative sampling keeps per-epoch cost constant regardless of dataset size
+- **Flexible architecture** — configurable hidden layers, output dims, distance metric, learning rate, early stopping, timeout
 - **CPU fallback** — all model code runs on NdArray (no GPU required for inference or tests)
 - **36 unit tests** — covering normalization, tensor conversion, model shape, distance math
 - **Hardware-tagged benchmarks** — CPU and GPU timings saved as Markdown + SVG, including a CPU vs GPU comparison chart
 
 ---
 
-## Roadmap
+## Installation
 
-- [x] MNIST dataset example with intermediate plots
-- [x] Charting behind a feature flag
-- [x] Labels in plots
-- [x] Batching + accumulated gradient
-- [x] CubeCL kernels for distance computation
-- [x] Hyperparameter testbench (`patience` vs `n_features` vs `epochs` …)
-- [x] Unit tests (36) and hardware benchmarks
-- [ ] PCA warm-start for initial embedding
+```shell
+cargo add fast-umap
+```
+
+`Cargo.toml`:
+
+```toml
+[dependencies]
+fast-umap  = "1.1.0"
+burn       = { version = "0.20.1", features = ["wgpu", "autodiff", "autotune"] }
+cubecl     = { version = "0.9.0",  features = ["wgpu"] }
+```
+
+---
+
+## Quick Start
+
+```rust
+use cubecl::wgpu::WgpuRuntime;
+use fast_umap::prelude::*;
+
+type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
+type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
+
+// 100 samples × 10 features
+let data: Vec<Vec<f64>> = generate_test_data(100, 10)
+    .chunks(10)
+    .map(|c| c.iter().map(|&x: &f32| x as f64).collect())
+    .collect();
+
+// Fit UMAP (default: 2-D output, Euclidean distance)
+let config = UmapConfig::default();
+let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+let fitted = umap.fit(data.clone(), None);
+
+// Get embedding
+let embedding = fitted.embedding();
+println!("Shape: {} × {}", embedding.len(), embedding[0].len());
+```
+
+---
+
+## API Overview
+
+The public API mirrors [`umap-rs`](https://crates.io/crates/umap-rs):
+
+| Type | Description |
+|------|-------------|
+| [`Umap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.Umap.html) | Main algorithm struct — `Umap::new(config)` |
+| [`FittedUmap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.FittedUmap.html) | Fitted model — `.embedding()`, `.transform()`, `.into_embedding()`, `.config()` |
+| [`UmapConfig`](https://docs.rs/fast-umap/latest/fast_umap/struct.UmapConfig.html) | Configuration with nested `GraphParams` + `OptimizationParams` |
+| [`GraphParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.GraphParams.html) | `n_neighbors`, `metric`, `normalized`, `minkowski_p` |
+| [`OptimizationParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.OptimizationParams.html) | `n_epochs`, `learning_rate`, `patience`, `timeout`, `verbose`, … |
+| [`Metric`](https://docs.rs/fast-umap/latest/fast_umap/enum.Metric.html) | `Euclidean`, `EuclideanKNN`, `Manhattan`, `Cosine` |
+
+### Configuration
+
+```rust
+let config = UmapConfig {
+    n_components: 2,
+    hidden_sizes: vec![128],
+    graph: GraphParams {
+        n_neighbors: 15,
+        metric: Metric::Euclidean,
+        ..Default::default()
+    },
+    optimization: OptimizationParams {
+        n_epochs: 200,
+        learning_rate: 1e-3,
+        patience: Some(50),
+        verbose: true,
+        ..Default::default()
+    },
+    ..Default::default()
+};
+```
+
+### Key parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `n_components` | 2 | Output dimensionality (2-D or 3-D) |
+| `hidden_sizes` | `[100, 100, 100]` | Neural network hidden layer sizes |
+| `n_neighbors` | 15 | KNN graph neighbours |
+| `n_epochs` | 200 | Training epochs |
+| `learning_rate` | 1e-3 | Adam step size |
+| `batch_size` | 1 000 | Samples per batch |
+| `penalty` | 0.0 | L2 weight decay |
+| `metric` | `Euclidean` | Distance metric |
+| `repulsion_strength` | 1.0 | Repulsion term weight |
+| `patience` | `None` | Early-stop epochs without improvement |
+| `min_desired_loss` | `None` | Stop when loss ≤ threshold |
+| `timeout` | `None` | Hard time limit (seconds) |
+| `verbose` | `true` | Progress bar + loss plots |
+
+### Transform new data
+
+Because fast-umap is *parametric* (neural network), it can project new
+unseen data — something classical UMAP cannot do:
+
+```rust
+let fitted = umap.fit(training_data, None);
+
+// Project new data through the trained model
+let new_embedding = fitted.transform(new_data);
+```
+
+---
+
+## Examples
+
+### Simple — random data, 2-D embedding
+
+```shell
+cargo run --release --example simple
+```
+
+```rust
+use cubecl::wgpu::WgpuRuntime;
+use fast_umap::prelude::*;
+
+fn main() {
+    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
+    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
+
+    let data: Vec<Vec<f64>> = (0..100 * 3)
+        .map(|_| rand::rng().random::<f64>())
+        .collect::<Vec<_>>()
+        .chunks_exact(3)
+        .map(|c| c.to_vec())
+        .collect();
+
+    let config = UmapConfig::default();
+    let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+    let fitted = umap.fit(data.clone(), None);
+
+    let embedding = fitted.embedding();
+    println!("Embedding shape: {} × {}", embedding.len(), embedding[0].len());
+
+    // Transform new unseen data through the trained model
+    let _new_embedding = fitted.transform(data);
+}
+```
+
+### Advanced — 1 000 samples, custom config
+
+```shell
+cargo run --release --example advanced
+```
+
+```rust
+use cubecl::wgpu::WgpuRuntime;
+use fast_umap::prelude::*;
+
+fn main() {
+    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
+    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
+
+    let train_data: Vec<f32> = generate_test_data(1000, 100);
+    let data: Vec<Vec<f32>> = train_data.chunks(100).map(|c| c.to_vec()).collect();
+
+    let config = UmapConfig {
+        n_components: 2,
+        hidden_sizes: vec![100, 100, 100],
+        graph: GraphParams {
+            n_neighbors: 10,
+            metric: Metric::Euclidean,
+            ..Default::default()
+        },
+        optimization: OptimizationParams {
+            n_epochs: 100,
+            batch_size: 1000,
+            learning_rate: 0.001,
+            verbose: true,
+            min_desired_loss: Some(0.001),
+            timeout: Some(60),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+    let fitted = umap.fit(data, None);
+
+    println!("Embedding: {} samples × {} dims",
+        fitted.embedding().len(), fitted.embedding()[0].len());
+}
+```
+
+### MNIST — 10 000 hand-written digits projected to 2-D
+
+```shell
+cargo run --release --example mnist         # quick run (no figures)
+./bench.sh --only mnist                     # generate figures
+```
+
+Downloads the MNIST dataset on first run (~12 MB), trains UMAP on 10K
+digits (784 features → 2-D).
+
+| 2-D digit embedding (coloured by class) | Loss curve |
+|:----------------------------------------:|:----------:|
+| ![MNIST embedding](figures/mnist.png) | ![MNIST loss](figures/losses_model.png) |
+
+```rust
+let config = UmapConfig {
+    n_components: 2,
+    hidden_sizes: vec![256],
+    graph: GraphParams {
+        n_neighbors: 15,
+        metric: Metric::Euclidean,
+        ..Default::default()
+    },
+    optimization: OptimizationParams {
+        n_epochs: 1_000,
+        learning_rate: 1e-3,
+        patience: Some(100),
+        repulsion_strength: 3.0,
+        penalty: 1e-6,
+        verbose: true,
+        ..Default::default()
+    },
+    ..Default::default()
+};
+
+let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+let fitted = umap.fit(data, Some(labels));
+```
+
+---
+
+## Generating Figures
+
+All figures are generated by the benchmark suite, not by the examples.
+Examples are lightweight smoke tests that verify correctness without
+writing any files.
+
+```shell
+# Run all benchmarks and generate all figures
+./bench.sh
+
+# Run only specific benchmarks
+./bench.sh --only comparison          # fast-umap vs umap-rs chart
+./bench.sh --only mnist               # MNIST embedding + loss curve
+./bench.sh --only hardware            # CPU + GPU micro-benchmarks
+./bench.sh --only mnist comparison    # combine multiple
+
+# Skip MNIST (saves ~70s)
+./bench.sh --skip-mnist
+
+# Include Criterion statistical suite
+./bench.sh --criterion
+```
+
+### What generates what
+
+| Benchmark | Output |
+|-----------|--------|
+| `comparison` | `figures/crate_comparison.{svg,json,md}` |
+| `mnist` | `figures/mnist.png`, `figures/losses_model.png` |
+| `hardware` | `benches/results/{cpu,gpu,comparison}_*.{svg,md}` |
+| `criterion` | `target/criterion/` (HTML reports) |
+
+### Run examples (no figures)
+
+```shell
+./run_all.sh                  # all examples
+./run_all.sh --skip-mnist     # skip MNIST download
+```
+
+---
+
+## Architecture
+
+fast-umap uses a **parametric** approach — a small feed-forward neural network
+is trained with the UMAP cross-entropy loss:
+
+```text
+attraction  =  mean_{k-NN edges}      [ −log q_ij ]
+repulsion   =  mean_{negative samples} [ −log (1 − q_ij) ]
+loss        =  attraction  +  repulsion_strength × repulsion
+```
+
+where `q_ij = 1 / (1 + d_ij²)` is the Student-t kernel applied to embedding
+distances.
+
+### Training pipeline
+
+```
+Input data [n, features]
+    │
+    ▼
+GPU pairwise distance → KNN graph (one-time O(n²) cost)
+    │
+    ▼
+┌─── Per epoch (cost: O(min(n·k, 50K))) ───┐
+│  Forward pass: data → neural net → [n, 2] │
+│  Edge subsampling from KNN graph           │
+│  Negative sampling (random non-neighbors)  │
+│  UMAP cross-entropy loss                   │
+│  Backward pass + Adam optimizer step       │
+└────────────────────────────────────────────┘
+    │
+    ▼
+FittedUmap with .embedding() and .transform()
+```
+
+### Modules
+
+| Module | Description |
+|--------|-------------|
+| [`model`] | `UMAPModel` neural network and config builder |
+| [`train`] | Training loop, `UmapConfig`, sparse training, loss computation |
+| [`chart`] | 2-D scatter plots and loss curves (plotters) |
+| [`utils`] | Data generation, tensor conversion, normalisation |
+| [`kernels`] | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
+| [`backend`] | Backend trait extension for custom kernel dispatch |
+| [`distances`] | CPU-side distance functions (Euclidean, cosine, Minkowski…) |
+| [`prelude`] | Re-exports of the most commonly used items |
+
+---
+
+## Legacy API
+
+The original `UMAP` struct and `train()` function are still available for
+backward compatibility:
+
+```rust
+use fast_umap::prelude::*;
+
+// Legacy one-liner
+let umap: fast_umap::UMAP<MyAutodiffBackend> = umap(data.clone());
+let embedding = umap.transform(data);
+
+// Legacy manual training
+let (model, losses, best_loss) = fast_umap::train::train(
+    "my_run", model, num_samples, num_features,
+    train_data, &config, device, exit_rx, None,
+);
+```
+
+> **Note:** The legacy API uses the dense O(n²) training path. Use the new
+> `Umap::new(config).fit(data)` API for the optimized sparse training path.
 
 ---
 
@@ -69,9 +473,9 @@ cargo test
 
 ---
 
-## Benchmarks
+## Micro-benchmarks
 
-**Reproduce:** `cargo run --release --bin bench_report`
+**Reproduce:** `./bench.sh --only hardware`
 
 Full detail files:
 [cpu\_apple\_m3\_max.md](benches/results/cpu_apple_m3_max.md) ·
@@ -79,73 +483,36 @@ Full detail files:
 [comparison\_apple\_m3\_max.md](benches/results/comparison_apple_m3_max.md) ·
 [cpu\_apple\_silicon\_aarch64.md](benches/results/cpu_apple_silicon_aarch64.md)
 
----
-
 ### CPU — Apple M3 Max (NdArray backend)
 
 ![CPU benchmark chart](benches/results/cpu_apple_m3_max.svg)
 
 | Benchmark | Input | Min | **Mean** | Max |
 |-----------|-------|-----|----------|-----|
-| `normalize_data` | 100×10 | 329 µs | **450 µs** | 797 µs |
-| `normalize_data` | 500×30 | 1.88 ms | **2.22 ms** | 2.98 ms |
-| `normalize_data` | 1 000×50 | 3.68 ms | **4.64 ms** | 5.71 ms |
-| `normalize_data` | 5 000×100 | 15.8 ms | **17.9 ms** | 19.4 ms |
-| `generate_test_data` | 100×10 | 3.58 µs | **4.05 µs** | 14.5 µs |
-| `generate_test_data` | 500×30 | 56.0 µs | **57.9 µs** | 72.5 µs |
-| `generate_test_data` | 1 000×50 | 189 µs | **192 µs** | 203 µs |
-| `generate_test_data` | 5 000×100 | 1.89 ms | **1.91 ms** | 1.97 ms |
-| `tensor_convert` | 100×10 | 4.96 µs | **5.02 µs** | 5.17 µs |
-| `tensor_convert` | 500×30 | 29.7 µs | **31.2 µs** | 40.6 µs |
-| `tensor_convert` | 1 000×50 | 70.8 µs | **75.7 µs** | 90.4 µs |
-| `model_forward` | 16s×10f \[32\]→2 | 21.8 µs | **36.0 µs** | 58.6 µs |
-| `model_forward` | 64s×50f \[64\]→2 | 27.9 µs | **34.4 µs** | 53.5 µs |
-| `model_forward` | 128s×50f \[128\]→2 | 54.3 µs | **57.5 µs** | 62.9 µs |
-| `model_forward` | 64s×100f \[128,64\]→3 | 71.0 µs | **74.7 µs** | 85.0 µs |
-| `model_forward` | 256s×100f \[256,128\]→2 | 243 µs | **248 µs** | 256 µs |
-| `normalize_tensor` | n=64 | 1.96 µs | **2.03 µs** | 2.17 µs |
-| `normalize_tensor` | n=512 | 2.79 µs | **2.92 µs** | 3.17 µs |
-| `normalize_tensor` | n=4 096 | 9.50 µs | **9.70 µs** | 14.6 µs |
-| `normalize_tensor` | n=32 768 | 69.7 µs | **70.3 µs** | 81.1 µs |
-| `layer_normalize` | 32×16 | 3.50 µs | **3.61 µs** | 3.75 µs |
-| `layer_normalize` | 128×64 | 17.9 µs | **18.1 µs** | 19.1 µs |
-| `layer_normalize` | 512×128 | 115 µs | **117 µs** | 126 µs |
-| `layer_normalize` | 1 000×256 | 413 µs | **416 µs** | 427 µs |
-
----
-
-### CPU — Apple Silicon aarch64 (NdArray backend)
-
-![CPU benchmark chart](benches/results/cpu_apple_silicon_aarch64.svg)
-
-| Benchmark | Input | Min | **Mean** | Max |
-|-----------|-------|-----|----------|-----|
-| `normalize_data` | 100×10 | 8.63 ms | **9.85 ms** | 11.4 ms |
-| `normalize_data` | 500×30 | 36.8 ms | **41.5 ms** | 51.4 ms |
-| `normalize_data` | 1 000×50 | 67.2 ms | **72.8 ms** | 78.9 ms |
-| `normalize_data` | 5 000×100 | 173 ms | **178 ms** | 183 ms |
-| `generate_test_data` | 100×10 | 5.08 µs | **5.82 µs** | 10.4 µs |
-| `generate_test_data` | 500×30 | 60.8 µs | **62.2 µs** | 75.8 µs |
-| `generate_test_data` | 1 000×50 | 198 µs | **204 µs** | 269 µs |
-| `generate_test_data` | 5 000×100 | 2.26 ms | **2.59 ms** | 3.20 ms |
-| `tensor_convert` | 100×10 | 20.3 µs | **22.6 µs** | 41.5 µs |
-| `tensor_convert` | 500×30 | 129 µs | **138 µs** | 159 µs |
-| `tensor_convert` | 1 000×50 | 328 µs | **354 µs** | 404 µs |
-| `model_forward` | 16s×10f \[32\]→2 | 34.7 µs | **121 µs** | 2.40 ms |
-| `model_forward` | 64s×50f \[64\]→2 | 45.7 µs | **111 µs** | 1.35 ms |
-| `model_forward` | 128s×50f \[128\]→2 | 162 µs | **263 µs** | 934 µs |
-| `model_forward` | 64s×100f \[128,64\]→3 | 291 µs | **315 µs** | 362 µs |
-| `model_forward` | 256s×100f \[256,128\]→2 | 790 µs | **857 µs** | 1.03 ms |
-| `normalize_tensor` | n=64 | 4.46 µs | **6.10 µs** | 21.6 µs |
-| `normalize_tensor` | n=512 | 3.54 µs | **4.16 µs** | 32.1 µs |
-| `normalize_tensor` | n=4 096 | 12.2 µs | **13.8 µs** | 27.8 µs |
-| `normalize_tensor` | n=32 768 | 176 µs | **195 µs** | 227 µs |
-| `layer_normalize` | 32×16 | 4.08 µs | **4.95 µs** | 21.0 µs |
-| `layer_normalize` | 128×64 | 64.8 µs | **75.8 µs** | 101 µs |
-| `layer_normalize` | 512×128 | 370 µs | **410 µs** | 455 µs |
-| `layer_normalize` | 1 000×256 | 1.44 ms | **1.56 ms** | 1.90 ms |
-
----
+| `normalize_data` | 100×10 | 294 µs | **439 µs** | 675 µs |
+| `normalize_data` | 500×30 | 1.90 ms | **2.41 ms** | 2.97 ms |
+| `normalize_data` | 1 000×50 | 4.26 ms | **4.80 ms** | 5.56 ms |
+| `normalize_data` | 5 000×100 | 16.3 ms | **17.2 ms** | 18.6 ms |
+| `generate_test_data` | 100×10 | 3.62 µs | **4.12 µs** | 14.0 µs |
+| `generate_test_data` | 500×30 | 57.6 µs | **61.7 µs** | 88.7 µs |
+| `generate_test_data` | 1 000×50 | 191 µs | **199 µs** | 247 µs |
+| `generate_test_data` | 5 000×100 | 1.91 ms | **1.99 ms** | 2.16 ms |
+| `tensor_convert` | 100×10 | 5.08 µs | **5.21 µs** | 8.04 µs |
+| `tensor_convert` | 500×30 | 30.7 µs | **33.2 µs** | 42.1 µs |
+| `tensor_convert` | 1 000×50 | 71.5 µs | **76.7 µs** | 92.3 µs |
+| `model_forward` | 16s×10f \[32\]→2 | 20.5 µs | **34.8 µs** | 52.1 µs |
+| `model_forward` | 64s×50f \[64\]→2 | 27.1 µs | **34.7 µs** | 49.8 µs |
+| `model_forward` | 128s×50f \[128\]→2 | 54.3 µs | **58.2 µs** | 71.2 µs |
+| `model_forward` | 64s×100f \[128,64\]→3 | 72.6 µs | **78.6 µs** | 135 µs |
+| `model_forward` | 256s×100f \[256,128\]→2 | 246 µs | **271 µs** | 368 µs |
+| `normalize_tensor` | n=64 | 1.88 µs | **1.93 µs** | 2.00 µs |
+| `normalize_tensor` | n=512 | 2.75 µs | **3.03 µs** | 3.88 µs |
+| `normalize_tensor` | n=4 096 | 9.46 µs | **9.75 µs** | 12.4 µs |
+| `normalize_tensor` | n=32 768 | 69.9 µs | **73.4 µs** | 91.5 µs |
+| `layer_normalize` | 32×16 | 3.50 µs | **3.60 µs** | 3.88 µs |
+| `layer_normalize` | 128×64 | 16.3 µs | **16.6 µs** | 17.4 µs |
+| `layer_normalize` | 512×128 | 116 µs | **119 µs** | 129 µs |
+| `layer_normalize` | 1 000×256 | 412 µs | **421 µs** | 446 µs |
 
 ### GPU — Apple M3 Max (WGPU / Metal)
 
@@ -153,22 +520,20 @@ Full detail files:
 
 | Benchmark | Input | Min | **Mean** | Max |
 |-----------|-------|-----|----------|-----|
-| `model_forward` | 16s×10f \[32\]→2 | 419 µs | **565 µs** | 770 µs |
-| `model_forward` | 64s×50f \[64\]→2 | 424 µs | **466 µs** | 585 µs |
-| `model_forward` | 128s×50f \[128\]→2 | 424 µs | **474 µs** | 551 µs |
-| `model_forward` | 64s×100f \[128,64\]→3 | 565 µs | **637 µs** | 825 µs |
-| `model_forward` | 256s×100f \[256,128\]→2 | 638 µs | **675 µs** | 724 µs |
-| `model_forward` | 512s×100f \[256,128\]→2 | 921 µs | **1.10 ms** | 1.32 ms |
-| `normalize_tensor` | n=512 | 560 µs | **660 µs** | 957 µs |
-| `normalize_tensor` | n=4 096 | 555 µs | **650 µs** | 828 µs |
-| `normalize_tensor` | n=32 768 | 642 µs | **711 µs** | 844 µs |
-| `normalize_tensor` | n=262 144 | 1.06 ms | **1.13 ms** | 1.23 ms |
-| `layer_normalize` | 128×64 | 365 µs | **419 µs** | 648 µs |
-| `layer_normalize` | 512×128 | 407 µs | **503 µs** | 1.46 ms |
-| `layer_normalize` | 1 000×256 | 568 µs | **715 µs** | 1.67 ms |
-| `layer_normalize` | 4 000×512 | 1.75 ms | **2.12 ms** | 3.01 ms |
-
----
+| `model_forward` | 16s×10f \[32\]→2 | 370 µs | **482 µs** | 1.19 ms |
+| `model_forward` | 64s×50f \[64\]→2 | 349 µs | **462 µs** | 747 µs |
+| `model_forward` | 128s×50f \[128\]→2 | 423 µs | **614 µs** | 846 µs |
+| `model_forward` | 64s×100f \[128,64\]→3 | 505 µs | **642 µs** | 998 µs |
+| `model_forward` | 256s×100f \[256,128\]→2 | 461 µs | **531 µs** | 1.00 ms |
+| `model_forward` | 512s×100f \[256,128\]→2 | 871 µs | **1.05 ms** | 1.36 ms |
+| `normalize_tensor` | n=512 | 554 µs | **788 µs** | 1.36 ms |
+| `normalize_tensor` | n=4 096 | 606 µs | **682 µs** | 853 µs |
+| `normalize_tensor` | n=32 768 | 635 µs | **689 µs** | 779 µs |
+| `normalize_tensor` | n=262 144 | 1.07 ms | **1.13 ms** | 1.31 ms |
+| `layer_normalize` | 128×64 | 463 µs | **668 µs** | 798 µs |
+| `layer_normalize` | 512×128 | 486 µs | **626 µs** | 832 µs |
+| `layer_normalize` | 1 000×256 | 618 µs | **667 µs** | 714 µs |
+| `layer_normalize` | 4 000×512 | 1.55 ms | **1.66 ms** | 1.79 ms |
 
 ### CPU vs GPU — Apple M3 Max
 
@@ -176,333 +541,52 @@ Full detail files:
 
 | Benchmark | Input | CPU | GPU | Speedup |
 |-----------|-------|-----|-----|---------|
-| `model_forward` | 16s×10f \[32\]→2 | **36.0 µs** | 565 µs | 0.06× *(CPU faster)* |
-| `model_forward` | 64s×50f \[64\]→2 | **34.4 µs** | 466 µs | 0.07× *(CPU faster)* |
-| `model_forward` | 128s×50f \[128\]→2 | **57.5 µs** | 474 µs | 0.12× *(CPU faster)* |
-| `model_forward` | 64s×100f \[128,64\]→3 | **74.7 µs** | 637 µs | 0.12× *(CPU faster)* |
-| `model_forward` | 256s×100f \[256,128\]→2 | **248 µs** | 675 µs | 0.37× *(CPU faster)* |
-| `normalize_tensor` | n=512 | **2.92 µs** | 660 µs | 0.00× *(CPU faster)* |
-| `normalize_tensor` | n=4 096 | **9.70 µs** | 650 µs | 0.01× *(CPU faster)* |
-| `normalize_tensor` | n=32 768 | **70.3 µs** | 711 µs | 0.10× *(CPU faster)* |
-| `layer_normalize` | 128×64 | **18.1 µs** | 419 µs | 0.04× *(CPU faster)* |
-| `layer_normalize` | 512×128 | **117 µs** | 503 µs | 0.23× *(CPU faster)* |
-| `layer_normalize` | 1 000×256 | **416 µs** | 715 µs | 0.58× *(CPU faster)* |
+| `model_forward` | 16s×10f \[32\]→2 | **34.8 µs** | 482 µs | 0.07× *(CPU faster)* |
+| `model_forward` | 64s×50f \[64\]→2 | **34.7 µs** | 462 µs | 0.07× *(CPU faster)* |
+| `model_forward` | 128s×50f \[128\]→2 | **58.2 µs** | 614 µs | 0.09× *(CPU faster)* |
+| `model_forward` | 64s×100f \[128,64\]→3 | **78.6 µs** | 642 µs | 0.12× *(CPU faster)* |
+| `model_forward` | 256s×100f \[256,128\]→2 | **271 µs** | 531 µs | 0.51× *(CPU faster)* |
+| `normalize_tensor` | n=512 | **3.03 µs** | 788 µs | 0.00× *(CPU faster)* |
+| `normalize_tensor` | n=4 096 | **9.75 µs** | 682 µs | 0.01× *(CPU faster)* |
+| `normalize_tensor` | n=32 768 | **73.4 µs** | 689 µs | 0.11× *(CPU faster)* |
+| `layer_normalize` | 128×64 | **16.6 µs** | 668 µs | 0.02× *(CPU faster)* |
+| `layer_normalize` | 512×128 | **119 µs** | 626 µs | 0.19× *(CPU faster)* |
+| `layer_normalize` | 1 000×256 | **421 µs** | 667 µs | 0.63× *(CPU faster)* |
 
-**Why is CPU faster for these sizes?**
+> **Note:** WGPU/Metal has a fixed dispatch overhead of ~400–700 µs per kernel
+> call. For the small model sizes above, that overhead dominates. The GPU wins
+> in full UMAP training loops over thousands of samples where operations are
+> chained without intermediate CPU readbacks.
 
-WGPU/Metal has a fixed dispatch overhead of ~400–700 µs per kernel call.
-For the small model sizes benchmarked above that overhead dominates over
-the actual compute. The GPU wins when:
-
-- Batch sizes are large (≥ 10 000 samples per forward pass)
-- Models are wide/deep (≥ 1 024 hidden units)
-- Operations are *chained* without intermediate CPU readbacks
-- The custom CubeBackend kernels run on large N×N pairwise distance matrices
-  (cost grows O(N²), quickly justifying dispatch overhead)
-
-In a full UMAP training loop over thousands of samples the GPU path is
-significantly faster; the numbers above reflect isolated micro-benchmarks
-with a forced CPU↔GPU sync after every operation.
-
----
-
-### Running benchmarks on your Mac
+### Running benchmarks
 
 ```shell
-# 1. Prerequisites
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh   # Rust
-xcode-select --install                                             # Metal / Xcode CLT
+# All benchmarks (hardware + comparison + MNIST)
+./bench.sh
 
-# 2. Run — writes hardware-tagged files to benches/results/
-cargo run --release --bin bench_report
+# + Criterion statistics (~5 min)
+./bench.sh --criterion
 
-# 3. Open the comparison chart
-open benches/results/comparison.svg
-```
-
-Or use the convenience script:
-
-```shell
-./bench.sh             # hardware report only  (~1 min)
-./bench.sh --criterion # + Criterion stats     (~5 min)
-```
-
-Output files written automatically:
-
-```
-benches/results/
-  cpu_<chip>.md / .svg            CPU timings
-  gpu_<chip>.md / .svg            GPU timings  (when GPU available)
-  comparison_<chip>.md / .svg     CPU vs GPU, speedup ratios
-  benchmark_results.md / .svg     copy of latest CPU run
+# Just hardware micro-benchmarks
+./bench.sh --only hardware
 ```
 
 ---
 
-## Installation
+## Roadmap
 
-```shell
-cargo add fast-umap
-```
-
-`Cargo.toml`:
-
-```toml
-[dependencies]
-fast-umap  = "1.0.0"
-burn       = { version = "0.20.1", features = ["wgpu", "autodiff", "autotune"] }
-cubecl     = { version = "0.9.0",  features = ["wgpu"] }
-```
-
----
-
-## Quick start
-
-```rust
-use cubecl::wgpu::WgpuRuntime;
-use fast_umap::prelude::*;
-
-fn main() {
-    type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
-    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
-
-    // 100 samples × 10 features, randomly generated
-    let data: Vec<Vec<f64>> = generate_test_data(100, 10)
-        .chunks(10)
-        .map(|c| c.iter().map(|&x: &f32| x as f64).collect())
-        .collect();
-
-    // Train UMAP and project to 2-D
-    let umap: fast_umap::UMAP<MyAutodiffBackend> = umap(data.clone());
-    let embedding = umap.transform(data);
-
-    // Save plot.png
-    chart_vector(embedding, None, None);
-}
-```
-
----
-
-## Model Configuration
-
-```rust
-let model_config = UMAPModelConfigBuilder::default()
-    .input_size(50)                      // input dimensionality
-    .hidden_sizes(vec![128, 64])         // one or more hidden layers
-    .output_size(2)                      // 2-D or 3-D embedding
-    .build()
-    .unwrap();
-```
-
----
-
-## Training
-
-```rust
-use cubecl::wgpu::WgpuRuntime;
-use fast_umap::{model::*, prelude::*, train::{train, TrainingConfig}, utils::*};
-
-type MyBackend        = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
-type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
-
-let device = burn::backend::wgpu::WgpuDevice::default();
-MyAutodiffBackend::seed(&device, 42);
-
-let num_samples  = 1_000;
-let num_features = 100;
-let train_data: Vec<f32> = generate_test_data(num_samples, num_features);
-
-let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(
-    &UMAPModelConfigBuilder::default()
-        .input_size(num_features)
-        .hidden_sizes(vec![128, 64])
-        .output_size(2)
-        .build().unwrap(),
-    &device,
-);
-
-let config = TrainingConfig::builder()
-    .with_epochs(200)
-    .with_batch_size(256)
-    .with_learning_rate(1e-3)
-    .with_beta1(0.9)
-    .with_beta2(0.999)
-    .with_k_neighbors(10)
-    .with_metric(Metric::Euclidean.into())
-    .with_verbose(true)
-    .with_patience(Some(20))
-    .with_min_desired_loss(Some(1e-3))
-    .with_timeout(Some(120))
-    .build()
-    .unwrap();
-
-let (exit_tx, exit_rx) = crossbeam_channel::unbounded();
-ctrlc::set_handler(move || exit_tx.send(()).unwrap()).unwrap();
-
-let (model, losses, _) = train(
-    "my_run",
-    model,
-    num_samples,
-    num_features,
-    train_data.clone(),
-    &config,
-    device.clone(),
-    exit_rx,
-);
-
-// Inference
-let model = model.valid();
-let input = convert_vector_to_tensor(train_data, num_samples, num_features, &device);
-let embedding = model.forward(input);  // shape [num_samples, 2]
-```
-
-### Key training parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `epochs` | 100 | Training epochs |
-| `batch_size` | 1 000 | Samples per batch |
-| `learning_rate` | 1e-3 | Adam step size |
-| `beta1` / `beta2` | 0.9 / 0.999 | Adam moment decay |
-| `penalty` | 0.0 | L2 weight decay |
-| `k_neighbors` | 10 | KNN graph neighbours |
-| `metric` | `Euclidean` | `Euclidean` · `EuclideanKNN` · `Manhattan` · `Cosine` |
-| `patience` | `None` | Early-stop epochs without improvement |
-| `min_desired_loss` | `None` | Stop when loss ≤ threshold |
-| `timeout` | `None` | Hard time limit (seconds) |
-| `verbose` | `true` | Progress bar |
-
----
-
-## Examples
-
-### Simple — random data, 2-D embedding
-
-```shell
-cargo run --example simple
-```
-
-```rust
-use cubecl::wgpu::WgpuRuntime;
-use fast_umap::prelude::*;
-
-fn main() {
-    type MyBackend        = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
-    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
-
-    let num_samples  = 100;
-    let num_features = 3;
-
-    let mut rng = rand::rng();
-    let data: Vec<Vec<f64>> = (0..num_samples)
-        .map(|_| (0..num_features).map(|_| rng.random::<f64>()).collect())
-        .collect();
-
-    let umap: fast_umap::UMAP<MyAutodiffBackend> = umap(data.clone());
-    let embedding = umap.transform(data);
-
-    // Saves plot.png
-    chart_vector(embedding, None, None);
-}
-```
-
----
-
-### Advanced — 1 000 samples, 100 features, custom config
-
-```shell
-cargo run --example advanced
-```
-
-```rust
-use cubecl::wgpu::WgpuRuntime;
-use fast_umap::{chart, model::*, prelude::*, train::train, utils::*};
-use crossbeam_channel::unbounded;
-
-fn main() {
-    let (exit_tx, exit_rx) = unbounded();
-    ctrlc::set_handler(move || exit_tx.send(()).unwrap()).unwrap();
-
-    type MyBackend        = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
-    type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
-
-    let device = burn::backend::wgpu::WgpuDevice::default();
-    MyAutodiffBackend::seed(&device, 9999);
-
-    let num_samples  = 1_000;
-    let num_features = 100;
-    let train_data: Vec<f32> = generate_test_data(num_samples, num_features);
-
-    let model: UMAPModel<MyAutodiffBackend> = UMAPModel::new(
-        &UMAPModelConfigBuilder::default()
-            .input_size(num_features)
-            .hidden_sizes(vec![100, 100, 100])
-            .output_size(2)
-            .build().unwrap(),
-        &device,
-    );
-
-    let config = TrainingConfig::builder()
-        .with_epochs(100)
-        .with_batch_size(1000)
-        .with_learning_rate(1e-3)
-        .with_beta1(0.9)
-        .with_beta2(0.999)
-        .with_verbose(true)
-        .with_metric(Metric::Euclidean.into())
-        .with_k_neighbors(10)
-        .with_min_desired_loss(Some(1e-3))
-        .with_timeout(Some(60))
-        .build().unwrap();
-
-    let (model, losses, _) = train(
-        "advanced", model, num_samples, num_features,
-        train_data.clone(), &config, device.clone(), exit_rx,
-    );
-
-    let model = model.valid();
-    let input = convert_vector_to_tensor(train_data, num_samples, num_features, &device);
-
-    // Saves losses.png + plot.png
-    chart::plot_loss(losses, "losses.png").unwrap();
-    chart::chart_tensor(model.forward(input), None, None);
-}
-```
-
----
-
-### MNIST — 70 000 hand-written digits projected to 2-D
-
-```shell
-cargo run --example mnist
-```
-
-Downloads the MNIST dataset on first run (~12 MB), trains UMAP, saves:
-
-| Output | File |
-|--------|------|
-| 2-D digit embedding (coloured by class) | ![MNIST embedding](figures/mnist.png) |
-| MNIST loss curve | ![MNIST loss](figures/losses_mnist.png) |
-
----
-
-### Regenerating example images
-
-The images above are generated by the examples themselves (GPU required).
-To refresh them on your Mac:
-
-```shell
-# Regenerate all example output images
-./generate_images.sh
-```
-
-Or individually:
-
-```shell
-cargo run --release --example simple       # → plot.png
-cargo run --release --example advanced     # → plot.png + losses.png
-cargo run --release --example mnist        # → mnist.png + losses_mnist.png
-```
+- [x] MNIST dataset example with intermediate plots
+- [x] Charting behind a feature flag
+- [x] Labels in plots
+- [x] Batching + accumulated gradient
+- [x] CubeCL kernels for distance computation
+- [x] Hyperparameter testbench (`patience` vs `n_features` vs `epochs` …)
+- [x] Unit tests (36) and hardware benchmarks
+- [x] New API mirroring umap-rs (`Umap`, `FittedUmap`, `UmapConfig`)
+- [x] Sparse training with edge subsampling + negative sampling
+- [x] Crate comparison benchmark (fast-umap vs umap-rs)
+- [ ] PCA warm-start for initial embedding
+- [ ] Approximate KNN (NN-descent) for datasets > 50K
 
 ---
 
@@ -527,7 +611,7 @@ paper, this repository, and acknowledge the Burn and CubeCL frameworks:
   author  = {Hauptmann, Eugene},
   year    = {2024},
   url     = {https://github.com/eugenehp/fast-umap},
-  version = {1.0.0}
+  version = {1.1.0}
 }
 ```
 
