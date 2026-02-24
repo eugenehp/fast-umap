@@ -44,7 +44,7 @@ serde = "1.0.216"
 [dev-dependencies]
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
 criterion = { version = "0.5", features = ["html_reports"] }
-mnist = { version = "0.6.1", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
+mnist = { version = "0.6.0", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
 
 [[bench]]
 name = "umap_bench"
