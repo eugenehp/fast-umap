@@ -10,8 +10,8 @@ See [docs.rs](https://docs.rs/crate/fast-umap/latest) for the full API reference
 
 ## Highlights
 
-- **Up to 9.2× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
-  datasets ≥ 5 000 samples (see [benchmarks](#performance--fast-umap-vs-umap-rs) below)
+- **Up to 4.7× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
+  datasets ≥ 10 000 samples (see [benchmarks](#performance--fast-umap-vs-umap-rs) below)
 - **Parametric** — trains a neural network, so you can
   [`transform()`](#transform-new-data) new unseen data instantly
 - **GPU-accelerated** — custom CubeCL kernels for pairwise distance and KNN,
@@ -32,14 +32,14 @@ fast-umap runs 50 epochs (parametric, GPU); umap-rs runs 200 epochs
 
 | Dataset | fast-umap | umap-rs | Speedup |
 |---------|-----------|---------|---------|
-| 500 × 50 | 0.22s | 0.06s | 0.29× *(umap-rs faster)* |
-| 1 000 × 50 | 0.81s | 0.12s | 0.15× *(umap-rs faster)* |
-| 2 000 × 100 | 0.92s | 0.44s | 0.48× *(umap-rs faster)* |
-| **5 000 × 100** | **1.62s** | **2.27s** | **1.4× faster** 🚀 |
-| **10 000 × 100** | **2.06s** | **8.67s** | **4.2× faster** 🚀 |
-| **20 000 × 100** | **3.72s** | **34.22s** | **9.2× faster** 🚀 |
+| 500 × 50 | 0.84s | 0.08s | 0.10× *(umap-rs faster)* |
+| 1 000 × 50 | 2.19s | 0.12s | 0.05× *(umap-rs faster)* |
+| 2 000 × 100 | 3.65s | 0.44s | 0.12× *(umap-rs faster)* |
+| 5 000 × 100 | 6.75s | 2.31s | 0.34× *(umap-rs faster)* |
+| **10 000 × 100** | **5.93s** | **8.68s** | **1.5× faster** 🚀 |
+| **20 000 × 100** | **7.32s** | **34.10s** | **4.7× faster** 🚀 |
 
-> **Crossover ≈ 5 000 samples.** Below that, umap-rs wins on raw CPU
+> **Crossover ≈ 10 000 samples.** Below that, umap-rs wins on raw CPU
 > efficiency for small data. Above it, fast-umap pulls ahead and the gap
 > widens with dataset size — umap-rs's brute-force KNN scales O(n²) while
 > fast-umap's per-epoch cost is capped.
@@ -70,22 +70,19 @@ Or run all benchmarks at once (hardware + comparison + MNIST):
 
 ---
 
-## What's New (v1.1.0)
+## What's New (v1.2.0)
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 | Area | Change |
 |------|--------|
+| **UMAP kernel** | Proper `q = 1/(1 + a·d^(2b))` kernel with `a`, `b` fitted from `min_dist`/`spread` — replaces fixed Student-t `1/(1+d²)` for better cluster separation |
+| **Configurable negative sampling** | New `neg_sample_rate` parameter (default 5); formula fixed from `n_pos × rate / k` → `n_pos × rate` |
+| **Verbose logging** | All training output gated behind `verbose` flag; improved structured messages with timings, edge counts, kernel params, stop reasons |
+| **ManifoldParams** | `min_dist` and `spread` now actively shape the embedding kernel (previously defined but unused) |
 | **New API** | `Umap::new(config).fit(data)` returns `FittedUmap` with `.embedding()`, `.transform()`, `.into_embedding()` — mirrors umap-rs |
-| **Sparse training** | O(n·k) per epoch with edge subsampling + negative sampling (was O(n²)) |
-| **burn upgrade** | `0.18` → `0.20.1`; cubecl `0.6` → `0.9` |
-| **API fixes** | `Backend::seed` now takes `(&device, seed)`; `as_tensor_arg` no longer takes a generic type param; `NodeID` renamed `NodeId` |
-| **Kernel fixes** | `ABSOLUTE_POS_X/Y` cast to `usize` for shape indexing; all `for i in 0..k` loops use `k as usize` |
-| **GPU fix** | `normalize_tensor` used `.to_vec::<bool>()` which panics on WGPU (booleans stored as `u32`); replaced with f32 arithmetic comparison |
-| **Warning fixes** | All 4 `unused Result` warnings from kernel launches resolved with `.expect()` |
-| **Tests** | 36 unit tests added (`cargo test`), all CPU-only via NdArray backend |
-| **Benchmarks** | `cargo run --release --bin bench_report` — auto-detects CPU & GPU, writes hardware-tagged `.md` + `.svg` + CPU vs GPU comparison |
-| **Crate comparison** | `cargo run --release --example crate_comparison` — fast-umap vs umap-rs benchmark |
+| **Sparse training** | O(n·k) per epoch with edge subsampling + configurable negative sampling (was O(n²)) |
+| **Benchmarks** | Updated micro-benchmarks and crate comparison numbers |
 
 ---
 
@@ -113,7 +110,7 @@ cargo add fast-umap
 
 ```toml
 [dependencies]
-fast-umap  = "1.1.0"
+fast-umap  = "1.2.0"
 burn       = { version = "0.20.1", features = ["wgpu", "autodiff", "autotune"] }
 cubecl     = { version = "0.9.0",  features = ["wgpu"] }
 ```
@@ -156,8 +153,9 @@ The public API mirrors [`umap-rs`](https://crates.io/crates/umap-rs):
 | [`Umap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.Umap.html) | Main algorithm struct — `Umap::new(config)` |
 | [`FittedUmap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.FittedUmap.html) | Fitted model — `.embedding()`, `.transform()`, `.into_embedding()`, `.config()` |
 | [`UmapConfig`](https://docs.rs/fast-umap/latest/fast_umap/struct.UmapConfig.html) | Configuration with nested `GraphParams` + `OptimizationParams` |
+| [`ManifoldParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.ManifoldParams.html) | `min_dist`, `spread` — control cluster tightness and separation |
 | [`GraphParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.GraphParams.html) | `n_neighbors`, `metric`, `normalized`, `minkowski_p` |
-| [`OptimizationParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.OptimizationParams.html) | `n_epochs`, `learning_rate`, `patience`, `timeout`, `verbose`, … |
+| [`OptimizationParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.OptimizationParams.html) | `n_epochs`, `learning_rate`, `patience`, `timeout`, `verbose`, `neg_sample_rate`, … |
 | [`Metric`](https://docs.rs/fast-umap/latest/fast_umap/enum.Metric.html) | `Euclidean`, `EuclideanKNN`, `Manhattan`, `Cosine` |
 
 ### Configuration
@@ -188,6 +186,8 @@ let config = UmapConfig {
 |-----------|---------|-------------|
 | `n_components` | 2 | Output dimensionality (2-D or 3-D) |
 | `hidden_sizes` | `[100, 100, 100]` | Neural network hidden layer sizes |
+| `min_dist` | 0.1 | Min distance in embedding — smaller = tighter clusters |
+| `spread` | 1.0 | Effective scale of embedded points |
 | `n_neighbors` | 15 | KNN graph neighbours |
 | `n_epochs` | 200 | Training epochs |
 | `learning_rate` | 1e-3 | Adam step size |
@@ -195,6 +195,7 @@ let config = UmapConfig {
 | `penalty` | 0.0 | L2 weight decay |
 | `metric` | `Euclidean` | Distance metric |
 | `repulsion_strength` | 1.0 | Repulsion term weight |
+| `neg_sample_rate` | 5 | Negative (repulsion) samples per positive edge per epoch |
 | `patience` | `None` | Early-stop epochs without improvement |
 | `min_desired_loss` | `None` | Stop when loss ≤ threshold |
 | `timeout` | `None` | Hard time limit (seconds) |
@@ -387,8 +388,8 @@ repulsion   =  mean_{negative samples} [ −log (1 − q_ij) ]
 loss        =  attraction  +  repulsion_strength × repulsion
 ```
 
-where `q_ij = 1 / (1 + d_ij²)` is the Student-t kernel applied to embedding
-distances.
+where `q_ij = 1 / (1 + a · d_ij^(2b))` is the UMAP kernel applied to embedding
+distances (`a` and `b` are fitted from `min_dist` / `spread`).
 
 ### Training pipeline
 
@@ -489,30 +490,30 @@ Full detail files:
 
 | Benchmark | Input | Min | **Mean** | Max |
 |-----------|-------|-----|----------|-----|
-| `normalize_data` | 100×10 | 294 µs | **439 µs** | 675 µs |
-| `normalize_data` | 500×30 | 1.90 ms | **2.41 ms** | 2.97 ms |
-| `normalize_data` | 1 000×50 | 4.26 ms | **4.80 ms** | 5.56 ms |
-| `normalize_data` | 5 000×100 | 16.3 ms | **17.2 ms** | 18.6 ms |
-| `generate_test_data` | 100×10 | 3.62 µs | **4.12 µs** | 14.0 µs |
-| `generate_test_data` | 500×30 | 57.6 µs | **61.7 µs** | 88.7 µs |
-| `generate_test_data` | 1 000×50 | 191 µs | **199 µs** | 247 µs |
-| `generate_test_data` | 5 000×100 | 1.91 ms | **1.99 ms** | 2.16 ms |
-| `tensor_convert` | 100×10 | 5.08 µs | **5.21 µs** | 8.04 µs |
-| `tensor_convert` | 500×30 | 30.7 µs | **33.2 µs** | 42.1 µs |
-| `tensor_convert` | 1 000×50 | 71.5 µs | **76.7 µs** | 92.3 µs |
-| `model_forward` | 16s×10f \[32\]→2 | 20.5 µs | **34.8 µs** | 52.1 µs |
-| `model_forward` | 64s×50f \[64\]→2 | 27.1 µs | **34.7 µs** | 49.8 µs |
-| `model_forward` | 128s×50f \[128\]→2 | 54.3 µs | **58.2 µs** | 71.2 µs |
-| `model_forward` | 64s×100f \[128,64\]→3 | 72.6 µs | **78.6 µs** | 135 µs |
-| `model_forward` | 256s×100f \[256,128\]→2 | 246 µs | **271 µs** | 368 µs |
-| `normalize_tensor` | n=64 | 1.88 µs | **1.93 µs** | 2.00 µs |
-| `normalize_tensor` | n=512 | 2.75 µs | **3.03 µs** | 3.88 µs |
-| `normalize_tensor` | n=4 096 | 9.46 µs | **9.75 µs** | 12.4 µs |
-| `normalize_tensor` | n=32 768 | 69.9 µs | **73.4 µs** | 91.5 µs |
-| `layer_normalize` | 32×16 | 3.50 µs | **3.60 µs** | 3.88 µs |
-| `layer_normalize` | 128×64 | 16.3 µs | **16.6 µs** | 17.4 µs |
-| `layer_normalize` | 512×128 | 116 µs | **119 µs** | 129 µs |
-| `layer_normalize` | 1 000×256 | 412 µs | **421 µs** | 446 µs |
+| `normalize_data` | 100×10 | 345 µs | **517 µs** | 986 µs |
+| `normalize_data` | 500×30 | 1.92 ms | **2.31 ms** | 2.77 ms |
+| `normalize_data` | 1 000×50 | 4.35 ms | **4.78 ms** | 5.79 ms |
+| `normalize_data` | 5 000×100 | 16.4 ms | **18.2 ms** | 19.4 ms |
+| `generate_test_data` | 100×10 | 3.62 µs | **4.03 µs** | 5.92 µs |
+| `generate_test_data` | 500×30 | 56.3 µs | **57.8 µs** | 61.9 µs |
+| `generate_test_data` | 1 000×50 | 246 µs | **258 µs** | 288 µs |
+| `generate_test_data` | 5 000×100 | 2.46 ms | **2.48 ms** | 2.54 ms |
+| `tensor_convert` | 100×10 | 5.08 µs | **5.16 µs** | 5.33 µs |
+| `tensor_convert` | 500×30 | 32.4 µs | **33.0 µs** | 35.8 µs |
+| `tensor_convert` | 1 000×50 | 74.6 µs | **78.1 µs** | 89.5 µs |
+| `model_forward` | 16s×10f \[32\]→2 | 21.4 µs | **34.5 µs** | 55.8 µs |
+| `model_forward` | 64s×50f \[64\]→2 | 26.7 µs | **34.2 µs** | 51.2 µs |
+| `model_forward` | 128s×50f \[128\]→2 | 55.9 µs | **58.6 µs** | 64.2 µs |
+| `model_forward` | 64s×100f \[128,64\]→3 | 70.0 µs | **80.3 µs** | 106 µs |
+| `model_forward` | 256s×100f \[256,128\]→2 | 279 µs | **293 µs** | 310 µs |
+| `normalize_tensor` | n=64 | 1.88 µs | **1.95 µs** | 2.29 µs |
+| `normalize_tensor` | n=512 | 2.79 µs | **2.86 µs** | 3.00 µs |
+| `normalize_tensor` | n=4 096 | 9.50 µs | **9.59 µs** | 10.3 µs |
+| `normalize_tensor` | n=32 768 | 70.0 µs | **70.3 µs** | 70.7 µs |
+| `layer_normalize` | 32×16 | 3.50 µs | **3.62 µs** | 3.96 µs |
+| `layer_normalize` | 128×64 | 19.7 µs | **20.0 µs** | 20.9 µs |
+| `layer_normalize` | 512×128 | 115 µs | **117 µs** | 130 µs |
+| `layer_normalize` | 1 000×256 | 412 µs | **420 µs** | 454 µs |
 
 ### GPU — Apple M3 Max (WGPU / Metal)
 
@@ -520,20 +521,20 @@ Full detail files:
 
 | Benchmark | Input | Min | **Mean** | Max |
 |-----------|-------|-----|----------|-----|
-| `model_forward` | 16s×10f \[32\]→2 | 370 µs | **482 µs** | 1.19 ms |
-| `model_forward` | 64s×50f \[64\]→2 | 349 µs | **462 µs** | 747 µs |
-| `model_forward` | 128s×50f \[128\]→2 | 423 µs | **614 µs** | 846 µs |
-| `model_forward` | 64s×100f \[128,64\]→3 | 505 µs | **642 µs** | 998 µs |
-| `model_forward` | 256s×100f \[256,128\]→2 | 461 µs | **531 µs** | 1.00 ms |
-| `model_forward` | 512s×100f \[256,128\]→2 | 871 µs | **1.05 ms** | 1.36 ms |
-| `normalize_tensor` | n=512 | 554 µs | **788 µs** | 1.36 ms |
-| `normalize_tensor` | n=4 096 | 606 µs | **682 µs** | 853 µs |
-| `normalize_tensor` | n=32 768 | 635 µs | **689 µs** | 779 µs |
-| `normalize_tensor` | n=262 144 | 1.07 ms | **1.13 ms** | 1.31 ms |
-| `layer_normalize` | 128×64 | 463 µs | **668 µs** | 798 µs |
-| `layer_normalize` | 512×128 | 486 µs | **626 µs** | 832 µs |
-| `layer_normalize` | 1 000×256 | 618 µs | **667 µs** | 714 µs |
-| `layer_normalize` | 4 000×512 | 1.55 ms | **1.66 ms** | 1.79 ms |
+| `model_forward` | 16s×10f \[32\]→2 | 408 µs | **617 µs** | 894 µs |
+| `model_forward` | 64s×50f \[64\]→2 | 430 µs | **481 µs** | 776 µs |
+| `model_forward` | 128s×50f \[128\]→2 | 432 µs | **475 µs** | 576 µs |
+| `model_forward` | 64s×100f \[128,64\]→3 | 549 µs | **688 µs** | 1.82 ms |
+| `model_forward` | 256s×100f \[256,128\]→2 | 631 µs | **691 µs** | 828 µs |
+| `model_forward` | 512s×100f \[256,128\]→2 | 926 µs | **1.08 ms** | 1.42 ms |
+| `normalize_tensor` | n=512 | 572 µs | **695 µs** | 1.28 ms |
+| `normalize_tensor` | n=4 096 | 590 µs | **662 µs** | 821 µs |
+| `normalize_tensor` | n=32 768 | 629 µs | **712 µs** | 883 µs |
+| `normalize_tensor` | n=262 144 | 1.08 ms | **1.12 ms** | 1.22 ms |
+| `layer_normalize` | 128×64 | 437 µs | **471 µs** | 609 µs |
+| `layer_normalize` | 512×128 | 467 µs | **500 µs** | 648 µs |
+| `layer_normalize` | 1 000×256 | 617 µs | **662 µs** | 777 µs |
+| `layer_normalize` | 4 000×512 | 1.81 ms | **1.93 ms** | 2.15 ms |
 
 ### CPU vs GPU — Apple M3 Max
 
@@ -541,17 +542,17 @@ Full detail files:
 
 | Benchmark | Input | CPU | GPU | Speedup |
 |-----------|-------|-----|-----|---------|
-| `model_forward` | 16s×10f \[32\]→2 | **34.8 µs** | 482 µs | 0.07× *(CPU faster)* |
-| `model_forward` | 64s×50f \[64\]→2 | **34.7 µs** | 462 µs | 0.07× *(CPU faster)* |
-| `model_forward` | 128s×50f \[128\]→2 | **58.2 µs** | 614 µs | 0.09× *(CPU faster)* |
-| `model_forward` | 64s×100f \[128,64\]→3 | **78.6 µs** | 642 µs | 0.12× *(CPU faster)* |
-| `model_forward` | 256s×100f \[256,128\]→2 | **271 µs** | 531 µs | 0.51× *(CPU faster)* |
-| `normalize_tensor` | n=512 | **3.03 µs** | 788 µs | 0.00× *(CPU faster)* |
-| `normalize_tensor` | n=4 096 | **9.75 µs** | 682 µs | 0.01× *(CPU faster)* |
-| `normalize_tensor` | n=32 768 | **73.4 µs** | 689 µs | 0.11× *(CPU faster)* |
-| `layer_normalize` | 128×64 | **16.6 µs** | 668 µs | 0.02× *(CPU faster)* |
-| `layer_normalize` | 512×128 | **119 µs** | 626 µs | 0.19× *(CPU faster)* |
-| `layer_normalize` | 1 000×256 | **421 µs** | 667 µs | 0.63× *(CPU faster)* |
+| `model_forward` | 16s×10f \[32\]→2 | **34.5 µs** | 617 µs | 0.06× *(CPU faster)* |
+| `model_forward` | 64s×50f \[64\]→2 | **34.2 µs** | 481 µs | 0.07× *(CPU faster)* |
+| `model_forward` | 128s×50f \[128\]→2 | **58.6 µs** | 475 µs | 0.12× *(CPU faster)* |
+| `model_forward` | 64s×100f \[128,64\]→3 | **80.3 µs** | 688 µs | 0.12× *(CPU faster)* |
+| `model_forward` | 256s×100f \[256,128\]→2 | **293 µs** | 691 µs | 0.42× *(CPU faster)* |
+| `normalize_tensor` | n=512 | **2.86 µs** | 695 µs | 0.00× *(CPU faster)* |
+| `normalize_tensor` | n=4 096 | **9.59 µs** | 662 µs | 0.01× *(CPU faster)* |
+| `normalize_tensor` | n=32 768 | **70.3 µs** | 712 µs | 0.10× *(CPU faster)* |
+| `layer_normalize` | 128×64 | **20.0 µs** | 471 µs | 0.04× *(CPU faster)* |
+| `layer_normalize` | 512×128 | **117 µs** | 500 µs | 0.23× *(CPU faster)* |
+| `layer_normalize` | 1 000×256 | **420 µs** | 662 µs | 0.63× *(CPU faster)* |
 
 > **Note:** WGPU/Metal has a fixed dispatch overhead of ~400–700 µs per kernel
 > call. For the small model sizes above, that overhead dominates. The GPU wins
@@ -611,11 +612,11 @@ paper, this repository, and acknowledge the Burn and CubeCL frameworks:
   author  = {Hauptmann, Eugene},
   year    = {2024},
   url     = {https://github.com/eugenehp/fast-umap},
-  version = {1.1.0}
+  version = {1.2.0}
 }
 ```
 
-> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.0.0).
+> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.2.0).
 > <https://github.com/eugenehp/fast-umap>
 
 ### UMAP algorithm

@@ -70,6 +70,17 @@ where
     let batch_size = config.batch_size;
     let k = config.k_neighbors;
     let repulsion_strength = config.repulsion_strength;
+    let kernel_a = config.kernel_a;
+    let kernel_b = config.kernel_b;
+    let verbose = config.verbose;
+
+    if verbose {
+        println!("[fast-umap] Configuration:");
+        println!("[fast-umap]   samples={num_samples}  features={num_features}  k_neighbors={k}");
+        println!("[fast-umap]   epochs={}  lr={:.0e}  repulsion_strength={repulsion_strength}",
+            config.epochs, config.learning_rate);
+        println!("[fast-umap]   kernel: a={kernel_a:.4}  b={kernel_b:.4}  (q = 1 / (1 + a·d^(2b)))");
+    }
 
     if batch_size <= 1 {
         panic!("batch_size must be > 1");
@@ -97,10 +108,11 @@ where
     //      complementary `non_neighbor_mask`.
     //   4. Store the input tensor slice for cheap reuse across epochs.
     // ─────────────────────────────────────────────────────────────────────────
-    println!(
-        "[fast-umap] Precomputing batch-local k-NN (k={k}) for {} point(s) …",
-        num_samples
-    );
+    if verbose {
+        println!(
+            "[fast-umap] Computing batch-local k-NN graph (k={k}) …",
+        );
+    }
 
     let mut batches_start: Vec<usize> = Vec::new();
     let mut tensor_batches: Vec<Tensor<B, 2>> = Vec::new();
@@ -165,9 +177,11 @@ where
     }
 
     let num_batches = batches_start.len();
-    println!(
-        "[fast-umap] Precomputation done ({num_batches} batch(es)). Starting training …"
-    );
+    if verbose {
+        println!(
+            "[fast-umap] Precomputation done ({num_batches} batch(es)). Training started …"
+        );
+    }
 
     // Concatenate all batch tensors for O(1) slicing in the epoch loop.
     let tensor_batches_all = Tensor::<B, 2>::cat(tensor_batches, 0);
@@ -226,8 +240,11 @@ where
             let local_pairwise = pairwise_distances(local); // [bs, bs]
             let local_sq = local_pairwise.clone() * local_pairwise; // d²
 
-            // ── Student-t kernel  q = 1 / (1 + d²) ───────────────────────────
-            let q = (local_sq.clone() + 1.0f32).recip(); // [bs, bs]
+            // ── UMAP kernel  q = 1 / (1 + a * d^(2b)) ───────────────────────
+            // d^(2b) = (d²)^b
+            let dist_pow = local_sq.clone().clamp_min(1e-8f32).powf_scalar(kernel_b);
+            let a_dpow = dist_pow.clone() * kernel_a;
+            let q = (a_dpow.clone() + 1.0f32).recip(); // [bs, bs]
 
             // ── Attraction: mean over k-NN pairs of −log(q_ij) ───────────────
             // knn_indicator zeros out non-neighbour entries; we normalise by
@@ -237,10 +254,8 @@ where
                 (log_q.neg() * knn_indicator).sum() / within_knn_count as f32;
 
             // ── Repulsion: mean over non-k-NN pairs of −log(1 − q_ij) ────────
-            // 1 − q = d² / (1 + d²).  Clamp d² to keep gradients finite at
-            // the diagonal; non_neighbor_mask zeros out self-pairs anyway.
-            let local_sq_safe = local_sq.clamp_min(1e-8f32);
-            let one_minus_q = local_sq_safe.clone() / (local_sq_safe + 1.0f32);
+            // 1 − q = a*d^(2b) / (1 + a*d^(2b)).
+            let one_minus_q = a_dpow.clone() / (a_dpow + 1.0f32);
             let repulsion_per_pair = one_minus_q.clamp_min(1e-6f32).log().neg();
 
             let num_non_neighbors =
@@ -282,8 +297,9 @@ where
         if let Some(pb) = &pb {
             pb.inc(1);
             pb.set_message(format!(
-                "Elapsed: {} | Epoch: {epoch} | Loss: {epoch_loss:.6} | Best: {best_loss:.6}",
+                "Elapsed: {} | Epoch: {epoch}/{} | Loss: {epoch_loss:.6} | Best: {best_loss:.6}",
                 format_duration(elapsed),
+                config.epochs,
             ));
         }
 
@@ -374,6 +390,14 @@ where
     model = model
         .load_file(model_path, &recorder, &device)
         .expect("Could not load best model checkpoint");
+
+    let total_elapsed = start_time.elapsed();
+    if verbose {
+        println!(
+            "[fast-umap] Training complete — {epoch} epochs in {}, best loss: {best_loss:.6}",
+            format_duration(total_elapsed),
+        );
+    }
 
     (model, losses, best_loss)
 }

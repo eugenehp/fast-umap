@@ -8,7 +8,7 @@ repository = "https://github.com/eugenehp/fast-map"
 homepage = "https://github.com/eugenehp/fast-map"
 documentation = "https://docs.rs/fast-umap/latest/fast_umap/"
 license = "MIT"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 
 # docs.rs build configuration.

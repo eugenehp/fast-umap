@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] — 2026-02-24
+
+### Added
+
+- **Proper UMAP kernel** — `q = 1 / (1 + a · d^(2b))` with `a` and `b` fitted
+  from `min_dist` and `spread` via grid search + coordinate descent refinement.
+  Replaces the fixed Student-t kernel `1/(1+d²)` which was causing clusters to
+  condense into blobs.
+- **`neg_sample_rate` parameter** (`OptimizationParams`, `TrainingConfig`,
+  `TrainingConfigBuilder`) — configurable number of negative (repulsion) samples
+  per positive (attraction) edge per epoch. Default: 5.
+- **`kernel_a` / `kernel_b` fields** on `TrainingConfig` — automatically
+  computed from `ManifoldParams` and passed to both dense and sparse training.
+- **`fit_ab(min_dist, spread)` public function** — computes UMAP kernel
+  parameters; available for advanced use.
+
+### Changed
+
+- **`ManifoldParams` is now active** — `min_dist` and `spread` were previously
+  defined in the config but completely ignored during training. They now control
+  the kernel shape that determines how tightly clusters pack and how far apart
+  groups separate.
+- **Negative sample count fixed** — was `n_pos × neg_rate / k` (giving only
+  16 666 negatives for 50 000 positives with k=15); now correctly
+  `n_pos × neg_rate` (250 000 with default `neg_sample_rate=5`).
+- **All training log output gated behind `verbose`** — `println!` calls in
+  `train_sparse` and `train` are now silent when `verbose = false` (the default).
+  Previously all runs printed k-NN progress and kernel info unconditionally.
+- **Improved log messages** — structured `[fast-umap]` prefix; configuration
+  summary at start; k-NN timing with edge count breakdown (positive + negative);
+  stop-reason messages (timeout, early stopping, desired loss); final training
+  summary with elapsed time and best loss.
+- **Progress bar shows epoch/total** — e.g. `Epoch: 42/200` instead of just
+  `Epoch: 42`.
+- **Kernel doc comments updated** — lib.rs and README now reference the UMAP
+  kernel `1/(1 + a·d^(2b))` instead of the Student-t kernel.
+
+### Performance
+
+Updated benchmarks on Apple M3 Max (fast-umap: 50 epochs GPU, umap-rs: 200 epochs CPU):
+
+| Dataset | fast-umap | umap-rs | Speedup |
+|---------|-----------|---------|---------|
+| 500 × 50 | 0.84s | 0.08s | 0.10× *(umap-rs faster)* |
+| 1 000 × 50 | 2.19s | 0.12s | 0.05× *(umap-rs faster)* |
+| 2 000 × 100 | 3.65s | 0.44s | 0.12× *(umap-rs faster)* |
+| 5 000 × 100 | 6.75s | 2.31s | 0.34× *(umap-rs faster)* |
+| 10 000 × 100 | 5.93s | 8.68s | **1.5× faster** |
+| 20 000 × 100 | 7.32s | 34.10s | **4.7× faster** |
+
+---
+
 ## [1.1.0] — 2026-02-24
 
 ### Added
