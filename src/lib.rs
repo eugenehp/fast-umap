@@ -1,3 +1,5 @@
+#![allow(unused_variables)]
+
 //! # fast-umap
 //!
 //! GPU-accelerated parametric UMAP (Uniform Manifold Approximation and Projection)
