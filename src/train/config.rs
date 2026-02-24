@@ -1,19 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
-/// How the per-sample losses are combined into a single scalar for
-/// backpropagation.
-///
-/// * [`Mean`](LossReduction::Mean) - divide by the number of elements
-///   (scale-invariant, recommended for most use cases).
-/// * [`Sum`](LossReduction::Sum) - sum without normalisation (sensitive to
-///   batch size; may require a lower learning rate).
-#[derive(Debug, Clone)]
-pub enum LossReduction {
-    /// Average the loss over all contributing pairs.
-    Mean,
-    /// Sum the loss over all contributing pairs without normalisation.
-    Sum,
-}
+// ─── Metric ──────────────────────────────────────────────────────────────────
 
 /// Distance metric used to build the high-dimensional k-NN graph during the
 /// precomputation phase.
@@ -21,7 +9,7 @@ pub enum LossReduction {
 /// The choice of metric determines how "closeness" is measured in the original
 /// feature space.  [`Euclidean`](Metric::Euclidean) (L2) is the default and
 /// works well for most continuous data.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Metric {
     /// Standard L2 (Euclidean) distance — default.
     Euclidean,
@@ -36,7 +24,6 @@ pub enum Metric {
     Minkowski,
 }
 
-// Implement From<&str> for Metric
 impl From<&str> for Metric {
     fn from(s: &str) -> Self {
         match s.to_lowercase().as_str() {
@@ -50,7 +37,6 @@ impl From<&str> for Metric {
     }
 }
 
-// Implement Display for Metric
 impl fmt::Display for Metric {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -63,71 +49,367 @@ impl fmt::Display for Metric {
     }
 }
 
-/// Configuration for training the UMAP model.
+// ─── LossReduction ───────────────────────────────────────────────────────────
+
+/// How the per-sample losses are combined into a single scalar for
+/// backpropagation.
 ///
-/// This struct contains the hyperparameters and settings required to train the UMAP model.
-/// It includes options for the optimizer (e.g., learning rate, batch size, and beta parameters),
-/// device configuration (e.g., CPU or GPU), and additional features like verbosity, early stopping,
-/// and time limits for training.
-#[derive(Debug, Clone)]
-pub struct TrainingConfig {
-    /// The distance metric to use for training the model (e.g., "euclidean", "manhattan").
+/// * [`Mean`](LossReduction::Mean) - divide by the number of elements
+///   (scale-invariant, recommended for most use cases).
+/// * [`Sum`](LossReduction::Sum) - sum without normalisation (sensitive to
+///   batch size; may require a lower learning rate).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LossReduction {
+    /// Average the loss over all contributing pairs.
+    Mean,
+    /// Sum the loss over all contributing pairs without normalisation.
+    Sum,
+}
+
+// ─── ManifoldParams ──────────────────────────────────────────────────────────
+
+/// Configuration for manifold shape and embedding space properties.
+///
+/// These parameters control the geometric properties of the low-dimensional
+/// embedding space and how the manifold is shaped.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ManifoldParams {
+    /// Minimum distance between points in the embedding space.
+    ///
+    /// Controls how tightly points can be packed together. Smaller values
+    /// create more clustered embeddings, larger values spread points out more.
+    ///
+    /// Default: 0.1
+    pub min_dist: f32,
+
+    /// The effective scale of embedded points.
+    ///
+    /// Together with `min_dist`, this determines the embedding's overall spread.
+    ///
+    /// Default: 1.0
+    pub spread: f32,
+}
+
+impl Default for ManifoldParams {
+    fn default() -> Self {
+        Self {
+            min_dist: 0.1,
+            spread: 1.0,
+        }
+    }
+}
+
+// ─── GraphParams ─────────────────────────────────────────────────────────────
+
+/// Configuration for k-nearest neighbor graph construction.
+///
+/// These parameters control how the high-dimensional manifold structure
+/// is captured via a fuzzy topological representation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphParams {
+    /// Number of nearest neighbors to use for manifold approximation.
+    ///
+    /// Larger values capture more global structure but may miss fine details.
+    /// Smaller values focus on local structure but may fragment the manifold.
+    ///
+    /// Default: 15
+    pub n_neighbors: usize,
+
+    /// The distance metric to use for building the k-NN graph.
+    ///
+    /// Default: Euclidean
     pub metric: Metric,
 
-    /// The total number of epochs to run during training.
-    pub epochs: usize,
-
-    /// The number of samples to process in each training batch.
-    pub batch_size: usize,
-
-    /// The learning rate for the optimizer (controls the step size for parameter updates).
-    pub learning_rate: f64,
-
-    /// The Beta1 parameter for the Adam optimizer (controls the first moment estimate).
-    pub beta1: f64,
-
-    /// The Beta2 parameter for the Adam optimizer (controls the second moment estimate).
-    pub beta2: f64,
-
-    /// The L2 regularization (weight decay) penalty to apply during training.
-    pub penalty: f32,
-
-    /// Whether to show detailed progress information during training (e.g., loss values, progress bars).
-    pub verbose: bool,
-
-    /// The number of epochs to wait for improvement before triggering early stopping.
-    /// `None` disables early stopping.
-    pub patience: Option<i32>,
-
-    /// The method used to reduce the loss during training (e.g., mean or sum).
-    pub loss_reduction: LossReduction,
-
-    /// The number of nearest neighbors to consider in the UMAP algorithm.
-    pub k_neighbors: usize,
-
-    /// Optionally, the minimum desired loss to achieve before stopping early.
-    pub min_desired_loss: Option<f64>,
-
-    /// The maximum time (in seconds) to allow for training. If `None`, there is no time limit.
-    pub timeout: Option<u64>,
-
-    // normalize distance output
+    /// Whether to normalize distance outputs before use in the loss.
+    ///
+    /// Default: true
     pub normalized: bool,
 
+    /// The Minkowski `p` parameter (only used when metric is Minkowski).
+    ///
+    /// Default: 1.0
     pub minkowski_p: f64,
+}
+
+impl Default for GraphParams {
+    fn default() -> Self {
+        Self {
+            n_neighbors: 15,
+            metric: Metric::Euclidean,
+            normalized: true,
+            minkowski_p: 1.0,
+        }
+    }
+}
+
+// ─── OptimizationParams ──────────────────────────────────────────────────────
+
+/// Configuration for stochastic gradient descent optimization.
+///
+/// These parameters control the embedding optimization process.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OptimizationParams {
+    /// Number of optimization epochs.
+    ///
+    /// Default: 100
+    pub n_epochs: usize,
+
+    /// The number of samples to process in each training batch.
+    ///
+    /// Default: 1000
+    pub batch_size: usize,
+
+    /// Initial learning rate for the Adam optimizer.
+    ///
+    /// Default: 0.001
+    pub learning_rate: f64,
+
+    /// Beta1 parameter for the Adam optimizer.
+    ///
+    /// Default: 0.9
+    pub beta1: f64,
+
+    /// Beta2 parameter for the Adam optimizer.
+    ///
+    /// Default: 0.999
+    pub beta2: f64,
+
+    /// L2 regularization (weight decay) penalty.
+    ///
+    /// Default: 1e-5
+    pub penalty: f32,
 
     /// Weight applied to the repulsion term of the UMAP cross-entropy loss.
-    /// 1.0 (default) balances attraction and repulsion equally.
-    /// Increase to push non-neighbour points further apart.
+    ///
+    /// Default: 1.0
+    pub repulsion_strength: f32,
+
+    /// Number of epochs to wait for improvement before triggering early stopping.
+    /// `None` disables early stopping.
+    ///
+    /// Default: None
+    pub patience: Option<i32>,
+
+    /// The method used to reduce the loss (mean or sum).
+    ///
+    /// Default: Sum
+    pub loss_reduction: LossReduction,
+
+    /// Minimum desired loss to achieve before stopping early.
+    ///
+    /// Default: None
+    pub min_desired_loss: Option<f64>,
+
+    /// Maximum training time in seconds. `None` means no limit.
+    ///
+    /// Default: None
+    pub timeout: Option<u64>,
+
+    /// Whether to show detailed progress information during training.
+    ///
+    /// Default: false
+    pub verbose: bool,
+}
+
+impl Default for OptimizationParams {
+    fn default() -> Self {
+        Self {
+            n_epochs: 100,
+            batch_size: 1000,
+            learning_rate: 0.001,
+            beta1: 0.9,
+            beta2: 0.999,
+            penalty: 1e-5,
+            repulsion_strength: 1.0,
+            patience: None,
+            loss_reduction: LossReduction::Sum,
+            min_desired_loss: None,
+            timeout: None,
+            verbose: false,
+        }
+    }
+}
+
+// ─── UmapConfig ──────────────────────────────────────────────────────────────
+
+/// Complete UMAP configuration.
+///
+/// Groups all parameters for dimensionality reduction into a coherent structure.
+/// All parameter groups have sensible defaults and can be customized individually.
+///
+/// This struct mirrors the configuration style of
+/// [`umap-rs`](https://crates.io/crates/umap-rs) with nested parameter groups.
+///
+/// # Example
+///
+/// ```ignore
+/// use fast_umap::prelude::*;
+///
+/// // Use all defaults (2-D output, Euclidean metric)
+/// let config = UmapConfig::default();
+///
+/// // Customize specific groups
+/// let config = UmapConfig {
+///     n_components: 3,
+///     graph: GraphParams {
+///         n_neighbors: 30,
+///         ..Default::default()
+///     },
+///     optimization: OptimizationParams {
+///         n_epochs: 500,
+///         learning_rate: 1e-3,
+///         ..Default::default()
+///     },
+///     ..Default::default()
+/// };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UmapConfig {
+    /// Number of dimensions in the output embedding.
+    ///
+    /// Typically 2 for visualization or 3-50 for downstream ML tasks.
+    ///
+    /// Default: 2
+    pub n_components: usize,
+
+    /// Hidden layer sizes for the parametric neural network.
+    ///
+    /// Default: [100]
+    pub hidden_sizes: Vec<usize>,
+
+    /// Manifold shape configuration.
+    pub manifold: ManifoldParams,
+
+    /// Graph construction configuration.
+    pub graph: GraphParams,
+
+    /// Optimization configuration.
+    pub optimization: OptimizationParams,
+}
+
+impl Default for UmapConfig {
+    fn default() -> Self {
+        Self {
+            n_components: 2,
+            hidden_sizes: vec![100],
+            manifold: ManifoldParams::default(),
+            graph: GraphParams::default(),
+            optimization: OptimizationParams::default(),
+        }
+    }
+}
+
+// ─── TrainingConfig (backward compatibility) ─────────────────────────────────
+
+/// Configuration for training the UMAP model.
+///
+/// **Deprecated**: Use [`UmapConfig`] instead. This type is provided for
+/// backward compatibility and converts to/from `UmapConfig`.
+#[derive(Debug, Clone)]
+pub struct TrainingConfig {
+    /// The distance metric to use for training the model.
+    pub metric: Metric,
+    /// The total number of epochs to run during training.
+    pub epochs: usize,
+    /// The number of samples to process in each training batch.
+    pub batch_size: usize,
+    /// The learning rate for the optimizer.
+    pub learning_rate: f64,
+    /// The Beta1 parameter for the Adam optimizer.
+    pub beta1: f64,
+    /// The Beta2 parameter for the Adam optimizer.
+    pub beta2: f64,
+    /// The L2 regularization (weight decay) penalty.
+    pub penalty: f32,
+    /// Whether to show detailed progress information during training.
+    pub verbose: bool,
+    /// The number of epochs to wait for improvement before triggering early stopping.
+    pub patience: Option<i32>,
+    /// The method used to reduce the loss during training.
+    pub loss_reduction: LossReduction,
+    /// The number of nearest neighbors to consider.
+    pub k_neighbors: usize,
+    /// Minimum desired loss to achieve before stopping early.
+    pub min_desired_loss: Option<f64>,
+    /// Maximum training time in seconds.
+    pub timeout: Option<u64>,
+    /// Normalize distance output.
+    pub normalized: bool,
+    /// Minkowski p parameter.
+    pub minkowski_p: f64,
+    /// Weight applied to the repulsion term.
     pub repulsion_strength: f32,
 }
 
 impl TrainingConfig {
     /// Creates a new builder for constructing a `TrainingConfig`.
-    ///
-    /// This method allows you to incrementally build a `TrainingConfig` by setting its fields.
     pub fn builder() -> TrainingConfigBuilder {
         TrainingConfigBuilder::default()
+    }
+}
+
+impl From<&UmapConfig> for TrainingConfig {
+    fn from(config: &UmapConfig) -> Self {
+        TrainingConfig {
+            metric: config.graph.metric.clone(),
+            epochs: config.optimization.n_epochs,
+            batch_size: config.optimization.batch_size,
+            learning_rate: config.optimization.learning_rate,
+            beta1: config.optimization.beta1,
+            beta2: config.optimization.beta2,
+            penalty: config.optimization.penalty,
+            verbose: config.optimization.verbose,
+            patience: config.optimization.patience,
+            loss_reduction: config.optimization.loss_reduction.clone(),
+            k_neighbors: config.graph.n_neighbors,
+            min_desired_loss: config.optimization.min_desired_loss,
+            timeout: config.optimization.timeout,
+            normalized: config.graph.normalized,
+            minkowski_p: config.graph.minkowski_p,
+            repulsion_strength: config.optimization.repulsion_strength,
+        }
+    }
+}
+
+impl From<UmapConfig> for TrainingConfig {
+    fn from(config: UmapConfig) -> Self {
+        TrainingConfig::from(&config)
+    }
+}
+
+impl From<&TrainingConfig> for UmapConfig {
+    fn from(config: &TrainingConfig) -> Self {
+        UmapConfig {
+            n_components: 2,
+            hidden_sizes: vec![100],
+            manifold: ManifoldParams::default(),
+            graph: GraphParams {
+                n_neighbors: config.k_neighbors,
+                metric: config.metric.clone(),
+                normalized: config.normalized,
+                minkowski_p: config.minkowski_p,
+            },
+            optimization: OptimizationParams {
+                n_epochs: config.epochs,
+                batch_size: config.batch_size,
+                learning_rate: config.learning_rate,
+                beta1: config.beta1,
+                beta2: config.beta2,
+                penalty: config.penalty,
+                repulsion_strength: config.repulsion_strength,
+                patience: config.patience,
+                loss_reduction: config.loss_reduction.clone(),
+                min_desired_loss: config.min_desired_loss,
+                timeout: config.timeout,
+                verbose: config.verbose,
+            },
+        }
+    }
+}
+
+impl From<TrainingConfig> for UmapConfig {
+    fn from(config: TrainingConfig) -> Self {
+        UmapConfig::from(&config)
     }
 }
 
@@ -153,141 +435,103 @@ pub struct TrainingConfigBuilder {
 }
 
 impl TrainingConfigBuilder {
-    /// Set the distance metric for training (e.g., "Euclidean", "Manhattan").
     pub fn with_metric(mut self, metric: Metric) -> Self {
         self.metric = Some(metric);
         self
     }
 
-    /// Set the number of epochs to train the model.
-    /// This defines how many times the entire dataset will be processed.
     pub fn with_epochs(mut self, epochs: usize) -> Self {
         self.epochs = Some(epochs);
         self
     }
 
-    /// Set the batch size used during training.
-    /// The batch size determines how many samples are processed before updating the model weights.
     pub fn with_batch_size(mut self, batch_size: usize) -> Self {
         self.batch_size = Some(batch_size);
         self
     }
 
-    /// Set the learning rate for the optimizer.
-    /// The learning rate controls the step size for each parameter update during training.
     pub fn with_learning_rate(mut self, learning_rate: f64) -> Self {
         self.learning_rate = Some(learning_rate);
         self
     }
 
-    /// Set the beta1 parameter for the Adam optimizer.
-    /// Beta1 controls the moving average of the first moment (mean) of the gradients.
     pub fn with_beta1(mut self, beta1: f64) -> Self {
         self.beta1 = Some(beta1);
         self
     }
 
-    /// Set the beta2 parameter for the Adam optimizer.
-    /// Beta2 controls the moving average of the second moment (uncentered variance) of the gradients.
     pub fn with_beta2(mut self, beta2: f64) -> Self {
         self.beta2 = Some(beta2);
         self
     }
 
-    /// Set the L2 regularization (weight decay) penalty for the optimizer.
-    /// This helps prevent overfitting by penalizing large weights.
     pub fn with_penalty(mut self, penalty: f32) -> Self {
         self.penalty = Some(penalty);
         self
     }
 
-    /// Set whether verbose output should be shown during training.
-    /// If `true`, detailed progress (e.g., loss, metrics) will be displayed during training.
     pub fn with_verbose(mut self, verbose: bool) -> Self {
         self.verbose = Some(verbose);
         self
     }
 
-    /// Set the patience value for early stopping.
-    ///
-    /// If training does not improve the loss for `patience` consecutive epochs, training will stop early.
-    /// **Warning!** Setting a `patience` value will override the `epochs` parameter.
     pub fn with_patience(mut self, patience: i32) -> Self {
         self.patience = Some(patience);
         self
     }
 
-    /// Set the loss reduction method.
-    /// This defines how the loss is reduced across batches (e.g., sum or mean).
     pub fn with_loss_reduction(mut self, loss_reduction: LossReduction) -> Self {
         self.loss_reduction = Some(loss_reduction);
         self
     }
 
-    /// Set the number of nearest neighbors to use in the UMAP algorithm.
-    /// This parameter controls the neighborhood size used in the model's calculations.
     pub fn with_k_neighbors(mut self, k_neighbors: usize) -> Self {
         self.k_neighbors = Some(k_neighbors);
         self
     }
 
-    /// Set the minimum desired loss for early stopping.
-    /// If the model reaches this loss value, training will stop early.
     pub fn with_min_desired_loss(mut self, min_desired_loss: f64) -> Self {
         self.min_desired_loss = Some(min_desired_loss);
         self
     }
 
-    /// Set the maximum training time in seconds.
-    /// The training will be stopped once this time is exceeded.
     pub fn with_timeout(mut self, timeout: u64) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
-    /// Set whether the distance outputs are normalised before being used in
-    /// the loss.  Normalisation keeps values in a numerically stable range,
-    /// especially when using non-Euclidean metrics.  Defaults to `true`.
     pub fn with_normalized(mut self, normalized: bool) -> Self {
         self.normalized = Some(normalized);
         self
     }
 
-    /// The minkowski function supports any positive value of `p`. For `p = 1`,
-    /// it computes Manhattan distance, and for `p = 2`, it computes Euclidean distance.
     pub fn with_minkowski_p(mut self, minkowski_p: f64) -> Self {
         self.minkowski_p = Some(minkowski_p);
         self
     }
 
-    /// Set the repulsion strength for the UMAP cross-entropy loss.
-    /// Default is 1.0.  Raise this to push non-neighbour classes further apart.
     pub fn with_repulsion_strength(mut self, repulsion_strength: f32) -> Self {
         self.repulsion_strength = Some(repulsion_strength);
         self
     }
 
-    /// Finalize and create a `TrainingConfig` with the specified options.
-    ///
-    /// This method returns an `Option<TrainingConfig>`. If any required parameters are missing,
-    /// it returns `None`, and default values will be used for those parameters.
     pub fn build(self) -> Option<TrainingConfig> {
         Some(TrainingConfig {
-            metric: self.metric.unwrap_or(Metric::Euclidean), // Default to Euclidean if not set
-            epochs: self.epochs.unwrap_or(1000),              // Will panic if not set
-            batch_size: self.batch_size.unwrap_or(1000),      // Will panic if not set
-            learning_rate: self.learning_rate.unwrap_or(0.001), // Default to 0.001 if not set
-            beta1: self.beta1.unwrap_or(0.9),                 // Default beta1 if not set
-            beta2: self.beta2.unwrap_or(0.999),               // Default beta2 if not set
-            penalty: self.penalty.unwrap_or(1e-5),            // Default penalty if not set
-            verbose: self.verbose.unwrap_or(false),           // Default to false if not set
-            patience: self.patience,                          // Optional, no default
-            loss_reduction: self.loss_reduction.unwrap_or(LossReduction::Sum), // Default to Sum if not set
-            k_neighbors: self.k_neighbors.unwrap_or(15), // Default to 15 if not set
-            min_desired_loss: self.min_desired_loss,     // Optional, no default
-            timeout: self.timeout,                       // Optional, no default
-            normalized: self.normalized.unwrap_or(true), // normalize output of distance by default
-            minkowski_p: self.minkowski_p.unwrap_or(1.0), // default to 1.0 so it computes Manhattan distance
+            metric: self.metric.unwrap_or(Metric::Euclidean),
+            epochs: self.epochs.unwrap_or(1000),
+            batch_size: self.batch_size.unwrap_or(1000),
+            learning_rate: self.learning_rate.unwrap_or(0.001),
+            beta1: self.beta1.unwrap_or(0.9),
+            beta2: self.beta2.unwrap_or(0.999),
+            penalty: self.penalty.unwrap_or(1e-5),
+            verbose: self.verbose.unwrap_or(false),
+            patience: self.patience,
+            loss_reduction: self.loss_reduction.unwrap_or(LossReduction::Sum),
+            k_neighbors: self.k_neighbors.unwrap_or(15),
+            min_desired_loss: self.min_desired_loss,
+            timeout: self.timeout,
+            normalized: self.normalized.unwrap_or(true),
+            minkowski_p: self.minkowski_p.unwrap_or(1.0),
             repulsion_strength: self.repulsion_strength.unwrap_or(1.0),
         })
     }

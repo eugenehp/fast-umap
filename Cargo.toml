@@ -8,7 +8,7 @@ repository = "https://github.com/eugenehp/fast-map"
 homepage = "https://github.com/eugenehp/fast-map"
 documentation = "https://docs.rs/fast-umap/latest/fast_umap/"
 license = "MIT"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 
 # docs.rs build configuration.
@@ -45,6 +45,10 @@ serde = "1.0.216"
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 mnist = { version = "0.6.0", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
+umap-rs = "0.4.5"
+ndarray_017 = { package = "ndarray", version = "0.17" }
+serde_json = "1.0"
+chrono = "0.4"
 
 [[bench]]
 name = "umap_bench"

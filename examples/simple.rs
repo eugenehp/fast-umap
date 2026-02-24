@@ -14,27 +14,25 @@ fn main() {
 
     // Generate a dataset of random values with `num_samples` rows and `num_features` columns
     let data: Vec<Vec<f64>> = (0..num_samples * num_features)
-        .map(|_| rng.random::<f64>()) // Random number generation for each feature
-        .collect::<Vec<f64>>() // Collect all random values into a vector
-        .chunks_exact(num_features) // Chunk the vector into rows of length `num_features`
-        .map(|chunk| chunk.to_vec()) // Convert each chunk into a Vec<f64>
-        .collect(); // Collect the rows into a vector of vectors
+        .map(|_| rng.random::<f64>())
+        .collect::<Vec<f64>>()
+        .chunks_exact(num_features)
+        .map(|chunk| chunk.to_vec())
+        .collect();
 
     type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
     type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
 
-    // Fit the UMAP model to the data and reduce the data to a lower-dimensional space (default: 2D)
-    let umap: fast_umap::UMAP<MyAutodiffBackend> = umap(data.clone());
-    // let umap = umap_size(data.clone(), 3); // where 3 is the output size of projected dimensions
+    // ── New API (mirrors umap-rs) ────────────────────────────────────────────
+    let config = UmapConfig::default(); // 2-D output, Euclidean, default hyperparameters
+    let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+    let fitted = umap.fit(data.clone(), None);
 
-    // Transform the data using the trained UMAP model to reduce its dimensions
-    let reduced_dimensions_vector = umap.transform(data.clone());
+    // Get the embedding
+    let embedding = fitted.embedding();
+    println!("Embedding shape: {} × {}", embedding.len(), embedding[0].len());
 
-    // Visualize the reduced dimensions as a vector, plots only 2D for now
-    chart_vector(reduced_dimensions_vector, None, None);
-
-    // Optionally, you can also visualize the reduced dimensions as a tensor
-    // let reduced_dimensions_tensor = umap.transform_to_tensor(data.clone());
-    // print_tensor_with_title("reduced_dimensions", &reduced_dimensions_tensor);
-    // chart_tensor(reduced_dimensions_tensor, None);
+    // Transform new data through the trained model
+    let _new_embedding = fitted.transform(data.clone());
+    println!("Transform done.");
 }
