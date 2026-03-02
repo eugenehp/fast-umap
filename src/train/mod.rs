@@ -17,12 +17,13 @@ use burn::{
     tensor::{cast::ToElement, Device, Int, IndexingUpdateOp, Tensor, TensorData},
 };
 pub use config::*;
-pub use train_sparse::train_sparse;
+pub use train_sparse::{train_sparse, EpochProgress};
 
 use crossbeam_channel::Receiver;
 use get_distance_by_metric::*;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive};
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{thread, time::Instant};
 
@@ -62,7 +63,28 @@ pub fn train<B: AutodiffBackend, F: Float>(
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
 {
-    std::fs::create_dir_all("figures").expect("Could not create figures/ directory");
+    // Resolve and create the figures output directory.
+    // Gracefully degrade: if the directory cannot be created (e.g. read-only
+    // filesystem) we warn once and disable all plot output for this run
+    // rather than panicking.
+    let figures_dir: PathBuf = config
+        .figures_dir
+        .clone()
+        .unwrap_or_else(std::env::temp_dir);
+
+    let can_plot = match std::fs::create_dir_all(&figures_dir) {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!(
+                "[fast-umap] Warning: could not create figures directory '{}': {}. \
+                 Plot output will be disabled for this run. \
+                 Set `figures_dir` in your config to a writable path.",
+                figures_dir.display(),
+                e
+            );
+            false
+        }
+    };
 
     let recorder = BinFileRecorder::<FullPrecisionSettings>::new();
     let model_path = format!("/tmp/{name}.bin");
@@ -337,10 +359,14 @@ where
         }
 
         // ── Periodic coloured snapshot (verbose feature flag) ─────────────────
-        let loss_plot_path = format!("figures/losses_{name}.png");
+        #[allow(unused_variables)]
+        let loss_plot_path = figures_dir
+            .join(format!("losses_{name}.png"))
+            .to_string_lossy()
+            .into_owned();
 
         #[cfg(feature = "verbose")]
-        {
+        if can_plot {
             const STEP: usize = 100;
             if epoch > 0 && epoch % STEP == 0 {
                 let losses_snap = losses.clone();
@@ -354,7 +380,10 @@ where
                 let embeddings = model_snap.forward(tensor_data);
                 let lpath = loss_plot_path.clone();
                 let caption = format!("{name}_{epoch}");
-                let fig_path = format!("figures/{name}_{epoch}.png");
+                let fig_path = figures_dir
+                    .join(format!("{name}_{epoch}.png"))
+                    .to_string_lossy()
+                    .into_owned();
                 let snap_labels = labels.clone();
 
                 thread::spawn(move || {
@@ -370,7 +399,7 @@ where
             }
         }
 
-        if config.verbose {
+        if can_plot && config.verbose {
             plot_loss(losses.clone(), &loss_plot_path).unwrap();
         }
 
@@ -378,8 +407,11 @@ where
     }
 
     #[cfg(feature = "verbose")]
-    {
-        let path = format!("figures/losses_{name}.png");
+    if can_plot {
+        let path = figures_dir
+            .join(format!("losses_{name}.png"))
+            .to_string_lossy()
+            .into_owned();
         plot_loss(losses.clone(), &path).unwrap();
     }
 
