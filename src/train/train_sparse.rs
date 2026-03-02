@@ -30,9 +30,10 @@ use super::config::*;
 
 use crossbeam_channel::Receiver;
 use indicatif::{ProgressBar, ProgressStyle};
-use num::{Float, FromPrimitive};
+use num::{Float, FromPrimitive, ToPrimitive};
 use rand::seq::SliceRandom;
 use rand::Rng;
+use std::path::PathBuf;
 use std::time::Duration;
 use std::{thread, time::Instant};
 
@@ -56,6 +57,17 @@ const MAX_POS_EDGES_PER_EPOCH: usize = 50_000;
 /// Train the UMAP model using sparse edge-based loss with negative sampling.
 ///
 /// Per-epoch cost is O(min(n·k, MAX_EDGES) + neg_samples).
+/// Progress info passed to the callback each epoch (or every N epochs).
+#[derive(Debug, Clone)]
+pub struct EpochProgress {
+    pub epoch: usize,
+    pub total_epochs: usize,
+    pub loss: f64,
+    pub best_loss: f64,
+    pub elapsed_secs: f64,
+    pub epoch_ms: f64,
+}
+
 pub fn train_sparse<B: AutodiffBackend, F: Float>(
     name: &str,
     mut model: UMAPModel<B>,
@@ -66,11 +78,33 @@ pub fn train_sparse<B: AutodiffBackend, F: Float>(
     device: Device<B>,
     exit_rx: Receiver<()>,
     labels: Option<Vec<String>>,
+    on_progress: Option<Box<dyn Fn(EpochProgress) + Send>>,
 ) -> (UMAPModel<B>, Vec<F>, F)
 where
     F: FromPrimitive + Send + Sync + burn::tensor::Element,
 {
-    std::fs::create_dir_all("figures").expect("Could not create figures/ directory");
+    // Resolve and create the figures output directory.
+    // Gracefully degrade: if the directory cannot be created (e.g. read-only
+    // filesystem) we warn once and disable all plot output for this run
+    // rather than panicking.
+    let figures_dir: PathBuf = config
+        .figures_dir
+        .clone()
+        .unwrap_or_else(std::env::temp_dir);
+
+    let can_plot = match std::fs::create_dir_all(&figures_dir) {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!(
+                "[fast-umap] Warning: could not create figures directory '{}': {}. \
+                 Plot output will be disabled for this run. \
+                 Set `figures_dir` in your config to a writable path.",
+                figures_dir.display(),
+                e
+            );
+            false
+        }
+    };
 
     let k = config.k_neighbors;
     let repulsion_strength = config.repulsion_strength;
@@ -302,6 +336,12 @@ where
         losses.push(current_loss);
 
         let elapsed = start_time.elapsed();
+        let epoch_ms = if epoch > 0 {
+            elapsed.as_secs_f64() * 1000.0 / epoch as f64
+        } else {
+            0.0
+        };
+
         if let Some(pb) = &pb {
             pb.inc(1);
             if should_read {
@@ -310,6 +350,20 @@ where
                     format_duration(elapsed),
                     config.epochs,
                 ));
+            }
+        }
+
+        // Fire progress callback every LOSS_READBACK_INTERVAL epochs
+        if should_read {
+            if let Some(ref cb) = on_progress {
+                cb(EpochProgress {
+                    epoch,
+                    total_epochs: config.epochs,
+                    loss: ToPrimitive::to_f64(&current_loss).unwrap_or(0.0),
+                    best_loss: ToPrimitive::to_f64(&best_loss).unwrap_or(0.0),
+                    elapsed_secs: elapsed.as_secs_f64(),
+                    epoch_ms,
+                });
             }
         }
 
@@ -360,10 +414,13 @@ where
 
         // ── Periodic coloured snapshot (verbose feature flag) ─────────────────
         #[allow(unused_variables)]
-        let loss_plot_path = format!("figures/losses_{name}.png");
+        let loss_plot_path = figures_dir
+            .join(format!("losses_{name}.png"))
+            .to_string_lossy()
+            .into_owned();
 
         #[cfg(feature = "verbose")]
-        {
+        if can_plot {
             const STEP: usize = 100;
             if epoch > 0 && epoch % STEP == 0 {
                 let losses_snap = losses.clone();
@@ -377,7 +434,10 @@ where
                 let embeddings = model_snap.forward(tensor_data);
                 let lpath = loss_plot_path.clone();
                 let caption = format!("{name}_{epoch}");
-                let fig_path = format!("figures/{name}_{epoch}.png");
+                let fig_path = figures_dir
+                    .join(format!("{name}_{epoch}.png"))
+                    .to_string_lossy()
+                    .into_owned();
                 let snap_labels = labels.clone();
 
                 thread::spawn(move || {
@@ -393,7 +453,7 @@ where
             }
         }
 
-        if verbose && epoch % PLOT_INTERVAL == 0 {
+        if can_plot && verbose && epoch % PLOT_INTERVAL == 0 {
             plot_loss(losses.clone(), &loss_plot_path).unwrap();
         }
 
@@ -401,13 +461,19 @@ where
     }
 
     #[cfg(feature = "verbose")]
-    {
-        let path = format!("figures/losses_{name}.png");
+    if can_plot {
+        let path = figures_dir
+            .join(format!("losses_{name}.png"))
+            .to_string_lossy()
+            .into_owned();
         plot_loss(losses.clone(), &path).unwrap();
     }
 
-    if verbose {
-        let path = format!("figures/losses_{name}.png");
+    if can_plot && verbose {
+        let path = figures_dir
+            .join(format!("losses_{name}.png"))
+            .to_string_lossy()
+            .into_owned();
         plot_loss(losses.clone(), &path).unwrap();
     }
 

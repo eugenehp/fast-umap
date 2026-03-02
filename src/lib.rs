@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+#![allow(unused_imports)]
 
 //! # fast-umap
 //!
@@ -106,8 +107,8 @@ pub mod utils;
 
 // Re-export config types at crate root for umap-rs style access
 pub use train::{
-    GraphParams, LossReduction, ManifoldParams, Metric, OptimizationParams, TrainingConfig,
-    TrainingConfigBuilder, UmapConfig,
+    EpochProgress, GraphParams, LossReduction, ManifoldParams, Metric, OptimizationParams,
+    TrainingConfig, TrainingConfigBuilder, UmapConfig,
 };
 
 /// UMAP dimensionality reduction algorithm (GPU-accelerated, parametric).
@@ -285,6 +286,7 @@ impl<B: AutodiffBackend> Umap<B> {
             kernel_a,
             kernel_b,
             neg_sample_rate: self.config.optimization.neg_sample_rate,
+            figures_dir: self.config.optimization.figures_dir.clone(),
         };
 
         // Use the sparse training path (O(n·k) per epoch) by default.
@@ -299,26 +301,115 @@ impl<B: AutodiffBackend> Umap<B> {
             self.device.clone(),
             exit_rx,
             labels,
+            None,
         );
 
+        Self::finalize(model, train_data, num_samples, num_features, self.device, self.config)
+    }
+
+    /// Like [`fit_with_signal`], but also accepts a progress callback that is
+    /// invoked every few epochs with timing and loss information.
+    pub fn fit_with_progress<F: Float>(
+        self,
+        data: Vec<Vec<F>>,
+        labels: Option<Vec<String>>,
+        exit_rx: Receiver<()>,
+        on_progress: Box<dyn Fn(EpochProgress) + Send>,
+    ) -> FittedUmap<B>
+    where
+        F: num::FromPrimitive + burn::tensor::Element,
+    {
+        let default_name = "model";
+        let num_samples = data.len();
+        let num_features = data[0].len();
+        let batch_size = num_samples;
+
+        let seed = 9999;
+        B::seed(&self.device, seed);
+
+        let train_data: Vec<F> = data.into_iter().flatten().collect();
+
+        let model_config = UMAPModelConfigBuilder::default()
+            .input_size(num_features)
+            .hidden_sizes(self.config.hidden_sizes.clone())
+            .output_size(self.config.n_components)
+            .build()
+            .unwrap();
+
+        let model: UMAPModel<B> = UMAPModel::new(&model_config, &self.device);
+
+        let (kernel_a, kernel_b) = train::fit_ab(
+            self.config.manifold.min_dist,
+            self.config.manifold.spread,
+        );
+        let training_config = TrainingConfig {
+            metric: self.config.graph.metric.clone(),
+            epochs: self.config.optimization.n_epochs,
+            batch_size,
+            learning_rate: self.config.optimization.learning_rate,
+            beta1: self.config.optimization.beta1,
+            beta2: self.config.optimization.beta2,
+            penalty: self.config.optimization.penalty,
+            verbose: self.config.optimization.verbose,
+            patience: self.config.optimization.patience,
+            loss_reduction: self.config.optimization.loss_reduction.clone(),
+            k_neighbors: self.config.graph.n_neighbors,
+            min_desired_loss: self.config.optimization.min_desired_loss,
+            timeout: self.config.optimization.timeout,
+            normalized: self.config.graph.normalized,
+            minkowski_p: self.config.graph.minkowski_p,
+            repulsion_strength: self.config.optimization.repulsion_strength,
+            kernel_a,
+            kernel_b,
+            neg_sample_rate: self.config.optimization.neg_sample_rate,
+            figures_dir: self.config.optimization.figures_dir.clone(),
+        };
+
+        let (model, _losses, _best_loss): (UMAPModel<B>, Vec<F>, F) = train::train_sparse(
+            default_name,
+            model,
+            num_samples,
+            num_features,
+            train_data.clone(),
+            &training_config,
+            self.device.clone(),
+            exit_rx,
+            labels,
+            Some(on_progress),
+        );
+
+        Self::finalize(model, train_data, num_samples, num_features, self.device, self.config)
+    }
+
+    /// Shared finalization: extract embedding from trained model.
+    fn finalize<F: Float>(
+        model: UMAPModel<B>,
+        train_data: Vec<F>,
+        num_samples: usize,
+        num_features: usize,
+        device: Device<B>,
+        config: UmapConfig,
+    ) -> FittedUmap<B>
+    where
+        F: num::FromPrimitive + burn::tensor::Element,
+    {
         let model: UMAPModel<B::InnerBackend> = model.valid();
 
-        // Compute the embedding for the training data
         let mut normalized_data = train_data;
         normalize_data(&mut normalized_data, num_samples, num_features);
         let global = convert_vector_to_tensor(
             normalized_data,
             num_samples,
             num_features,
-            &self.device,
+            &device,
         );
         let embedding_tensor = model.forward(global);
         let embedding: Vec<Vec<f64>> = convert_tensor_to_vector(embedding_tensor);
 
         FittedUmap {
             model,
-            device: self.device,
-            config: self.config,
+            device,
+            config,
             embedding,
             num_features,
         }

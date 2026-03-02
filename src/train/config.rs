@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::PathBuf;
 
 // ─── UMAP a, b curve fitting ─────────────────────────────────────────────────
 
@@ -295,6 +296,17 @@ pub struct OptimizationParams {
     ///
     /// Default: 5
     pub neg_sample_rate: usize,
+
+    /// Directory where loss-curve and embedding snapshot plots are written
+    /// when `verbose` is `true` (or the `verbose` feature flag is enabled).
+    ///
+    /// Defaults to `"figures"` (relative to the current working directory).
+    /// Set this to an absolute path — or any writable location — if the
+    /// process runs on a read-only filesystem.
+    ///
+    /// When `None` the default `"figures"` directory is used.
+    #[serde(skip)]
+    pub figures_dir: Option<PathBuf>,
 }
 
 impl Default for OptimizationParams {
@@ -313,6 +325,7 @@ impl Default for OptimizationParams {
             timeout: None,
             verbose: false,
             neg_sample_rate: 5,
+            figures_dir: None,
         }
     }
 }
@@ -434,6 +447,13 @@ pub struct TrainingConfig {
     pub kernel_b: f32,
     /// Number of negative samples per positive edge per epoch.
     pub neg_sample_rate: usize,
+
+    /// Directory where loss-curve and embedding snapshot plots are written.
+    ///
+    /// Defaults to `None`, which resolves to `"figures"` in the current working
+    /// directory.  Set to a writable [`PathBuf`] when the process runs on a
+    /// read-only filesystem.
+    pub figures_dir: Option<PathBuf>,
 }
 
 impl TrainingConfig {
@@ -466,6 +486,7 @@ impl From<&UmapConfig> for TrainingConfig {
             kernel_a,
             kernel_b,
             neg_sample_rate: config.optimization.neg_sample_rate,
+            figures_dir: config.optimization.figures_dir.clone(),
         }
     }
 }
@@ -502,6 +523,7 @@ impl From<&TrainingConfig> for UmapConfig {
                 timeout: config.timeout,
                 verbose: config.verbose,
                 neg_sample_rate: config.neg_sample_rate,
+                figures_dir: config.figures_dir.clone(),
             },
         }
     }
@@ -533,6 +555,7 @@ pub struct TrainingConfigBuilder {
     minkowski_p: Option<f64>,
     repulsion_strength: Option<f32>,
     neg_sample_rate: Option<usize>,
+    figures_dir: Option<PathBuf>,
 }
 
 impl TrainingConfigBuilder {
@@ -621,6 +644,17 @@ impl TrainingConfigBuilder {
         self
     }
 
+    /// Set the directory where loss-curve and snapshot plots are saved.
+    ///
+    /// Use this to redirect output away from a read-only working directory:
+    /// ```ignore
+    /// .with_figures_dir(std::env::temp_dir().join("umap_figures"))
+    /// ```
+    pub fn with_figures_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.figures_dir = Some(dir.into());
+        self
+    }
+
     pub fn build(self) -> Option<TrainingConfig> {
         let defaults = ManifoldParams::default();
         let (kernel_a, kernel_b) = fit_ab(defaults.min_dist, defaults.spread);
@@ -644,6 +678,7 @@ impl TrainingConfigBuilder {
             kernel_a,
             kernel_b,
             neg_sample_rate: self.neg_sample_rate.unwrap_or(5),
+            figures_dir: self.figures_dir,
         })
     }
 }
