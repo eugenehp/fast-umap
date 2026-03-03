@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.2] — 2026-03-03
+
+### Added
+
+- **`cooldown_ms` parameter** (`OptimizationParams`, `TrainingConfig`,
+  `TrainingConfigBuilder`) — configurable per-epoch sleep in milliseconds that
+  gives the GPU scheduler breathing room and prevents 100 % utilisation during
+  long training runs. Default is `0` (disabled, no change to existing behaviour).
+  Propagated through both the sparse (`train_sparse`) and dense (`train`) loops.
+
+---
+
 ## [1.2.0] — 2026-02-24
 
 ### Added

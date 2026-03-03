@@ -286,6 +286,7 @@ impl<B: AutodiffBackend> Umap<B> {
             kernel_a,
             kernel_b,
             neg_sample_rate: self.config.optimization.neg_sample_rate,
+            cooldown_ms: self.config.optimization.cooldown_ms,
             figures_dir: self.config.optimization.figures_dir.clone(),
         };
 
@@ -362,6 +363,7 @@ impl<B: AutodiffBackend> Umap<B> {
             kernel_a,
             kernel_b,
             neg_sample_rate: self.config.optimization.neg_sample_rate,
+            cooldown_ms: self.config.optimization.cooldown_ms,
             figures_dir: self.config.optimization.figures_dir.clone(),
         };
 

@@ -70,19 +70,19 @@ Or run all benchmarks at once (hardware + comparison + MNIST):
 
 ---
 
-## What's New (v1.2.0)
+## What's New (v1.2.2)
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 | Area | Change |
 |------|--------|
+| **GPU cooldown** | New `cooldown_ms` parameter — sleep N ms between epochs to prevent 100 % GPU utilisation; default `0` (no change to existing behaviour) |
 | **UMAP kernel** | Proper `q = 1/(1 + a·d^(2b))` kernel with `a`, `b` fitted from `min_dist`/`spread` — replaces fixed Student-t `1/(1+d²)` for better cluster separation |
-| **Configurable negative sampling** | New `neg_sample_rate` parameter (default 5); formula fixed from `n_pos × rate / k` → `n_pos × rate` |
+| **Configurable negative sampling** | `neg_sample_rate` parameter (default 5); formula fixed from `n_pos × rate / k` → `n_pos × rate` |
 | **Verbose logging** | All training output gated behind `verbose` flag; improved structured messages with timings, edge counts, kernel params, stop reasons |
 | **ManifoldParams** | `min_dist` and `spread` now actively shape the embedding kernel (previously defined but unused) |
 | **New API** | `Umap::new(config).fit(data)` returns `FittedUmap` with `.embedding()`, `.transform()`, `.into_embedding()` — mirrors umap-rs |
 | **Sparse training** | O(n·k) per epoch with edge subsampling + configurable negative sampling (was O(n²)) |
-| **Benchmarks** | Updated micro-benchmarks and crate comparison numbers |
 
 ---
 
@@ -110,7 +110,7 @@ cargo add fast-umap
 
 ```toml
 [dependencies]
-fast-umap  = "1.2.0"
+fast-umap  = "1.2.2"
 burn       = { version = "0.20.1", features = ["wgpu", "autodiff", "autotune"] }
 cubecl     = { version = "0.9.0",  features = ["wgpu"] }
 ```
@@ -196,6 +196,7 @@ let config = UmapConfig {
 | `metric` | `Euclidean` | Distance metric |
 | `repulsion_strength` | 1.0 | Repulsion term weight |
 | `neg_sample_rate` | 5 | Negative (repulsion) samples per positive edge per epoch |
+| `cooldown_ms` | `0` | Sleep N ms between epochs to reduce GPU utilisation (0 = disabled) |
 | `patience` | `None` | Early-stop epochs without improvement |
 | `min_desired_loss` | `None` | Stop when loss ≤ threshold |
 | `timeout` | `None` | Hard time limit (seconds) |
@@ -612,11 +613,11 @@ paper, this repository, and acknowledge the Burn and CubeCL frameworks:
   author  = {Hauptmann, Eugene},
   year    = {2024},
   url     = {https://github.com/eugenehp/fast-umap},
-  version = {1.2.0}
+  version = {1.2.2}
 }
 ```
 
-> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.2.0).
+> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.2.2).
 > <https://github.com/eugenehp/fast-umap>
 
 ### UMAP algorithm
