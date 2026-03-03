@@ -403,6 +403,14 @@ where
             plot_loss(losses.clone(), &loss_plot_path).unwrap();
         }
 
+        // ── Per-epoch GPU cooldown ────────────────────────────────────────────
+        // Sleeping here (between the optimizer step and the next forward pass)
+        // gives the GPU scheduler breathing room and prevents 100 % utilisation
+        // for the full run.  The default is 0 ms (no pause).
+        if config.cooldown_ms > 0 {
+            thread::sleep(Duration::from_millis(config.cooldown_ms));
+        }
+
         epoch += 1;
     }
 

@@ -297,6 +297,21 @@ pub struct OptimizationParams {
     /// Default: 5
     pub neg_sample_rate: usize,
 
+    /// Milliseconds to sleep at the end of every training epoch.
+    ///
+    /// Inserting a small pause between epochs lets the GPU scheduler breathe,
+    /// preventing the device from being pinned at 100 % utilisation for the
+    /// entire run.  Typical values:
+    ///
+    /// | `cooldown_ms` | Effect |
+    /// |---------------|--------|
+    /// | `0` (default) | No pause — maximum throughput |
+    /// | `1–5`         | Barely perceptible pause, ~10–20 % GPU headroom |
+    /// | `10–50`       | Noticeable slowdown, significant GPU headroom |
+    ///
+    /// Default: 0 (disabled)
+    pub cooldown_ms: u64,
+
     /// Directory where loss-curve and embedding snapshot plots are written
     /// when `verbose` is `true` (or the `verbose` feature flag is enabled).
     ///
@@ -325,6 +340,7 @@ impl Default for OptimizationParams {
             timeout: None,
             verbose: false,
             neg_sample_rate: 5,
+            cooldown_ms: 0,
             figures_dir: None,
         }
     }
@@ -448,6 +464,13 @@ pub struct TrainingConfig {
     /// Number of negative samples per positive edge per epoch.
     pub neg_sample_rate: usize,
 
+    /// Milliseconds to sleep at the end of every training epoch.
+    ///
+    /// `0` (the default) disables the pause and gives maximum throughput.
+    /// Increase this value to reduce GPU utilisation at the cost of longer
+    /// training time (e.g. `cooldown_ms = 5` for ~10–20 % GPU headroom).
+    pub cooldown_ms: u64,
+
     /// Directory where loss-curve and embedding snapshot plots are written.
     ///
     /// Defaults to `None`, which resolves to `"figures"` in the current working
@@ -486,6 +509,7 @@ impl From<&UmapConfig> for TrainingConfig {
             kernel_a,
             kernel_b,
             neg_sample_rate: config.optimization.neg_sample_rate,
+            cooldown_ms: config.optimization.cooldown_ms,
             figures_dir: config.optimization.figures_dir.clone(),
         }
     }
@@ -523,6 +547,7 @@ impl From<&TrainingConfig> for UmapConfig {
                 timeout: config.timeout,
                 verbose: config.verbose,
                 neg_sample_rate: config.neg_sample_rate,
+                cooldown_ms: config.cooldown_ms,
                 figures_dir: config.figures_dir.clone(),
             },
         }
@@ -555,6 +580,7 @@ pub struct TrainingConfigBuilder {
     minkowski_p: Option<f64>,
     repulsion_strength: Option<f32>,
     neg_sample_rate: Option<usize>,
+    cooldown_ms: Option<u64>,
     figures_dir: Option<PathBuf>,
 }
 
@@ -644,6 +670,15 @@ impl TrainingConfigBuilder {
         self
     }
 
+    /// Set the per-epoch cooldown sleep in milliseconds.
+    ///
+    /// Inserting a pause between epochs prevents the GPU from being pinned at
+    /// 100 % utilisation.  `0` (the default) disables the sleep entirely.
+    pub fn with_cooldown_ms(mut self, cooldown_ms: u64) -> Self {
+        self.cooldown_ms = Some(cooldown_ms);
+        self
+    }
+
     /// Set the directory where loss-curve and snapshot plots are saved.
     ///
     /// Use this to redirect output away from a read-only working directory:
@@ -678,6 +713,7 @@ impl TrainingConfigBuilder {
             kernel_a,
             kernel_b,
             neg_sample_rate: self.neg_sample_rate.unwrap_or(5),
+            cooldown_ms: self.cooldown_ms.unwrap_or(0),
             figures_dir: self.figures_dir,
         })
     }
