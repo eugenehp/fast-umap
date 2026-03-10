@@ -13,12 +13,13 @@
 
 use crate::{
     backend::AutodiffBackend,
-    chart::{self, plot_loss, ChartConfigBuilder},
     format_duration,
     model::UMAPModel,
     normalize_data,
     utils::convert_vector_to_tensor,
 };
+#[cfg(feature = "plotters")]
+use crate::chart::{self, plot_loss, ChartConfigBuilder};
 use burn::{
     module::{AutodiffModule, Module},
     optim::{decay::WeightDecayConfig, AdamConfig, GradientsParams, Optimizer},
@@ -45,6 +46,7 @@ const EDGE_BATCH_COUNT: usize = 16;
 const LOSS_READBACK_INTERVAL: usize = 5;
 
 /// How often to render loss plots when verbose (every N epochs).
+#[cfg(feature = "plotters")]
 const PLOT_INTERVAL: usize = 25;
 
 /// Maximum number of positive edges sampled per epoch.
@@ -87,11 +89,13 @@ where
     // Gracefully degrade: if the directory cannot be created (e.g. read-only
     // filesystem) we warn once and disable all plot output for this run
     // rather than panicking.
+    #[cfg(feature = "plotters")]
     let figures_dir: PathBuf = config
         .figures_dir
         .clone()
         .unwrap_or_else(std::env::temp_dir);
 
+    #[cfg(feature = "plotters")]
     let can_plot = match std::fs::create_dir_all(&figures_dir) {
         Ok(()) => true,
         Err(e) => {
@@ -413,13 +417,13 @@ where
         }
 
         // ── Periodic coloured snapshot (verbose feature flag) ─────────────────
-        #[allow(unused_variables)]
+        #[cfg(feature = "plotters")]
         let loss_plot_path = figures_dir
             .join(format!("losses_{name}.png"))
             .to_string_lossy()
             .into_owned();
 
-        #[cfg(feature = "verbose")]
+        #[cfg(all(feature = "plotters", feature = "verbose"))]
         if can_plot {
             const STEP: usize = 100;
             if epoch > 0 && epoch % STEP == 0 {
@@ -453,6 +457,7 @@ where
             }
         }
 
+        #[cfg(feature = "plotters")]
         if can_plot && verbose && epoch % PLOT_INTERVAL == 0 {
             plot_loss(losses.clone(), &loss_plot_path).unwrap();
         }
@@ -468,7 +473,7 @@ where
         epoch += 1;
     }
 
-    #[cfg(feature = "verbose")]
+    #[cfg(all(feature = "plotters", feature = "verbose"))]
     if can_plot {
         let path = figures_dir
             .join(format!("losses_{name}.png"))
@@ -477,6 +482,7 @@ where
         plot_loss(losses.clone(), &path).unwrap();
     }
 
+    #[cfg(feature = "plotters")]
     if can_plot && verbose {
         let path = figures_dir
             .join(format!("losses_{name}.png"))

@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.3] — 2026-03-10
+
+### Changed
+
+- **`plotters` feature is now optional** — `plotters` and `hsl` are no longer
+  unconditional dependencies. They are gated behind a new `plotters` cargo
+  feature, which is included in `default` so existing users see no change.
+  Downstreams that don't need chart output can opt out with
+  `default-features = false` (or `features = ["verbose"]`) to shed `plotters`,
+  `plotters-bitmap`, `plotters-backend`, `hsl`, and `image v0.24` entirely.
+- All chart-related code (`pub mod chart`, imports, `figures_dir`/`can_plot`
+  setup, every `plot_loss` / `chart_tensor` call, `PLOT_INTERVAL` constant)
+  is gated with `#[cfg(feature = "plotters")]`. Snapshot blocks that require
+  both features use `#[cfg(all(feature = "plotters", feature = "verbose"))]`.
+
+---
+
 ## [1.2.2] — 2026-03-03
 
 ### Added

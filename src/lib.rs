@@ -76,7 +76,7 @@
 //! |--------|-------------|
 //! | [`model`] | `UMAPModel` neural network and config builder |
 //! | [`train`] | Training loop, `UmapConfig`, sparse training, loss computation |
-//! | [`chart`] | 2-D scatter plots and loss curves (plotters) |
+//! | [`chart`] | 2-D scatter plots and loss curves (plotters, optional) |
 //! | [`utils`] | Data generation, tensor conversion, normalisation |
 //! | [`kernels`] | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
 //! | [`backend`] | Backend trait extension for custom kernel dispatch |
@@ -95,6 +95,7 @@ use utils::*;
 use burn::tensor::{Device, Tensor};
 
 pub mod backend;
+#[cfg(feature = "plotters")]
 pub mod chart;
 pub mod distances;
 pub mod kernels;
