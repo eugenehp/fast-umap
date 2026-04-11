@@ -1,7 +1,9 @@
+#![cfg(feature = "gpu")]
+
 use fast_umap::prelude::*;
 use fast_umap::{Umap, FittedUmap};
 use cubecl::wgpu::WgpuRuntime;
-use tempfile::NamedTempFile;
+
 use std::path::PathBuf;
 
 type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;

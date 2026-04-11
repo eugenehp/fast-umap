@@ -1,6 +1,6 @@
 [package]
 name = "fast-umap"
-version = "1.5.0"
+version = "1.5.1"
 description = "Configurable UMAP (Uniform Manifold Approximation and Projection) in Rust"
 keywords = ["UMAP", "dimensionality", "manifold", "machine-learning", "GPU"]
 categories = ["science", "mathematics", "visualization"]
@@ -24,7 +24,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 exclude = ["figures/*"]
 
 [dependencies]
-burn = { version = "0.20.1", features = ["train", "wgpu", "autodiff", "autotune", "ndarray"] }
+burn = { version = "0.20.1", default-features = false, features = ["std", "train", "autodiff", "autotune", "ndarray"] }
 burn-cubecl = { version = "0.20.1", optional = true }
 # burn-jit = { version = "0.16.1", features = ["burn-autodiff"] }
 crossbeam-channel = "0.5.15"
@@ -80,6 +80,26 @@ required-features = ["gpu", "plotters"]
 name = "crate_comparison"
 required-features = ["gpu", "plotters"]
 
+[[example]]
+name = "advanced"
+required-features = ["gpu"]
+
+[[example]]
+name = "backend_choice"
+required-features = ["gpu"]
+
+[[example]]
+name = "simple"
+required-features = ["gpu"]
+
+[[example]]
+name = "mnist"
+required-features = ["gpu", "plotters"]
+
+[[example]]
+name = "fallback_demo"
+required-features = ["gpu", "cpu"]
+
 [[bin]]
 name = "bench_report"
 required-features = ["gpu"]
@@ -87,7 +107,7 @@ required-features = ["gpu"]
 [features]
 default = ["gpu", "verbose"]
 # Core backend features
-gpu = ["dep:burn-cubecl", "dep:cubecl"]  # GPU backend with WGPU support
+gpu = ["burn/wgpu", "dep:burn-cubecl", "dep:cubecl"]  # GPU backend with WGPU support
 cpu = ["dep:umap-rs"]  # CPU backend with umap-rs fallback
 # Optional features
 verbose = []  # Verbose output and progress bars

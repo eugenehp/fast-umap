@@ -432,7 +432,7 @@ fn model_deep_network() {
 
 /// Compute Euclidean pairwise distances with standard tensor ops
 fn euclidean_distances_cpu(x: Tensor<B, 2>) -> Tensor<B, 2> {
-    let n = x.dims()[0];
+    let _n = x.dims()[0];
     let x3 = x.clone().unsqueeze::<3>(); // [1, n, d]
     let xt = x.unsqueeze_dim(1);         // [n, 1, d]
     let diff = x3 - xt;                  // [n, n, d]

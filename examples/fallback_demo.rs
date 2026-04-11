@@ -98,7 +98,7 @@ fn try_gpu_backend(data: Vec<Vec<f64>>) -> Result<Vec<Vec<f64>>, String> {
 }
 
 /// Try CPU backend with proper error handling
-fn try_cpu_backend(_data: Vec<Vec<f64>>) -> Result<Vec<Vec<f64>>, String> {
+fn try_cpu_backend(data: Vec<Vec<f64>>) -> Result<Vec<Vec<f64>>, String> {
     #[cfg(feature = "cpu")]
     {
         use fast_umap::{prelude::*, cpu_backend::api as cpu_api};

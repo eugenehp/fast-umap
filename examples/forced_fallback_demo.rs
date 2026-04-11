@@ -3,7 +3,6 @@
 //! This example simulates GPU failure to demonstrate the fallback mechanism.
 
 use rand::Rng;
-use std::panic::catch_unwind;
 
 fn main() {
     println!("=== Forced Fallback Demo ===");
@@ -84,14 +83,16 @@ fn try_gpu_backend_with_forced_failure(_data: Vec<Vec<f64>>) -> Result<Vec<Vec<f
 }
 
 /// Try CPU backend (same as fallback_demo)
+#[allow(unused_variables)]
 fn try_cpu_backend(data: Vec<Vec<f64>>) -> Result<Vec<Vec<f64>>, String> {
     #[cfg(feature = "cpu")]
     {
         use fast_umap::{prelude::*, cpu_backend::api as cpu_api};
-        
+        use std::panic::catch_unwind;
+
         println!("  CPU initialization... SUCCESS");
         println!("  CPU processing... COMPLETE");
-        
+
         let config = UmapConfig::default();
         match catch_unwind(|| cpu_api::fit_cpu(config, data, None)) {
             Ok(fitted) => Ok(fitted.embedding().clone()),

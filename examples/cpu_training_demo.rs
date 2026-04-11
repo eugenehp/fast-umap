@@ -15,6 +15,7 @@ fn main() {
     let num_features = 5;
     
     let mut rng = rand::rng();
+    #[allow(unused_variables)]
     let data: Vec<Vec<f64>> = (0..num_samples * num_features)
         .map(|_| rng.random::<f64>())
         .collect::<Vec<f64>>()

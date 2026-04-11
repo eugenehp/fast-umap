@@ -91,7 +91,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).collect();
 
     let transform_start = Instant::now();
-    let embedding = loaded_fitted.transform(test_data);
+    let _embedding = loaded_fitted.transform(test_data);
     let transform_duration = transform_start.elapsed();
     
     println!("Transform time (100 samples): {:.3} seconds", transform_duration.as_secs_f64());

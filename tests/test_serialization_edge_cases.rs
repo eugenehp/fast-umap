@@ -1,3 +1,5 @@
+#![cfg(feature = "gpu")]
+
 use fast_umap::prelude::*;
 use fast_umap::{Umap, FittedUmap};
 use cubecl::wgpu::WgpuRuntime;
