@@ -28,6 +28,8 @@
 //! // let fitted = umap.fit(data.clone(), None);
 //! // let embedding = fitted.embedding();
 //! // let new_embedding = fitted.transform(new_data);
+//! // fitted.save("model.umap")?; // Save trained model
+//! // let loaded = FittedUmap::<MyAutodiffBackend>::load("model.umap", config, input_size, device)?;
 //! ```
 //!
 //! ## Interface
@@ -81,6 +83,7 @@
 //! | [`kernels`] | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
 //! | [`backend`] | Backend trait extension for custom kernel dispatch |
 //! | [`distances`] | CPU-side distance functions (Euclidean, cosine, Minkowski…) |
+//! | [`serialize`] | Model weight serialization/deserialization |
 //! | [`prelude`] | Re-exports of the most commonly used items |
 
 use backend::AutodiffBackend;
@@ -105,6 +108,7 @@ pub mod macros;
 pub mod model;
 pub mod normalizer;
 pub mod prelude;
+pub mod serialize;
 pub mod train;
 pub mod utils;
 
@@ -505,6 +509,130 @@ impl<B: AutodiffBackend> FittedUmap<B> {
         let global = convert_vector_to_tensor(train_data, num_samples, num_features, &self.device);
 
         self.model.forward(global)
+    }
+
+    /// Save the model's weights to a file.
+    ///
+    /// Serializes the trained model weights to disk for later use.
+    /// The configuration and embedding are not saved, only the neural network weights.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the output file
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` on success, or an error if saving fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use fast_umap::prelude::*;
+    /// use burn::backend::Wgpu;
+    ///
+    /// let config = UmapConfig::default();
+    /// let umap = Umap::<Wgpu>::new(config);
+    /// let fitted = umap.fit(data, None);
+    /// fitted.save("model.umap").expect("Failed to save model");
+    /// ```
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> Result<(), Box<dyn std::error::Error>> {
+        serialize::save_model::<B>(&self.model, path)
+    }
+
+    /// Load a model's weights from a file into a new FittedUmap instance.
+    ///
+    /// Creates a new FittedUmap with the loaded weights. Note that the configuration
+    /// must match the configuration used when the model was saved (same input size,
+    /// hidden layer sizes, and output size).
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the input file
+    /// * `config` - The UMAP configuration that matches the saved model
+    /// * `input_size` - The number of features in the input data (must match the saved model)
+    /// * `device` - The device where the model should be loaded
+    ///
+    /// # Returns
+    ///
+    /// A new `FittedUmap` instance with the loaded weights, or an error if loading fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use fast_umap::prelude::*;
+    /// use burn::backend::Wgpu;
+    ///
+    /// // Load a previously saved model
+    /// let config = UmapConfig::default();
+    /// let device = Default::default();
+    /// let input_size = 100; // Must match the data used during training
+    /// let fitted = FittedUmap::<Wgpu>::load("model.umap", config, input_size, device)?;
+    /// let embedding = fitted.transform(new_data);
+    /// ```
+    pub fn load(
+        path: impl AsRef<std::path::Path>,
+        config: UmapConfig,
+        input_size: usize,
+        device: Device<B>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        // Create a new model with the same architecture
+        let model_config = UMAPModelConfigBuilder::default()
+            .input_size(input_size)
+            .hidden_sizes(config.hidden_sizes.clone())
+            .output_size(config.n_components)
+            .build()?;
+
+        let mut model: UMAPModel<B::InnerBackend> = UMAPModel::new(&model_config, &device);
+
+        // Load the weights
+        serialize::load_model::<B>(&mut model, path, &device)?;
+
+        // Create a FittedUmap instance (embedding will be empty since we don't have training data)
+        Ok(Self {
+            model,
+            device,
+            config,
+            embedding: Vec::new(),
+            num_features: input_size,
+        })
+    }
+
+    /// Load a model's weights from a file, inferring input size from sample data.
+    ///
+    /// This convenience method creates a new FittedUmap with the loaded weights,
+    /// using a sample data point to determine the input size.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the input file
+    /// * `config` - The UMAP configuration that matches the saved model
+    /// * `sample_data` - A single sample data point to infer the input size
+    /// * `device` - The device where the model should be loaded
+    ///
+    /// # Returns
+    ///
+    /// A new `FittedUmap` instance with the loaded weights, or an error if loading fails.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use fast_umap::prelude::*;
+    /// use burn::backend::Wgpu;
+    ///
+    /// // Load a previously saved model
+    /// let config = UmapConfig::default();
+    /// let device = Default::default();
+    /// let sample = vec![1.0, 2.0, 3.0]; // Same dimensionality as training data
+    /// let fitted = FittedUmap::<Wgpu>::load_with_sample("model.umap", config, sample, device)?;
+    /// ```
+    pub fn load_with_sample(
+        path: impl AsRef<std::path::Path>,
+        config: UmapConfig,
+        sample_data: Vec<f64>,
+        device: Device<B>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let input_size = sample_data.len();
+        Self::load(path, config, input_size, device)
     }
 }
 

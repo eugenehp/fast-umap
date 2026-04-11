@@ -44,6 +44,7 @@ serde = "1.0.216"
 
 [dev-dependencies]
 burn = { version = "0.20.1", features = ["ndarray", "autodiff"] }
+tempfile = "3.10"
 criterion = { version = "0.5", features = ["html_reports"] }
 mnist = { version = "0.6.0", git = "https://github.com/eugenehp/mnist.git", features = ["download"] }
 umap-rs = "0.4.5"
@@ -54,6 +55,18 @@ chrono = "0.4"
 [[bench]]
 name = "umap_bench"
 harness = false
+
+[[example]]
+name = "serialization_demo"
+required-features = ["gpu"]
+
+[[example]]
+name = "benchmark_serialization"
+required-features = ["gpu"]
+
+[[example]]
+name = "benchmark_scalability"
+required-features = ["gpu"]
 
 [features]
 default = ["gpu", "verbose"]

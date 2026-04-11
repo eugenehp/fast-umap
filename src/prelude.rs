@@ -1,7 +1,7 @@
 use crate::backend::AutodiffBackend;
 #[cfg(feature = "plotters")]
 use crate::chart;
-use crate::{train, utils, UMAP};
+use crate::{serialize, train, utils, UMAP};
 
 // Re-export common utilities for easier use
 #[cfg(feature = "plotters")]
