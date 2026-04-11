@@ -1,6 +1,6 @@
 [package]
 name = "fast-umap"
-version = "1.3.0"
+version = "1.4.0"
 description = "Configurable UMAP (Uniform Manifold Approximation and Projection) in Rust"
 keywords = ["UMAP", "dimensionality", "manifold", "machine-learning", "GPU"]
 categories = ["science", "mathematics", "visualization"]
