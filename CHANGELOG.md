@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.5.0] — 2026-04-11
+
+### Changed
+
+- **GPU dependencies are now optional** — `burn-cubecl` and `cubecl` are gated behind the `gpu` feature flag, reducing compile times and dependency footprint when building without GPU support.
+- Added `required-features` for GPU/plotters-dependent examples and binaries (`bench_mnist`, `mnist_benchmark`, `crate_comparison`, `bench_report`).
+
+---
+
 ## [1.4.0] — 2026-04-11
 
 ### Added
