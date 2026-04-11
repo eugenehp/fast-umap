@@ -25,11 +25,11 @@ exclude = ["figures/*"]
 
 [dependencies]
 burn = { version = "0.20.1", features = ["train", "wgpu", "autodiff", "autotune", "ndarray"] }
-burn-cubecl = { version = "0.20.1" }
+burn-cubecl = { version = "0.20.1", optional = true }
 # burn-jit = { version = "0.16.1", features = ["burn-autodiff"] }
 crossbeam-channel = "0.5.15"
 ctrlc = "3.4.7"
-cubecl = { version = "0.9.0", features = ["wgpu"] }
+cubecl = { version = "0.9.0", features = ["wgpu"], optional = true }
 hsl = { version = "0.1.1", optional = true }
 indicatif = "0.18"
 ndarray = "0.16.1"
@@ -68,10 +68,26 @@ required-features = ["gpu"]
 name = "benchmark_scalability"
 required-features = ["gpu"]
 
+[[example]]
+name = "bench_mnist"
+required-features = ["gpu", "plotters"]
+
+[[example]]
+name = "mnist_benchmark"
+required-features = ["gpu", "plotters"]
+
+[[example]]
+name = "crate_comparison"
+required-features = ["gpu", "plotters"]
+
+[[bin]]
+name = "bench_report"
+required-features = ["gpu"]
+
 [features]
 default = ["gpu", "verbose"]
 # Core backend features
-gpu = []  # GPU backend with WGPU support
+gpu = ["dep:burn-cubecl", "dep:cubecl"]  # GPU backend with WGPU support
 cpu = ["dep:umap-rs"]  # CPU backend with umap-rs fallback
 # Optional features
 verbose = []  # Verbose output and progress bars

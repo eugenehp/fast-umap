@@ -103,6 +103,7 @@ pub mod chart;
 #[cfg(feature = "cpu")]
 pub mod cpu_backend;
 pub mod distances;
+#[cfg(feature = "gpu")]
 pub mod kernels;
 pub mod macros;
 pub mod model;

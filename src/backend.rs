@@ -2,6 +2,7 @@ use burn::{
     backend::Autodiff,
     tensor::ops::{FloatTensor, IntTensor},
 };
+#[cfg(feature = "gpu")]
 use burn_cubecl::{BoolElement, CubeBackend, CubeRuntime, FloatElement, IntElement};
 
 /// Extension of the Burn [`Backend`](burn::tensor::backend::Backend) trait that
@@ -75,6 +76,7 @@ pub trait AutodiffBackend: Backend + burn::tensor::backend::AutodiffBackend {}
 ///
 /// This covers the primary GPU training path:
 /// `Autodiff<CubeBackend<WgpuRuntime, f32, i32, u32>>`.
+#[cfg(feature = "gpu")]
 impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> AutodiffBackend
     for Autodiff<CubeBackend<R, F, I, BT>>
 {
