@@ -97,6 +97,8 @@ use burn::tensor::{Device, Tensor};
 pub mod backend;
 #[cfg(feature = "plotters")]
 pub mod chart;
+#[cfg(feature = "cpu")]
+pub mod cpu_backend;
 pub mod distances;
 pub mod kernels;
 pub mod macros;

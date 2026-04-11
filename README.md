@@ -144,6 +144,110 @@ println!("Shape: {} × {}", embedding.len(), embedding[0].len());
 
 ---
 
+## Backend Choice: CPU vs GPU with Feature-Based Compilation
+
+fast-umap supports both CPU and GPU backends with feature-based compilation for optimal flexibility:
+
+### GPU Backend (WGPU) - Primary Recommended Backend
+
+For GPU-accelerated execution (requires WGPU-compatible GPU):
+
+```rust
+use cubecl::wgpu::WgpuRuntime;
+use fast_umap::prelude::*;
+
+type MyBackend = burn::backend::wgpu::CubeBackend<WgpuRuntime, f32, i32, u32>;
+type MyAutodiffBackend = burn::backend::Autodiff<MyBackend>;
+
+let config = UmapConfig::default();
+let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+let fitted = umap.fit(data, None);
+```
+
+**Features:**
+- ✅ Full parametric UMAP with neural network training
+- ✅ GPU acceleration via WGPU (Metal/Vulkan/DX12)
+- ✅ Transform new data through trained model
+- ✅ Custom GPU kernels for efficient computation
+- ✅ Automatic differentiation for training
+
+### CPU Backend - Full Functionality with umap-rs Fallback
+
+For CPU-only execution or when GPU is not available, fast-umap provides a complete CPU backend that uses classical UMAP computation:
+
+```rust
+#[cfg(feature = "cpu")]
+{
+    use fast_umap::cpu_backend::api as cpu_api;
+    
+    // Full CPU UMAP with umap-rs backend
+    let config = UmapConfig::default();
+    let fitted = cpu_api::fit_cpu(config, data, None);
+    let embedding = fitted.embedding();
+}
+```
+
+**Features:**
+- ✅ Complete UMAP functionality using classical UMAP algorithm
+- ✅ No GPU required
+- ✅ Same API as GPU backend for consistency
+- ✅ Full configuration support (n_components, n_neighbors, etc.)
+- ✅ Excellent for environments without GPU access
+- ❌ Cannot transform new data (classical UMAP limitation)
+
+**When to use CPU backend:**
+- Development and testing environments without GPU
+- Cloud environments with CPU-only instances
+- Edge devices without GPU acceleration
+- Fallback when GPU drivers are unavailable
+
+See [`cpu_training_demo` example](examples/cpu_training_demo.rs) for complete CPU usage.
+
+### Feature-Based Compilation
+
+fast-umap uses Cargo features to enable only the backends you need:
+
+```shell
+# GPU backend (default, includes gpu + verbose features)
+cargo build --release
+
+# CPU-only backend
+cargo build --release --features cpu
+
+# Minimal build (no backends, library mode only)
+cargo build --release --no-default-features
+
+# All features (development)
+cargo build --release --features all
+```
+
+See [`feature_demo` example](examples/feature_demo.rs) for complete feature matrix.
+
+### Runtime Backend Selection
+
+The [`backend_choice` example](examples/backend_choice.rs) demonstrates runtime backend selection:
+
+```shell
+# Run with GPU backend
+cargo run --release --example backend_choice gpu
+
+# Run with CPU backend  
+cargo run --release --features cpu --example backend_choice cpu
+```
+
+### CPU Testing Examples
+
+For working CPU examples, see the test suite:
+
+```shell
+# Run CPU-based tests
+cargo test --lib
+```
+
+The tests in `tests/tests.rs` demonstrate NdArray backend usage for CPU computation.
+
+---
+
 ## API Overview
 
 The public API mirrors [`umap-rs`](https://crates.io/crates/umap-rs):
@@ -217,6 +321,28 @@ let new_embedding = fitted.transform(new_data);
 ---
 
 ## Examples
+
+### CPU Capabilities Demo
+
+Demonstrates CPU backend capabilities for utility functions and tensor operations:
+
+```shell
+cargo run --release --example cpu_training_demo
+```
+
+### Backend Choice — CPU vs GPU selection
+
+Demonstrates how to choose between CPU (NdArray) and GPU (WGPU) backends at runtime:
+
+```shell
+# Run with GPU backend (default)
+cargo run --release --example backend_choice gpu
+
+# Run with CPU backend  
+cargo run --release --example backend_choice cpu
+```
+
+**Note about CPU backend:** The CPU option shows backend selection structure. For utility functions, see `cpu_training_demo`. The GPU backend provides full parametric UMAP with neural network training and the ability to transform new data.
 
 ### Simple — random data, 2-D embedding
 
@@ -375,6 +501,46 @@ writing any files.
 ./run_all.sh                  # all examples
 ./run_all.sh --skip-mnist     # skip MNIST download
 ```
+
+### CPU Capabilities Demo
+
+Demonstrates CPU backend capabilities:
+
+```shell
+# Run CPU demo (requires cpu feature)
+cargo run --release --features cpu --example cpu_training_demo
+```
+
+### Developer Experience Improvements
+
+The feature-based compilation system provides:
+
+**✅ Faster Compilation**
+- Compile only what you need: `cargo build --release --features cpu`
+- Minimal builds: `cargo build --release --no-default-features`
+- Feature-specific examples and documentation
+
+**✅ Smaller Binaries**
+- GPU-only: exclude CPU dependencies (save ~5MB)
+- CPU-only: exclude GPU dependencies (save ~10MB)
+- Library mode: minimal footprint for integration
+
+**✅ Clear Feature Matrix**
+
+| Feature | Description | When to Use |
+|---------|-------------|--------------|
+| `gpu` | GPU backend (WGPU) | Production, large datasets |
+| `cpu` | CPU backend (umap-rs) | CPU-only environments |
+| `verbose` | Progress output | Development, debugging |
+| `plotters` | Visualization | Exploration, analysis |
+| `all` | Everything | Development, testing |
+
+**✅ Better Error Messages**
+- Clear feature requirements at compile time
+- Graceful runtime fallback handling
+- Comprehensive validation
+
+See [`feature_demo` example](examples/feature_demo.rs) for complete feature guide.
 
 ---
 
