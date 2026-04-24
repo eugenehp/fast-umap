@@ -10,16 +10,16 @@ See [docs.rs](https://docs.rs/crate/fast-umap/latest) for the full API reference
 
 ## Highlights
 
-- **Up to 24× faster with MLX** on Apple Silicon vs WGPU
+- **Up to 38× faster with MLX** on Apple Silicon vs WGPU
   (see [MLX benchmarks](#performance--mlx-vs-wgpu-apple-silicon) below)
 - **Up to 4.7× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
   datasets ≥ 10 000 samples (see [benchmarks](#performance--fast-umap-vs-umap-rs) below)
+- **Scales to 50K+ samples** — NN-Descent approximate KNN avoids the O(n^2) distance matrix
 - **Parametric** — trains a neural network, so you can
   [`transform()`](#transform-new-data) new unseen data instantly
 - **Three backends** — MLX (Apple Silicon native), WGPU (Metal/Vulkan/DX12), CPU (NdArray)
+- **PCA warm-start** — optional PCA pre-training for faster convergence
 - **API mirrors umap-rs** — drop-in replacement with `Umap::new(config).fit(data)`
-- **Automatic differentiation** — full autograd through custom GPU kernels
-- **CPU fallback** — runs on NdArray backend (no GPU required for inference or tests)
 
 ---
 
@@ -74,33 +74,40 @@ Or run all benchmarks at once (hardware + comparison + MNIST):
 ## Performance — MLX vs WGPU (Apple Silicon)
 
 On Apple Silicon, the MLX backend ([burn-mlx](https://github.com/eidolons-ai/burn-mlx))
-is **4–24× faster** than the WGPU backend. MLX talks directly to Metal with
-unified memory (zero-copy CPU/GPU), while WGPU adds a WebGPU abstraction layer.
+is **3–38× faster** than the WGPU backend across all configurations tested.
+MLX talks directly to Metal with unified memory (zero-copy CPU/GPU), while
+WGPU adds a WebGPU abstraction layer.
 
 ![Backend benchmark chart](figures/backend_benchmark.svg)
 
-| Dataset | WGPU | MLX | Speedup |
-|---------|------|-----|---------|
-| 1 000 × 50 | 1.67s | 0.07s | **MLX 24× faster** |
-| 5 000 × 100 | 4.74s | 0.39s | **MLX 12× faster** |
-| 10 000 × 100 | 5.09s | 0.55s | **MLX 9.3× faster** |
-| 20 000 × 100 | 6.82s | 1.62s | **MLX 4.2× faster** |
+| Scenario | Samples | Features | Hidden | Out | WGPU | MLX | Speedup |
+|----------|---------|----------|--------|-----|------|-----|---------|
+| Small | 500 | 20 | [64] | 2D | 2.49s | 0.10s | **MLX 25x** |
+| Medium | 1K | 50 | [128] | 2D | 1.65s | 0.08s | **MLX 21x** |
+| Standard | 5K | 100 | [128] | 2D | 4.94s | 0.34s | **MLX 15x** |
+| Large | 10K | 100 | [128] | 2D | 6.13s | 0.78s | **MLX 7.8x** |
+| XL | 20K | 100 | [128] | 2D | 7.37s | 2.22s | **MLX 3.3x** |
+| High-dim | 2K | 500 | [256] | 2D | 7.43s | 0.27s | **MLX 28x** |
+| MNIST-like | 5K | 784 | [256] | 2D | 8.69s | 0.71s | **MLX 12x** |
+| Deep net | 5K | 100 | [256,128,64] | 2D | 9.93s | 0.44s | **MLX 23x** |
+| 3-D output | 5K | 100 | [128] | 3D | 12.31s | 0.33s | **MLX 38x** |
+| Huge | 50K | 100 | [128] | 2D | -- | 14.04s | MLX only |
 
-> Both backends run identical code: 50 epochs, same config, same data.
-> MLX wins at all sizes thanks to unified memory (no CPU-GPU copies) and
-> native Metal dispatch without the WGPU abstraction layer.
+> 50 epochs per scenario, Apple Silicon. The 50K scenario uses NN-Descent
+> approximate KNN (`nn-descent` feature) — WGPU can't run it because the
+> exact pairwise distance matrix would need 10 GB.
 
 **Reproduce:**
 
 ```shell
-cargo run --release --features gpu,mlx --example backend_benchmark
+cargo run --release --features gpu,mlx,pca,nn-descent --example backend_benchmark
 ```
 
 ### Using the MLX backend
 
 ```toml
 [dependencies]
-fast-umap = { version = "1.5", features = ["mlx"] }
+fast-umap = { version = "1.6", features = ["mlx"] }
 ```
 
 ```rust
@@ -113,19 +120,17 @@ let fitted = umap.fit(data, None);
 
 ---
 
-## What's New (v1.2.2)
+## What's New (v1.6.0)
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 | Area | Change |
 |------|--------|
-| **GPU cooldown** | New `cooldown_ms` parameter — sleep N ms between epochs to prevent 100 % GPU utilisation; default `0` (no change to existing behaviour) |
-| **UMAP kernel** | Proper `q = 1/(1 + a·d^(2b))` kernel with `a`, `b` fitted from `min_dist`/`spread` — replaces fixed Student-t `1/(1+d²)` for better cluster separation |
-| **Configurable negative sampling** | `neg_sample_rate` parameter (default 5); formula fixed from `n_pos × rate / k` → `n_pos × rate` |
-| **Verbose logging** | All training output gated behind `verbose` flag; improved structured messages with timings, edge counts, kernel params, stop reasons |
-| **ManifoldParams** | `min_dist` and `spread` now actively shape the embedding kernel (previously defined but unused) |
-| **New API** | `Umap::new(config).fit(data)` returns `FittedUmap` with `.embedding()`, `.transform()`, `.into_embedding()` — mirrors umap-rs |
-| **Sparse training** | O(n·k) per epoch with edge subsampling + configurable negative sampling (was O(n²)) |
+| **MLX backend** | Apple Silicon native backend via [burn-mlx](https://github.com/eidolons-ai/burn-mlx) — 4-24× faster than WGPU on Mac (feature: `mlx`) |
+| **PCA warm-start** | Pre-trains the network to approximate PCA output before UMAP loss, improving convergence (feature: `pca`) |
+| **NN-Descent** | Approximate KNN graph construction in O(n*k) memory — enables 50K+ sample datasets without the O(n^2) distance matrix (feature: `nn-descent`) |
+| **Generic backend ops** | Pairwise distance and KNN implemented with standard Burn tensor ops, enabling any backend without CubeCL |
+| **Autodiff refactor** | Autodiff backward registration factored out of GPU-only `kernels/` module, now works with all backends |
 
 ---
 
@@ -133,13 +138,13 @@ See [CHANGELOG.md](CHANGELOG.md) for the full release history.
 
 - **Dimensionality Reduction** — projects high-dimensional data to 2-D or 3-D for visualization
 - **Parametric model** — learned neural network can project new, unseen data via `transform()`
-- **GPU-accelerated kernels** — custom CubeCL kernels for Euclidean pairwise distance and KNN, compiled for WGPU (Metal / Vulkan / DX12)
-- **Automatic differentiation** — full autograd through the custom kernels via burn's autodiff backend
+- **Three GPU backends** — MLX (Apple Silicon native), WGPU (Metal/Vulkan/DX12 via CubeCL), and CPU (NdArray)
+- **PCA warm-start** — optional pre-training phase initializes embeddings from PCA for faster convergence (`pca` feature)
+- **NN-Descent** — approximate KNN in O(n*k) memory for datasets > 10K samples, avoiding the O(n^2) distance matrix (`nn-descent` feature)
+- **Automatic differentiation** — full autograd through custom kernels via burn's autodiff backend
 - **Sparse training** — edge subsampling + negative sampling keeps per-epoch cost constant regardless of dataset size
 - **Flexible architecture** — configurable hidden layers, output dims, distance metric, learning rate, early stopping, timeout
-- **CPU fallback** — all model code runs on NdArray (no GPU required for inference or tests)
 - **36 unit tests** — covering normalization, tensor conversion, model shape, distance math
-- **Hardware-tagged benchmarks** — CPU and GPU timings saved as Markdown + SVG, including a CPU vs GPU comparison chart
 
 ---
 
@@ -153,7 +158,7 @@ cargo add fast-umap
 
 ```toml
 [dependencies]
-fast-umap  = "1.2.2"
+fast-umap  = "1.6.0"
 burn       = { version = "0.20.1", features = ["wgpu", "autodiff", "autotune"] }
 cubecl     = { version = "0.9.0",  features = ["wgpu"] }
 ```
@@ -276,6 +281,9 @@ cargo build --release
 
 # MLX backend (Apple Silicon, fastest on Mac)
 cargo build --release --features mlx
+
+# With PCA warm-start and approximate KNN
+cargo build --release --features mlx,pca,nn-descent
 
 # CPU-only backend
 cargo build --release --features cpu
@@ -598,6 +606,8 @@ The feature-based compilation system provides:
 | `gpu` | GPU backend (WGPU) | Cross-platform GPU, large datasets |
 | `mlx` | MLX backend (Apple native) | Apple Silicon (fastest on Mac) |
 | `cpu` | CPU backend (umap-rs) | CPU-only environments |
+| `pca` | PCA warm-start for embeddings | Better convergence quality |
+| `nn-descent` | Approximate KNN for large data | Datasets > 10K samples (avoids O(n^2) memory) |
 | `verbose` | Progress output | Development, debugging |
 | `plotters` | Visualization | Exploration, analysis |
 | `all` | Everything | Development, testing |
@@ -630,8 +640,14 @@ distances (`a` and `b` are fitted from `min_dist` / `spread`).
 ```
 Input data [n, features]
     │
+    ├─ n < 10K ──→ GPU pairwise distance → exact KNN (O(n²))
+    │
+    ├─ n ≥ 10K ──→ NN-Descent approximate KNN (O(n·k))  [nn-descent]
+    │
     ▼
-GPU pairwise distance → KNN graph (one-time O(n²) cost)
+KNN graph (n·k edges)
+    │
+    ├─── [pca] PCA warm-start: pre-train network to match PCA output
     │
     ▼
 ┌─── Per epoch (cost: O(min(n·k, 50K))) ───┐
@@ -648,16 +664,22 @@ FittedUmap with .embedding() and .transform()
 
 ### Modules
 
-| Module | Description |
-|--------|-------------|
-| [`model`] | `UMAPModel` neural network and config builder |
-| [`train`] | Training loop, `UmapConfig`, sparse training, loss computation |
-| [`chart`] | 2-D scatter plots and loss curves (plotters) |
-| [`utils`] | Data generation, tensor conversion, normalisation |
-| [`kernels`] | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
-| [`backend`] | Backend trait extension for custom kernel dispatch |
-| [`distances`] | CPU-side distance functions (Euclidean, cosine, Minkowski…) |
-| [`prelude`] | Re-exports of the most commonly used items |
+| Module | Feature | Description |
+|--------|---------|-------------|
+| [`model`] | -- | `UMAPModel` neural network and config builder |
+| [`train`] | -- | Training loop, `UmapConfig`, sparse training, loss computation |
+| [`backend`] | -- | Backend trait extension for custom kernel dispatch |
+| [`generic_backend`] | -- | Backend ops via standard Burn tensor math (works on any backend) |
+| [`autodiff_ops`] | -- | Autodiff backward registration for custom ops |
+| [`kernels`] | `gpu` | Custom CubeCL GPU kernels (Euclidean distance, k-NN) |
+| [`mlx_backend`] | `mlx` | MLX backend implementation for Apple Silicon |
+| [`pca`] | `pca` | PCA warm-start for initial embedding |
+| [`nn_descent`] | `nn-descent` | NN-Descent approximate KNN graph construction |
+| [`chart`] | `plotters` | 2-D scatter plots and loss curves |
+| [`cpu_backend`] | `cpu` | CPU fallback via umap-rs |
+| [`distances`] | -- | CPU-side distance functions (Euclidean, cosine, Minkowski) |
+| [`utils`] | -- | Data generation, tensor conversion, normalisation |
+| [`prelude`] | -- | Re-exports of the most commonly used items |
 
 ---
 
@@ -822,7 +844,7 @@ Full detail files:
 - [x] Crate comparison benchmark (fast-umap vs umap-rs)
 - [x] MLX backend for Apple Silicon (4–24× faster than WGPU)
 - [x] PCA warm-start for initial embedding
-- [ ] Approximate KNN (NN-descent) for datasets > 50K
+- [x] Approximate KNN (NN-descent) for datasets > 10K
 
 ---
 
@@ -847,11 +869,11 @@ paper, this repository, and acknowledge the Burn and CubeCL frameworks:
   author  = {Hauptmann, Eugene},
   year    = {2024},
   url     = {https://github.com/eugenehp/fast-umap},
-  version = {1.2.2}
+  version = {1.6.0}
 }
 ```
 
-> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.2.2).
+> Hauptmann, E. (2024). *fast-umap: GPU-Accelerated UMAP in Rust* (v1.6.0).
 > <https://github.com/eugenehp/fast-umap>
 
 ### UMAP algorithm

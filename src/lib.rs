@@ -99,6 +99,8 @@ use burn::tensor::{Device, Tensor};
 
 pub mod autodiff_ops;
 pub mod backend;
+// #[cfg(feature = "candle")]
+// pub mod candle_backend;  // TODO: re-enable when burn-candle fixes candle-core DType compat
 #[cfg(feature = "plotters")]
 pub mod chart;
 #[cfg(feature = "cpu")]
@@ -111,7 +113,10 @@ pub mod macros;
 #[cfg(feature = "mlx")]
 pub mod mlx_backend;
 pub mod model;
+#[cfg(feature = "nn-descent")]
+pub mod nn_descent;
 pub mod normalizer;
+#[cfg(feature = "pca")]
 pub mod pca;
 pub mod prelude;
 pub mod serialize;

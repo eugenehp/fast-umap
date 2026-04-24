@@ -134,8 +134,19 @@ where
     normalize_data(&mut data, num_samples, num_features);
 
     // ── Precompute global KNN once ───────────────────────────────────────────
+    #[cfg(feature = "nn-descent")]
+    const NN_DESCENT_THRESHOLD: usize = 10_000;
+    #[cfg(feature = "nn-descent")]
+    let use_nn_descent = num_samples >= NN_DESCENT_THRESHOLD;
+    #[cfg(not(feature = "nn-descent"))]
+    let use_nn_descent = false;
+
     if verbose {
-        println!("[fast-umap] Computing global k-NN graph (k={k}) …");
+        if use_nn_descent {
+            println!("[fast-umap] Computing approximate k-NN graph via NN-Descent (k={k}, n={num_samples}) …");
+        } else {
+            println!("[fast-umap] Computing global k-NN graph (k={k}) …");
+        }
     }
     let knn_start = Instant::now();
 
@@ -143,6 +154,18 @@ where
         convert_vector_to_tensor(data.clone(), num_samples, num_features, &device);
 
     let knn_indices: Vec<i32>;
+    #[cfg(feature = "nn-descent")]
+    if use_nn_descent {
+        let data_f32: Vec<f32> = data.iter().map(|x| num::ToPrimitive::to_f32(x).unwrap()).collect();
+        let (idx, _dist) = crate::nn_descent::nn_descent(&data_f32, num_samples, num_features, k);
+        knn_indices = idx;
+    } else {
+        let hd_pairwise = pairwise_distances(all_data_tensor.clone());
+        let flat: Vec<f32> = hd_pairwise.to_data().to_vec::<f32>().unwrap();
+        let (idx, _dist) = knn_from_pairwise_cpu(&flat, num_samples, k);
+        knn_indices = idx;
+    }
+    #[cfg(not(feature = "nn-descent"))]
     {
         let hd_pairwise = pairwise_distances(all_data_tensor.clone());
         let flat: Vec<f32> = hd_pairwise.to_data().to_vec::<f32>().unwrap();
@@ -237,15 +260,12 @@ where
         println!("[fast-umap] Training started …");
     }
 
-    // ── PCA warm-start ────────────────────────────────────────────────────────
-    // Pre-train the network for a few epochs to approximate PCA output.
-    // This gives the UMAP loss a structured starting point instead of random
-    // embeddings, significantly improving convergence.
+    // ── PCA warm-start (optional) ───────────────────────────────────────────
+    #[cfg(feature = "pca")]
     {
         let pca_epochs = 10;
         let pca_lr = 1e-2;
 
-        // Compute PCA on the normalized data
         let data_f32: Vec<f32> = data.iter().map(|x| num::ToPrimitive::to_f32(x).unwrap()).collect();
         let n_components = model.forward(all_data_tensor.clone()).dims()[1];
         let (projected, _components, _mean) = crate::pca::pca::<B::InnerBackend>(

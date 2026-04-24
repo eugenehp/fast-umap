@@ -96,3 +96,10 @@ impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> AutodiffBa
 /// `Autodiff<burn_mlx::Mlx>`.
 #[cfg(feature = "mlx")]
 impl AutodiffBackend for Autodiff<burn_mlx::Mlx> {}
+
+// TODO: Candle backend — blocked on burn-candle/candle-core DType compat
+// #[cfg(feature = "candle")]
+// impl<F: burn_candle::element::FloatCandleElement, I: burn_candle::element::IntCandleElement>
+//     AutodiffBackend for Autodiff<burn_candle::Candle<F, I>>
+// {
+// }
