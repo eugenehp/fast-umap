@@ -821,7 +821,7 @@ Full detail files:
 - [x] Sparse training with edge subsampling + negative sampling
 - [x] Crate comparison benchmark (fast-umap vs umap-rs)
 - [x] MLX backend for Apple Silicon (4–24× faster than WGPU)
-- [ ] PCA warm-start for initial embedding
+- [x] PCA warm-start for initial embedding
 - [ ] Approximate KNN (NN-descent) for datasets > 50K
 
 ---

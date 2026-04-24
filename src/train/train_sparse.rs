@@ -237,6 +237,50 @@ where
         println!("[fast-umap] Training started …");
     }
 
+    // ── PCA warm-start ────────────────────────────────────────────────────────
+    // Pre-train the network for a few epochs to approximate PCA output.
+    // This gives the UMAP loss a structured starting point instead of random
+    // embeddings, significantly improving convergence.
+    {
+        let pca_epochs = 10;
+        let pca_lr = 1e-2;
+
+        // Compute PCA on the normalized data
+        let data_f32: Vec<f32> = data.iter().map(|x| num::ToPrimitive::to_f32(x).unwrap()).collect();
+        let n_components = model.forward(all_data_tensor.clone()).dims()[1];
+        let (projected, _components, _mean) = crate::pca::pca::<B::InnerBackend>(
+            &data_f32, num_samples, num_features, n_components,
+            &device.clone().into(),
+        );
+
+        let pca_target: Tensor<B, 2> = Tensor::from_data(
+            TensorData::new(projected, [num_samples, n_components]),
+            &device,
+        );
+
+        if verbose {
+            println!("[fast-umap] PCA warm-start ({pca_epochs} epochs) …");
+        }
+
+        let mut pca_optim = AdamConfig::new()
+            .with_beta_1(0.9f32)
+            .with_beta_2(0.999f32)
+            .init();
+
+        for _e in 0..pca_epochs {
+            let output = model.forward(all_data_tensor.clone());
+            let diff = output - pca_target.clone();
+            let mse_vals = (diff.clone() * diff).reshape([num_samples * n_components]).mean_dim(0);
+            let grads = mse_vals.backward();
+            let grads = GradientsParams::from_grads(grads, &model);
+            model = pca_optim.step(pca_lr, model, grads);
+        }
+
+        if verbose {
+            println!("[fast-umap] PCA warm-start complete");
+        }
+    }
+
     // ── Optimizer ─────────────────────────────────────────────────────────────
     let config_optimizer = AdamConfig::new()
         .with_weight_decay(Some(WeightDecayConfig::new(config.penalty)))

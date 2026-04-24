@@ -105,6 +105,10 @@ required-features = ["gpu", "cpu"]
 name = "backend_benchmark"
 required-features = ["gpu", "mlx"]
 
+[[example]]
+name = "pca_comparison"
+required-features = ["mlx"]
+
 
 [[bin]]
 name = "bench_report"

@@ -112,6 +112,7 @@ pub mod macros;
 pub mod mlx_backend;
 pub mod model;
 pub mod normalizer;
+pub mod pca;
 pub mod prelude;
 pub mod serialize;
 pub mod train;
