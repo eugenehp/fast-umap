@@ -20,6 +20,13 @@ use burn_cubecl::{BoolElement, CubeBackend, CubeRuntime, FloatElement, IntElemen
 /// Concrete implementations are provided for [`CubeBackend`] (GPU) and
 /// [`Autodiff<B>`] (automatic differentiation wrapper).
 pub trait Backend: burn::tensor::backend::Backend {
+    /// Whether to use `gather` instead of `select` for row indexing.
+    ///
+    /// Some backends (e.g. MLX) have buggy `select_add` in their backward pass.
+    /// When `true`, the training loop uses `gather` (correct everywhere but
+    /// slightly slower) instead of `select` (faster but broken on some backends).
+    const USE_GATHER_FOR_SELECT: bool = false;
+
     /// Compute the full `[n, n]` symmetric Euclidean pairwise distance matrix
     /// for an input tensor of shape `[n, d]`.
     ///
@@ -82,4 +89,10 @@ impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> AutodiffBa
 {
 }
 
-
+/// Blanket implementation of [`AutodiffBackend`] for [`burn_mlx::Mlx`]
+/// wrapped in [`Autodiff`].
+///
+/// This covers the MLX (Apple Silicon) training path:
+/// `Autodiff<burn_mlx::Mlx>`.
+#[cfg(feature = "mlx")]
+impl AutodiffBackend for Autodiff<burn_mlx::Mlx> {}

@@ -1,5 +1,5 @@
 mod config;
-mod get_distance_by_metric;
+pub mod get_distance_by_metric;
 mod train_sparse;
 
 use crate::{

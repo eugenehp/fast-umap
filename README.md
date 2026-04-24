@@ -10,12 +10,13 @@ See [docs.rs](https://docs.rs/crate/fast-umap/latest) for the full API reference
 
 ## Highlights
 
+- **Up to 24× faster with MLX** on Apple Silicon vs WGPU
+  (see [MLX benchmarks](#performance--mlx-vs-wgpu-apple-silicon) below)
 - **Up to 4.7× faster** than [umap-rs](https://crates.io/crates/umap-rs) on
   datasets ≥ 10 000 samples (see [benchmarks](#performance--fast-umap-vs-umap-rs) below)
 - **Parametric** — trains a neural network, so you can
   [`transform()`](#transform-new-data) new unseen data instantly
-- **GPU-accelerated** — custom CubeCL kernels for pairwise distance and KNN,
-  compiled for Metal / Vulkan / DX12 via WGPU
+- **Three backends** — MLX (Apple Silicon native), WGPU (Metal/Vulkan/DX12), CPU (NdArray)
 - **API mirrors umap-rs** — drop-in replacement with `Umap::new(config).fit(data)`
 - **Automatic differentiation** — full autograd through custom GPU kernels
 - **CPU fallback** — runs on NdArray backend (no GPU required for inference or tests)
@@ -66,6 +67,48 @@ Or run all benchmarks at once (hardware + comparison + MNIST):
 
 ```shell
 ./bench.sh
+```
+
+---
+
+## Performance — MLX vs WGPU (Apple Silicon)
+
+On Apple Silicon, the MLX backend ([burn-mlx](https://github.com/eidolons-ai/burn-mlx))
+is **4–24× faster** than the WGPU backend. MLX talks directly to Metal with
+unified memory (zero-copy CPU/GPU), while WGPU adds a WebGPU abstraction layer.
+
+![Backend benchmark chart](figures/backend_benchmark.svg)
+
+| Dataset | WGPU | MLX | Speedup |
+|---------|------|-----|---------|
+| 1 000 × 50 | 1.67s | 0.07s | **MLX 24× faster** |
+| 5 000 × 100 | 4.74s | 0.39s | **MLX 12× faster** |
+| 10 000 × 100 | 5.09s | 0.55s | **MLX 9.3× faster** |
+| 20 000 × 100 | 6.82s | 1.62s | **MLX 4.2× faster** |
+
+> Both backends run identical code: 50 epochs, same config, same data.
+> MLX wins at all sizes thanks to unified memory (no CPU-GPU copies) and
+> native Metal dispatch without the WGPU abstraction layer.
+
+**Reproduce:**
+
+```shell
+cargo run --release --features gpu,mlx --example backend_benchmark
+```
+
+### Using the MLX backend
+
+```toml
+[dependencies]
+fast-umap = { version = "1.5", features = ["mlx"] }
+```
+
+```rust
+type MlxBackend = burn_mlx::Mlx;
+type MyAutodiffBackend = burn::backend::Autodiff<MlxBackend>;
+
+let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+let fitted = umap.fit(data, None);
 ```
 
 ---
@@ -171,6 +214,26 @@ let fitted = umap.fit(data, None);
 - ✅ Custom GPU kernels for efficient computation
 - ✅ Automatic differentiation for training
 
+### MLX Backend (Apple Silicon) - Fastest on Mac
+
+For native Apple Silicon acceleration via [MLX](https://github.com/eidolons-ai/burn-mlx):
+
+```rust
+type MlxBackend = burn_mlx::Mlx;
+type MyAutodiffBackend = burn::backend::Autodiff<MlxBackend>;
+
+let config = UmapConfig::default();
+let umap = fast_umap::Umap::<MyAutodiffBackend>::new(config);
+let fitted = umap.fit(data, None);
+```
+
+**Features:**
+- ✅ Full parametric UMAP with neural network training
+- ✅ Native Metal GPU acceleration (no WGPU layer)
+- ✅ Unified memory — zero-copy CPU/GPU data sharing
+- ✅ Transform new data through trained model
+- ✅ 4–24× faster than WGPU on Apple Silicon
+
 ### CPU Backend - Full Functionality with umap-rs Fallback
 
 For CPU-only execution or when GPU is not available, fast-umap provides a complete CPU backend that uses classical UMAP computation:
@@ -210,6 +273,9 @@ fast-umap uses Cargo features to enable only the backends you need:
 ```shell
 # GPU backend (default, includes gpu + verbose features)
 cargo build --release
+
+# MLX backend (Apple Silicon, fastest on Mac)
+cargo build --release --features mlx
 
 # CPU-only backend
 cargo build --release --features cpu
@@ -529,7 +595,8 @@ The feature-based compilation system provides:
 
 | Feature | Description | When to Use |
 |---------|-------------|--------------|
-| `gpu` | GPU backend (WGPU) | Production, large datasets |
+| `gpu` | GPU backend (WGPU) | Cross-platform GPU, large datasets |
+| `mlx` | MLX backend (Apple native) | Apple Silicon (fastest on Mac) |
 | `cpu` | CPU backend (umap-rs) | CPU-only environments |
 | `verbose` | Progress output | Development, debugging |
 | `plotters` | Visualization | Exploration, analysis |
@@ -753,6 +820,7 @@ Full detail files:
 - [x] New API mirroring umap-rs (`Umap`, `FittedUmap`, `UmapConfig`)
 - [x] Sparse training with edge subsampling + negative sampling
 - [x] Crate comparison benchmark (fast-umap vs umap-rs)
+- [x] MLX backend for Apple Silicon (4–24× faster than WGPU)
 - [ ] PCA warm-start for initial embedding
 - [ ] Approximate KNN (NN-descent) for datasets > 50K
 

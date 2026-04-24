@@ -1,7 +1,4 @@
-use burn::{
-    backend::{autodiff::checkpoint::strategy::CheckpointStrategy, Autodiff},
-    tensor::ops::{FloatTensor, IntTensor},
-};
+use burn::tensor::ops::{FloatTensor, IntTensor};
 use cubecl::CubeDim;
 
 use crate::backend::Backend;
@@ -69,54 +66,6 @@ impl<R: CubeRuntime, F: FloatElement, I: IntElement, BT: BoolElement> Backend
     }
 }
 
-/// Autodiff implementation of the fast-umap [`Backend`] trait.
-///
-/// This wrapper records the computation graph so that gradients flow back
-/// through the custom kernels during `loss.backward()`.
-///
-/// * `euclidean_pairwise_distance` — delegates to [`euclidean::backward`],
-///   which checkpoints the forward input and registers the backward hook.
-/// * `knn` — delegates to [`knn::backward`], which checkpoints the pairwise
-///   distance matrix and registers the backward hook.
-/// * The `*_backward` variants are only called on the inner [`CubeBackend`]
-///   and are therefore `unimplemented!()` here.
-impl<B: Backend, C: CheckpointStrategy> Backend for Autodiff<B, C> {
-    /// Register the Euclidean pairwise distance operation in the autodiff graph.
-    ///
-    /// The actual forward computation runs on the inner [`CubeBackend`]; this
-    /// layer only hooks up the backward pass.
-    fn euclidean_pairwise_distance(x: FloatTensor<Self>) -> FloatTensor<Self> {
-        euclidean::backward::backward::<B, C>(x)
-    }
-
-    /// Not called on the [`Autodiff`] wrapper — only on the inner backend.
-    fn euclidean_pairwise_distance_backward(
-        _grad_pairwise: FloatTensor<Self>,
-        _x: FloatTensor<Self>,
-        _pairwise: FloatTensor<Self>,
-    ) -> FloatTensor<Self> {
-        unimplemented!(
-            "Called on inner CubeBackend only; Autodiff dispatches via euclidean::backward."
-        );
-    }
-
-    /// Register the k-NN operation in the autodiff graph.
-    ///
-    /// The actual forward computation runs on the inner [`CubeBackend`]; this
-    /// layer only hooks up the backward pass.
-    fn knn(pairwise_distances: FloatTensor<Self>, k: u32) -> (IntTensor<Self>, FloatTensor<Self>) {
-        knn::backward::backward::<B, C>(pairwise_distances, k)
-    }
-
-    /// Not called on the [`Autodiff`] wrapper — only on the inner backend.
-    fn knn_backward(
-        _pairwise_distances: FloatTensor<Self>,
-        _k: u32,
-        _grad_output: FloatTensor<Self>,
-    ) -> FloatTensor<Self> {
-        unimplemented!(
-            "Triggered on the inner CubeBackend only; \
-             the Autodiff wrapper delegates via knn::backward."
-        );
-    }
-}
+// Note: The Autodiff<B, C> impl of Backend has been moved to
+// src/autodiff_ops.rs so it is available for all backends (MLX, WGPU, etc.),
+// not just CubeBackend.

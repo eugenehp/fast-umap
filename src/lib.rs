@@ -97,15 +97,19 @@ use utils::*;
 
 use burn::tensor::{Device, Tensor};
 
+pub mod autodiff_ops;
 pub mod backend;
 #[cfg(feature = "plotters")]
 pub mod chart;
 #[cfg(feature = "cpu")]
 pub mod cpu_backend;
 pub mod distances;
+pub mod generic_backend;
 #[cfg(feature = "gpu")]
 pub mod kernels;
 pub mod macros;
+#[cfg(feature = "mlx")]
+pub mod mlx_backend;
 pub mod model;
 pub mod normalizer;
 pub mod prelude;

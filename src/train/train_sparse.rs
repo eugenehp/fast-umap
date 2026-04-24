@@ -285,8 +285,19 @@ where
         let batch_n_pos = *batch_n_pos;
         let batch_n_total = *batch_n_total;
 
-        let all_head_emb = embeddings.clone().select(0, fused_h.clone());
-        let all_tail_emb = embeddings.select(0, fused_t.clone());
+        // select(0, indices) is fastest on most backends, but some (e.g. MLX)
+        // have buggy select_add backward — fall back to gather for those.
+        let (all_head_emb, all_tail_emb) = if B::USE_GATHER_FOR_SELECT {
+            let output_dim = embeddings.dims()[1];
+            let gh = fused_h.clone().reshape([batch_n_total, 1]).repeat_dim(1, output_dim);
+            let gt = fused_t.clone().reshape([batch_n_total, 1]).repeat_dim(1, output_dim);
+            (embeddings.clone().gather(0, gh), embeddings.gather(0, gt))
+        } else {
+            (
+                embeddings.clone().select(0, fused_h.clone()),
+                embeddings.select(0, fused_t.clone()),
+            )
+        };
 
         let diff = all_head_emb - all_tail_emb;
         let dist_sq = (diff.clone() * diff).sum_dim(1); // [batch_n_total, 1]
@@ -300,13 +311,15 @@ where
         // Attraction: -log(q)
         let dist_pow_pos = dist_sq_pos.clamp_min(1e-8f32).powf_scalar(kernel_b);
         let q_pos = (dist_pow_pos.clone() * kernel_a + 1.0f32).recip();
-        let attraction = q_pos.clamp_min(1e-6f32).log().neg().mean();
+        let attract_vals = q_pos.clamp_min(1e-6f32).log().neg();
+        let attraction = attract_vals.clone().reshape([attract_vals.dims().iter().product::<usize>()]).mean_dim(0);
 
         // Repulsion: -log(1-q) where 1-q = a*d^(2b) / (1 + a*d^(2b))
         let dist_pow_neg = dist_sq_neg.clamp_min(1e-8f32).powf_scalar(kernel_b);
         let a_dpow_neg = dist_pow_neg.clone() * kernel_a;
         let one_minus_q_neg = a_dpow_neg.clone() / (a_dpow_neg + 1.0f32);
-        let repulsion = one_minus_q_neg.clamp_min(1e-6f32).log().neg().mean();
+        let repulse_vals = one_minus_q_neg.clamp_min(1e-6f32).log().neg();
+        let repulsion = repulse_vals.clone().reshape([repulse_vals.dims().iter().product::<usize>()]).mean_dim(0);
 
         // ── UMAP cross-entropy loss ──────────────────────────────────────────
         let loss = attraction + repulsion_strength * repulsion;

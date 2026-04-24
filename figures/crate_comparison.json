@@ -2,8 +2,8 @@
   {
     "scenario": "500×50",
     "crate_name": "umap-rs",
-    "total_secs": 0.080429791,
-    "fit_secs": 0.069235417,
+    "total_secs": 0.056638833,
+    "fit_secs": 0.045123042,
     "epochs": 200,
     "n_samples": 500,
     "n_features": 50
@@ -11,8 +11,8 @@
   {
     "scenario": "500×50",
     "crate_name": "fast-umap",
-    "total_secs": 0.843080583,
-    "fit_secs": 0.842942459,
+    "total_secs": 1.413797083,
+    "fit_secs": 1.413619209,
     "epochs": 50,
     "n_samples": 500,
     "n_features": 50
@@ -20,8 +20,8 @@
   {
     "scenario": "1000×50",
     "crate_name": "umap-rs",
-    "total_secs": 0.118693208,
-    "fit_secs": 0.073756459,
+    "total_secs": 0.106470584,
+    "fit_secs": 0.063209833,
     "epochs": 200,
     "n_samples": 1000,
     "n_features": 50
@@ -29,8 +29,8 @@
   {
     "scenario": "1000×50",
     "crate_name": "fast-umap",
-    "total_secs": 2.188408583,
-    "fit_secs": 2.188153083,
+    "total_secs": 3.167840167,
+    "fit_secs": 3.167504333,
     "epochs": 50,
     "n_samples": 1000,
     "n_features": 50
@@ -38,8 +38,8 @@
   {
     "scenario": "2000×100",
     "crate_name": "umap-rs",
-    "total_secs": 0.43625275,
-    "fit_secs": 0.112548875,
+    "total_secs": 0.401242375,
+    "fit_secs": 0.10059325,
     "epochs": 200,
     "n_samples": 2000,
     "n_features": 100
@@ -47,8 +47,8 @@
   {
     "scenario": "2000×100",
     "crate_name": "fast-umap",
-    "total_secs": 3.651611917,
-    "fit_secs": 3.650677666,
+    "total_secs": 5.627106,
+    "fit_secs": 5.625860417,
     "epochs": 50,
     "n_samples": 2000,
     "n_features": 100
@@ -56,8 +56,8 @@
   {
     "scenario": "5000×100",
     "crate_name": "umap-rs",
-    "total_secs": 2.311658291,
-    "fit_secs": 0.247503084,
+    "total_secs": 2.318486375,
+    "fit_secs": 0.235864625,
     "epochs": 200,
     "n_samples": 5000,
     "n_features": 100
@@ -65,8 +65,8 @@
   {
     "scenario": "5000×100",
     "crate_name": "fast-umap",
-    "total_secs": 6.74523525,
-    "fit_secs": 6.742883792,
+    "total_secs": 10.164484167,
+    "fit_secs": 10.161218417,
     "epochs": 50,
     "n_samples": 5000,
     "n_features": 100
@@ -74,8 +74,8 @@
   {
     "scenario": "10000×100",
     "crate_name": "umap-rs",
-    "total_secs": 8.675307459,
-    "fit_secs": 0.386763,
+    "total_secs": 9.238087,
+    "fit_secs": 0.4600315,
     "epochs": 200,
     "n_samples": 10000,
     "n_features": 100
@@ -83,8 +83,8 @@
   {
     "scenario": "10000×100",
     "crate_name": "fast-umap",
-    "total_secs": 5.934444833,
-    "fit_secs": 5.929601541,
+    "total_secs": 12.930574333,
+    "fit_secs": 12.923625792,
     "epochs": 50,
     "n_samples": 10000,
     "n_features": 100
@@ -92,8 +92,8 @@
   {
     "scenario": "20000×100",
     "crate_name": "umap-rs",
-    "total_secs": 34.09619675,
-    "fit_secs": 0.730666125,
+    "total_secs": 34.769094,
+    "fit_secs": 1.024776584,
     "epochs": 200,
     "n_samples": 20000,
     "n_features": 100
@@ -101,8 +101,8 @@
   {
     "scenario": "20000×100",
     "crate_name": "fast-umap",
-    "total_secs": 7.31740225,
-    "fit_secs": 7.306708125,
+    "total_secs": 15.692764417,
+    "fit_secs": 15.669817583,
     "epochs": 50,
     "n_samples": 20000,
     "n_features": 100

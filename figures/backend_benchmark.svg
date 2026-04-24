@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="380" font-family="system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="wgpu" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4A90D9"/>
+      <stop offset="100%" stop-color="#357ABD"/>
+    </linearGradient>
+    <linearGradient id="mlx" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#E8833A"/>
+      <stop offset="100%" stop-color="#D4722E"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="720" height="380" fill="#FAFAFA" rx="8"/>
+
+  <!-- Title -->
+  <text x="360" y="32" text-anchor="middle" font-size="16" font-weight="600" fill="#333">WGPU vs MLX Backend — End-to-End UMAP Training</text>
+  <text x="360" y="50" text-anchor="middle" font-size="11" fill="#888">50 epochs, Apple Silicon, lower is better</text>
+
+  <!-- Chart area: x=160..690, y=70..310 -->
+  <!-- Y axis -->
+  <line x1="160" y1="70" x2="160" y2="310" stroke="#CCC" stroke-width="1"/>
+  <!-- X axis -->
+  <line x1="160" y1="310" x2="690" y2="310" stroke="#CCC" stroke-width="1"/>
+
+  <!-- Y gridlines and labels (0s to 18s) -->
+  <line x1="160" y1="310" x2="690" y2="310" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="314" text-anchor="end" font-size="10" fill="#999">0s</text>
+
+  <line x1="160" y1="270" x2="690" y2="270" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="274" text-anchor="end" font-size="10" fill="#999">3s</text>
+
+  <line x1="160" y1="230" x2="690" y2="230" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="234" text-anchor="end" font-size="10" fill="#999">6s</text>
+
+  <line x1="160" y1="190" x2="690" y2="190" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="194" text-anchor="end" font-size="10" fill="#999">9s</text>
+
+  <line x1="160" y1="150" x2="690" y2="150" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="154" text-anchor="end" font-size="10" fill="#999">12s</text>
+
+  <line x1="160" y1="110" x2="690" y2="110" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="114" text-anchor="end" font-size="10" fill="#999">15s</text>
+
+  <line x1="160" y1="70" x2="690" y2="70" stroke="#EEE" stroke-width="0.5"/>
+  <text x="150" y="74" text-anchor="end" font-size="10" fill="#999">18s</text>
+
+  <!-- Scale: 310 = 0s, 70 = 18s => 1s = (310-70)/18 = 13.33px -->
+
+  <!-- 1000x50: WGPU=1.67s MLX=0.07s -->
+  <g transform="translate(210, 0)">
+    <rect x="0" y="287.7" width="40" height="22.3" rx="2" fill="url(#wgpu)"/>
+    <text x="20" y="283" text-anchor="middle" font-size="9" font-weight="500" fill="#357ABD">1.67s</text>
+    <rect x="45" y="309.1" width="40" height="0.9" rx="2" fill="url(#mlx)"/>
+    <text x="65" y="305" text-anchor="middle" font-size="9" font-weight="500" fill="#D4722E">0.07s</text>
+    <text x="42" y="330" text-anchor="middle" font-size="11" fill="#555">1K x 50</text>
+    <text x="42" y="344" text-anchor="middle" font-size="9" font-weight="600" fill="#D4722E">24x</text>
+  </g>
+
+  <!-- 5000x100: WGPU=4.74s MLX=0.39s -->
+  <g transform="translate(340, 0)">
+    <rect x="0" y="246.8" width="40" height="63.2" rx="2" fill="url(#wgpu)"/>
+    <text x="20" y="242" text-anchor="middle" font-size="9" font-weight="500" fill="#357ABD">4.74s</text>
+    <rect x="45" y="304.8" width="40" height="5.2" rx="2" fill="url(#mlx)"/>
+    <text x="65" y="300" text-anchor="middle" font-size="9" font-weight="500" fill="#D4722E">0.39s</text>
+    <text x="42" y="330" text-anchor="middle" font-size="11" fill="#555">5K x 100</text>
+    <text x="42" y="344" text-anchor="middle" font-size="9" font-weight="600" fill="#D4722E">12x</text>
+  </g>
+
+  <!-- 10000x100: WGPU=5.09s MLX=0.55s -->
+  <g transform="translate(470, 0)">
+    <rect x="0" y="242.1" width="40" height="67.9" rx="2" fill="url(#wgpu)"/>
+    <text x="20" y="237" text-anchor="middle" font-size="9" font-weight="500" fill="#357ABD">5.09s</text>
+    <rect x="45" y="302.7" width="40" height="7.3" rx="2" fill="url(#mlx)"/>
+    <text x="65" y="298" text-anchor="middle" font-size="9" font-weight="500" fill="#D4722E">0.55s</text>
+    <text x="42" y="330" text-anchor="middle" font-size="11" fill="#555">10K x 100</text>
+    <text x="42" y="344" text-anchor="middle" font-size="9" font-weight="600" fill="#D4722E">9.3x</text>
+  </g>
+
+  <!-- 20000x100: WGPU=6.82s MLX=1.62s -->
+  <g transform="translate(600, 0)">
+    <rect x="0" y="219.1" width="40" height="90.9" rx="2" fill="url(#wgpu)"/>
+    <text x="20" y="214" text-anchor="middle" font-size="9" font-weight="500" fill="#357ABD">6.82s</text>
+    <rect x="45" y="288.4" width="40" height="21.6" rx="2" fill="url(#mlx)"/>
+    <text x="65" y="284" text-anchor="middle" font-size="9" font-weight="500" fill="#D4722E">1.62s</text>
+    <text x="42" y="330" text-anchor="middle" font-size="11" fill="#555">20K x 100</text>
+    <text x="42" y="344" text-anchor="middle" font-size="9" font-weight="600" fill="#D4722E">4.2x</text>
+  </g>
+
+  <!-- Legend -->
+  <rect x="260" y="360" width="14" height="10" rx="2" fill="url(#wgpu)"/>
+  <text x="280" y="369" font-size="11" fill="#555">WGPU (Metal via WebGPU)</text>
+  <rect x="440" y="360" width="14" height="10" rx="2" fill="url(#mlx)"/>
+  <text x="460" y="369" font-size="11" fill="#555">MLX (Apple native)</text>
+</svg>
