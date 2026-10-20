@@ -8,8 +8,10 @@
 //! Reference: Dong, W., Moses, C., & Li, K. (2011).
 //! "Efficient k-nearest neighbor graph construction for generic similarity measures."
 
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::SeedableRng;
 use rayon::prelude::*;
 
 /// Build an approximate k-NN graph using NN-Descent.
@@ -24,6 +26,12 @@ use rayon::prelude::*;
 /// `(indices, distances)` each flat row-major of length `n * k`.
 /// Same format as [`knn_from_pairwise_cpu`](crate::train::get_distance_by_metric::knn_from_pairwise_cpu).
 pub fn nn_descent(data: &[f32], n: usize, d: usize, k: usize) -> (Vec<i32>, Vec<f32>) {
+    nn_descent_with_seed(data, n, d, k, crate::train::DEFAULT_SEED)
+}
+
+/// Same as [`nn_descent`], with the seed of the random initialisation given
+/// explicitly (see [`UmapConfig::seed`](crate::UmapConfig::seed)).
+pub fn nn_descent_with_seed(data: &[f32], n: usize, d: usize, k: usize, seed: u64) -> (Vec<i32>, Vec<f32>) {
     assert!(k < n, "k ({k}) must be < n ({n})");
     let max_iters = 12;
     let sample_rate = 0.5f32; // fraction of neighbors to sample per iteration
@@ -32,7 +40,7 @@ pub fn nn_descent(data: &[f32], n: usize, d: usize, k: usize) -> (Vec<i32>, Vec<
     // ── Initialize with random neighbors ────────────────────────────────────
     let mut graph = vec![vec![(f32::INFINITY, 0u32); k]; n];
     {
-        let mut rng = rand::rng();
+        let mut rng = StdRng::seed_from_u64(seed);
         for i in 0..n {
             let mut candidates: Vec<usize> = (0..n).filter(|&j| j != i).collect();
             candidates.shuffle(&mut rng);

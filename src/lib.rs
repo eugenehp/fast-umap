@@ -263,7 +263,7 @@ impl<B: AutodiffBackend> Umap<B> {
         let num_features = data[0].len();
         let batch_size = num_samples;
 
-        let seed = 9999;
+        let seed = self.config.seed;
         B::seed(&self.device, seed);
 
         // Flatten input data
@@ -306,6 +306,7 @@ impl<B: AutodiffBackend> Umap<B> {
             neg_sample_rate: self.config.optimization.neg_sample_rate,
             cooldown_ms: self.config.optimization.cooldown_ms,
             figures_dir: self.config.optimization.figures_dir.clone(),
+            seed,
         };
 
         // Use the sparse training path (O(n·k) per epoch) by default.
@@ -343,7 +344,7 @@ impl<B: AutodiffBackend> Umap<B> {
         let num_features = data[0].len();
         let batch_size = num_samples;
 
-        let seed = 9999;
+        let seed = self.config.seed;
         B::seed(&self.device, seed);
 
         let train_data: Vec<F> = data.into_iter().flatten().collect();
@@ -383,6 +384,7 @@ impl<B: AutodiffBackend> Umap<B> {
             neg_sample_rate: self.config.optimization.neg_sample_rate,
             cooldown_ms: self.config.optimization.cooldown_ms,
             figures_dir: self.config.optimization.figures_dir.clone(),
+            seed,
         };
 
         let (model, _losses, _best_loss): (UMAPModel<B>, Vec<F>, F) = train::train_sparse(
@@ -680,7 +682,7 @@ impl<B: AutodiffBackend> UMAP<B> {
         let beta1 = 0.9;
         let beta2 = 0.999;
         let epochs = 100;
-        let seed = 9999;
+        let seed = DEFAULT_SEED;
 
         B::seed(&device, seed);
 

@@ -330,7 +330,7 @@ The public API mirrors [`umap-rs`](https://crates.io/crates/umap-rs):
 |------|-------------|
 | [`Umap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.Umap.html) | Main algorithm struct — `Umap::new(config)` |
 | [`FittedUmap<B>`](https://docs.rs/fast-umap/latest/fast_umap/struct.FittedUmap.html) | Fitted model — `.embedding()`, `.transform()`, `.into_embedding()`, `.config()` |
-| [`UmapConfig`](https://docs.rs/fast-umap/latest/fast_umap/struct.UmapConfig.html) | Configuration with nested `GraphParams` + `OptimizationParams` |
+| [`UmapConfig`](https://docs.rs/fast-umap/latest/fast_umap/struct.UmapConfig.html) | Configuration with nested `GraphParams` + `OptimizationParams`, and the `seed` of every random generator |
 | [`ManifoldParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.ManifoldParams.html) | `min_dist`, `spread` — control cluster tightness and separation |
 | [`GraphParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.GraphParams.html) | `n_neighbors`, `metric`, `normalized`, `minkowski_p` |
 | [`OptimizationParams`](https://docs.rs/fast-umap/latest/fast_umap/struct.OptimizationParams.html) | `n_epochs`, `learning_rate`, `patience`, `timeout`, `verbose`, `neg_sample_rate`, … |
@@ -342,6 +342,7 @@ The public API mirrors [`umap-rs`](https://crates.io/crates/umap-rs):
 let config = UmapConfig {
     n_components: 2,
     hidden_sizes: vec![128],
+    seed: 42, // same data, config and seed => same embedding (default 9999)
     graph: GraphParams {
         n_neighbors: 15,
         metric: Metric::Euclidean,
