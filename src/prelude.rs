@@ -17,7 +17,7 @@ pub use crate::{
 };
 
 // Re-export legacy types for backward compatibility
-pub use train::{TrainingConfig, TrainingConfigBuilder};
+pub use train::{TrainingConfig, TrainingConfigBuilder, DEFAULT_SEED};
 pub use utils::generate_test_data;
 
 /// Convenience function for running UMAP with the WGPU backend.

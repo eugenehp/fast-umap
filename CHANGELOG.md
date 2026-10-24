@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **Configurable seed** — `UmapConfig::seed` (default `9999`, the value the crate already passed to `Backend::seed`) and `TrainingConfigBuilder::with_seed`. `nn_descent_with_seed` exposes the same for the NN-Descent graph.
+
+### Fixed
+
+- **Training was not reproducible.** `Backend::seed` seeds the backend's tensor generator only; the edge sampling of every epoch and the NN-Descent initialisation drew from `rand::rng()`, so two fits with identical data and configuration differed (measured: up to 19 % of the embedding scale). Every generator now derives from `UmapConfig::seed`; `tests/test_seed.rs` checks it.
+
+---
+
 ## [1.5.0] — 2026-04-11
 
 ### Changed

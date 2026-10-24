@@ -2,6 +2,17 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
+/// Seed used by every random generator in training when none is given.
+///
+/// It is the value the crate has always passed to `Backend::seed`; since
+/// [`UmapConfig::seed`] exists it also seeds the CPU generators (the edge
+/// sampling of each epoch and the NN-Descent initialisation).
+pub const DEFAULT_SEED: u64 = 9999;
+
+fn default_seed() -> u64 {
+    DEFAULT_SEED
+}
+
 // ─── UMAP a, b curve fitting ─────────────────────────────────────────────────
 
 /// Fit the UMAP kernel parameters `a` and `b` from `min_dist` and `spread`.
@@ -367,6 +378,7 @@ impl Default for OptimizationParams {
 /// // Customize specific groups
 /// let config = UmapConfig {
 ///     n_components: 3,
+///     seed: 42, // same data, config and seed => same embedding
 ///     graph: GraphParams {
 ///         n_neighbors: 30,
 ///         ..Default::default()
@@ -401,6 +413,18 @@ pub struct UmapConfig {
 
     /// Optimization configuration.
     pub optimization: OptimizationParams,
+
+    /// Seed for every random generator involved in training: the weight
+    /// initialisation on the backend (`Backend::seed`), the positive and
+    /// negative edge sampling of each epoch and the NN-Descent initialisation.
+    ///
+    /// Two fits with the same data, configuration and seed give the same
+    /// embedding. Before this field existed only the backend was seeded and the
+    /// CPU generators drew from entropy, so two identical runs differed.
+    ///
+    /// Default: 9999 ([`DEFAULT_SEED`])
+    #[serde(default = "default_seed")]
+    pub seed: u64,
 }
 
 impl Default for UmapConfig {
@@ -411,6 +435,7 @@ impl Default for UmapConfig {
             manifold: ManifoldParams::default(),
             graph: GraphParams::default(),
             optimization: OptimizationParams::default(),
+            seed: DEFAULT_SEED,
         }
     }
 }
@@ -477,6 +502,10 @@ pub struct TrainingConfig {
     /// directory.  Set to a writable [`PathBuf`] when the process runs on a
     /// read-only filesystem.
     pub figures_dir: Option<PathBuf>,
+
+    /// Seed for every random generator involved in training. See
+    /// [`UmapConfig::seed`].
+    pub seed: u64,
 }
 
 impl TrainingConfig {
@@ -511,6 +540,7 @@ impl From<&UmapConfig> for TrainingConfig {
             neg_sample_rate: config.optimization.neg_sample_rate,
             cooldown_ms: config.optimization.cooldown_ms,
             figures_dir: config.optimization.figures_dir.clone(),
+            seed: config.seed,
         }
     }
 }
@@ -550,6 +580,7 @@ impl From<&TrainingConfig> for UmapConfig {
                 cooldown_ms: config.cooldown_ms,
                 figures_dir: config.figures_dir.clone(),
             },
+            seed: config.seed,
         }
     }
 }
@@ -582,6 +613,7 @@ pub struct TrainingConfigBuilder {
     neg_sample_rate: Option<usize>,
     cooldown_ms: Option<u64>,
     figures_dir: Option<PathBuf>,
+    seed: Option<u64>,
 }
 
 impl TrainingConfigBuilder {
@@ -690,6 +722,14 @@ impl TrainingConfigBuilder {
         self
     }
 
+    /// Set the seed for every random generator used in training.
+    ///
+    /// See [`UmapConfig::seed`]. Defaults to [`DEFAULT_SEED`].
+    pub fn with_seed(mut self, seed: u64) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
     pub fn build(self) -> Option<TrainingConfig> {
         let defaults = ManifoldParams::default();
         let (kernel_a, kernel_b) = fit_ab(defaults.min_dist, defaults.spread);
@@ -715,6 +755,7 @@ impl TrainingConfigBuilder {
             neg_sample_rate: self.neg_sample_rate.unwrap_or(5),
             cooldown_ms: self.cooldown_ms.unwrap_or(0),
             figures_dir: self.figures_dir,
+            seed: self.seed.unwrap_or(DEFAULT_SEED),
         })
     }
 }

@@ -32,8 +32,10 @@ use super::config::*;
 use crossbeam_channel::Receiver;
 use indicatif::{ProgressBar, ProgressStyle};
 use num::{Float, FromPrimitive, ToPrimitive};
+use rand::rngs::StdRng;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::SeedableRng;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::{thread, time::Instant};
@@ -157,7 +159,7 @@ where
     #[cfg(feature = "nn-descent")]
     if use_nn_descent {
         let data_f32: Vec<f32> = data.iter().map(|x| num::ToPrimitive::to_f32(x).unwrap()).collect();
-        let (idx, _dist) = crate::nn_descent::nn_descent(&data_f32, num_samples, num_features, k);
+        let (idx, _dist) = crate::nn_descent::nn_descent_with_seed(&data_f32, num_samples, num_features, k, config.seed);
         knn_indices = idx;
     } else {
         let hd_pairwise = pairwise_distances(all_data_tensor.clone());
@@ -190,7 +192,7 @@ where
     let n_total = n_pos + n_neg;
 
     // ── Pre-generate fused edge-sample batches on GPU ────────────────────────
-    let mut rng = rand::rng();
+    let mut rng = StdRng::seed_from_u64(config.seed);
 
     let fused_batches: Vec<(Tensor<B, 1, Int>, Tensor<B, 1, Int>, usize, usize)> =
         (0..EDGE_BATCH_COUNT)
